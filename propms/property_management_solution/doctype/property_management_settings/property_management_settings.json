@@ -22,7 +22,9 @@
   "column_break_14",
   "maintenance_item_group",
   "section_break_17",
-  "self_consumption_customer"
+  "self_consumption_customer",
+  "section_break_5djc",
+  "advanced_property_management"
  ],
  "fields": [
   {
@@ -109,12 +111,22 @@
    "fieldname": "invoice_start_date",
    "fieldtype": "Date",
    "label": "Invoice Start Date"
+  },
+  {
+   "default": "0",
+   "fieldname": "advanced_property_management",
+   "fieldtype": "Check",
+   "label": "Advanced Property Management"
+  },
+  {
+   "fieldname": "section_break_5djc",
+   "fieldtype": "Section Break"
   }
  ],
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2021-09-27 12:28:52.887903",
+ "modified": "2022-12-30 16:30:27.573672",
  "modified_by": "Administrator",
  "module": "Property Management Solution",
  "name": "Property Management Settings",
@@ -143,5 +155,6 @@
  ],
  "sort_field": "modified",
  "sort_order": "DESC",
+ "states": [],
  "track_changes": 1
 }

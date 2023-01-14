@@ -1,0 +1,85 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2023-01-05 14:37:21.068921",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "unit_type",
+  "rent_price",
+  "rent_cycle",
+  "property",
+  "room_name",
+  "rentable"
+ ],
+ "fields": [
+  {
+   "fieldname": "unit_type",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_preview": 1,
+   "label": "Unit Type",
+   "options": "Unit Type"
+  },
+  {
+   "fieldname": "rent_price",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "in_preview": 1,
+   "in_standard_filter": 1,
+   "label": "Rent Price",
+   "read_only_depends_on": "eval: doc.rentable == 0"
+  },
+  {
+   "fieldname": "rent_cycle",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_preview": 1,
+   "in_standard_filter": 1,
+   "label": "Rent Cycle",
+   "options": "\nMonthly\nWeekly\nBiweekly",
+   "read_only_depends_on": "eval: doc.rentable == 0"
+  },
+  {
+   "default": "0",
+   "fetch_from": "unit_type.rentable",
+   "fieldname": "rentable",
+   "fieldtype": "Check",
+   "label": "Rentable",
+   "read_only": 1
+  },
+  {
+   "fieldname": "property",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_preview": 1,
+   "in_standard_filter": 1,
+   "label": "Property",
+   "options": "Property",
+   "read_only_depends_on": "eval: doc.rentable == 0"
+  },
+  {
+   "fieldname": "room_name",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_preview": 1,
+   "in_standard_filter": 1,
+   "label": "Room Name",
+   "options": "\nEast\nNorth\nWest\nSouth\nNorth-East\nNorth-West\nSouth-East\nSouth-West",
+   "read_only_depends_on": "eval: doc.rentable == 0"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2023-01-11 18:08:22.553451",
+ "modified_by": "Administrator",
+ "module": "Property Management Solution",
+ "name": "Unit Characteristics",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

@@ -13,6 +13,19 @@ class Property(NestedSet):
     def on_trash(self, allow_root_deletion=True):
         super().on_trash(allow_root_deletion)
 
+    def validate(self):
+        self.address_as_name()
+
+    @frappe.whitelist()
+    def address_as_name(self):
+        if self.advanced_property_management == 1 and not self.name1:
+            if self.type in ["Apartment (Flat)", "House"]:
+                address_doc = frappe.get_doc("Address", self.address)
+                self.name1 = address_doc.address_line1
+                if address_doc.address_line2:
+                    self.name1 = f"{address_doc.address_line1} {address_doc.address_line2}"
+    
+
 
 @frappe.whitelist()
 def add_node():

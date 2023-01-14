@@ -10,9 +10,11 @@
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
+  "advanced_property_management",
   "identification_section",
+  "address",
+  "property_use",
   "name1",
-  "parent_property",
   "is_group",
   "column_break_2",
   "photo",
@@ -23,9 +25,13 @@
   "title_deed_number",
   "type",
   "column_break_9",
+  "room",
   "bedroom",
   "master_bedroom",
   "common_bathroom",
+  "section_break_qdws",
+  "unit_children",
+  "images",
   "section_break_13",
   "builtup_area",
   "carpet_area",
@@ -47,7 +53,8 @@
   "description",
   "lft",
   "rgt",
-  "old_parent"
+  "old_parent",
+  "parent_property"
  ],
  "fields": [
   {
@@ -60,14 +67,10 @@
    "fieldname": "name1",
    "fieldtype": "Data",
    "label": "Name",
+   "mandatory_depends_on": "eval:doc.advanced_property_management == 0;",
+   "read_only_depends_on": "eval:doc.advanced_property_management == 1;",
    "reqd": 1,
    "unique": 1
-  },
-  {
-   "fieldname": "parent_property",
-   "fieldtype": "Link",
-   "label": "Parent property",
-   "options": "Property"
   },
   {
    "fieldname": "column_break_2",
@@ -86,12 +89,14 @@
    "label": "UNIT CHARACTERISTICS"
   },
   {
+   "depends_on": "eval:doc.advanced_property_management == 0;",
    "fieldname": "unit_owner",
    "fieldtype": "Link",
    "label": "Unit Owner",
    "options": "Customer"
   },
   {
+   "depends_on": "eval:doc.advanced_property_management == 0;",
    "fieldname": "title_deed_number",
    "fieldtype": "Data",
    "label": "Title deed number"
@@ -103,20 +108,24 @@
    "options": "Unit Type"
   },
   {
+   "depends_on": "eval:doc.advanced_property_management == 0;",
    "fieldname": "column_break_9",
    "fieldtype": "Column Break"
   },
   {
+   "depends_on": "eval:doc.advanced_property_management == 0;",
    "fieldname": "bedroom",
    "fieldtype": "Int",
    "label": "Bedroom"
   },
   {
+   "depends_on": "eval:doc.advanced_property_management == 0;",
    "fieldname": "master_bedroom",
    "fieldtype": "Int",
    "label": "Master bedroom"
   },
   {
+   "depends_on": "eval:doc.advanced_property_management == 0;",
    "fieldname": "common_bathroom",
    "fieldtype": "Int",
    "label": "Common bathroom"
@@ -277,16 +286,69 @@
    "fieldtype": "Link",
    "label": "Parent property",
    "options": "Property"
+  },
+  {
+   "default": "0",
+   "fieldname": "advanced_property_management",
+   "fieldtype": "Check",
+   "hidden": 1,
+   "label": "Advanced Property Management",
+   "print_hide": 1,
+   "report_hide": 1
+  },
+  {
+   "allow_in_quick_entry": 1,
+   "depends_on": "eval: doc.advanced_property_management == 1",
+   "fieldname": "address",
+   "fieldtype": "Link",
+   "label": "Address",
+   "mandatory_depends_on": "eval: doc.advanced_property_management == 1",
+   "options": "Address"
+  },
+  {
+   "depends_on": "eval: doc.advanced_property_management == 1",
+   "fieldname": "property_use",
+   "fieldtype": "Select",
+   "label": "Property Use",
+   "mandatory_depends_on": "eval: doc.advanced_property_management == 1",
+   "options": "Rent-To-Rent Shared Living (HMO)"
+  },
+  {
+   "depends_on": "eval: doc.advanced_property_management == 1",
+   "fieldname": "unit_children",
+   "fieldtype": "Table",
+   "label": "Characteristics",
+   "options": "Unit Characteristics"
+  },
+  {
+   "fieldname": "section_break_qdws",
+   "fieldtype": "Section Break"
+  },
+  {
+   "default": "0",
+   "depends_on": "eval: doc.advanced_property_management == 1 && doc.room == 1",
+   "fetch_from": "type.room",
+   "fieldname": "room",
+   "fieldtype": "Check",
+   "label": "Room"
+  },
+  {
+   "depends_on": "eval: doc.advanced_property_management == 1",
+   "fieldname": "images",
+   "fieldtype": "Table",
+   "label": "Images",
+   "options": "Property Image"
   }
  ],
  "icon": "octicon octicon-home",
  "image_field": "photo",
  "is_tree": 1,
  "links": [],
- "modified": "2021-12-29 14:57:26.678556",
+ "modified": "2023-01-13 20:56:33.838311",
  "modified_by": "Administrator",
  "module": "Property Management Solution",
  "name": "Property",
+ "naming_rule": "By fieldname",
  "nsm_parent_field": "parent_property",
  "owner": "Administrator",
  "permissions": [
@@ -368,5 +430,6 @@
  ],
  "sort_field": "modified",
  "sort_order": "DESC",
+ "states": [],
  "track_changes": 1
 }
