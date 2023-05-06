@@ -15,16 +15,26 @@ class Property(NestedSet):
 
     def validate(self):
         self.address_as_name()
+        self.status_as_common_area()
 
     @frappe.whitelist()
     def address_as_name(self):
         if self.advanced_property_management == 1 and not self.name1:
-            if self.type in ["Apartment (Flat)", "House"]:
-                address_doc = frappe.get_doc("Address", self.address)
-                self.name1 = address_doc.address_line1
-                if address_doc.address_line2:
-                    self.name1 = f"{address_doc.address_line1} {address_doc.address_line2}"
-    
+            if self.type and self.address:
+                type_doc = frappe.get_doc("Unit Type", self.type)
+                print(type_doc.room)
+                if not type_doc.room:
+                    address_doc = frappe.get_doc("Address", self.address)
+                    self.name1 = address_doc.address_line1
+                    if address_doc.address_line2:
+                        self.name1 = f"{address_doc.address_line1} {address_doc.address_line2}"
+
+    @frappe.whitelist()
+    def status_as_common_area(self):
+        if self.advanced_property_management == 1 and self.rentable == 0:
+            self.status = "Common Area (Not for lease)"
+        elif self.advanced_property_management == 1 and self.rentable == 1 and self.status == "Common Area (Not for lease)":
+            self.status = "Available"
 
 
 @frappe.whitelist()

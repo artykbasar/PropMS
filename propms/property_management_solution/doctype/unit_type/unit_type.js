@@ -6,7 +6,6 @@ frappe.ui.form.on('Unit Type', {
 	after_save: function (frm) {
 		if (frm.doc.name != frm.doc.unit_type) {
 			frappe.set_route('Form', frm.doc.doctype, frm.doc.unit_type)
-			console.log("I am here bro")
 		}
 	},
 	refresh: function (frm) {
@@ -22,6 +21,9 @@ frappe.ui.form.on('Unit Type', {
 		name_fetcher(frm)
 	},
 	rentable: function (frm) {
+		name_fetcher(frm)
+	},
+	rented: function (frm) {
 		name_fetcher(frm)
 	},
 

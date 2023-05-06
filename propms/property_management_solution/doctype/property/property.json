@@ -26,9 +26,13 @@
   "type",
   "column_break_9",
   "room",
+  "rentable",
+  "rented",
   "bedroom",
   "master_bedroom",
   "common_bathroom",
+  "column_break_kiwj",
+  "room_name",
   "section_break_qdws",
   "unit_children",
   "images",
@@ -163,12 +167,14 @@
    "fieldtype": "Column Break"
   },
   {
+   "depends_on": "eval: (doc.advanced_property_management == 0) || (doc.advanced_property_management == 1 && doc.rentable == 1)",
    "fieldname": "rent",
    "fieldtype": "Currency",
    "label": "Rent",
    "permlevel": 2
   },
   {
+   "depends_on": "eval: (doc.advanced_property_management == 0) || (doc.advanced_property_management == 1 && doc.rentable == 1)",
    "fieldname": "security_deposit",
    "fieldtype": "Currency",
    "label": "Security Deposit",
@@ -190,7 +196,8 @@
    "fieldname": "status",
    "fieldtype": "Select",
    "label": "Status",
-   "options": "Available\nBooked\nCommon Area (Not for lease)\nManaged for Customer\nOff Lease in 3 Months\nOn Lease\nOn Sale\nRemoved\nRenewal\nSold\nVacating\nOn lease"
+   "options": "Available\nBooked\nCommon Area (Not for lease)\nManaged for Customer\nOff Lease in 3 Months\nOn Lease\nOn Sale\nRemoved\nRenewal\nSold\nVacating\nOn lease",
+   "read_only_depends_on": "eval: doc.advanced_property_management == 1 && doc.rentable == 0"
   },
   {
    "bold": 1,
@@ -338,13 +345,42 @@
    "fieldtype": "Table",
    "label": "Images",
    "options": "Property Image"
+  },
+  {
+   "default": "0",
+   "depends_on": "eval: doc.advanced_property_management == 1 && doc.rentable == 1",
+   "fetch_from": "type.rentable",
+   "fieldname": "rentable",
+   "fieldtype": "Check",
+   "label": "Rentable"
+  },
+  {
+   "depends_on": "eval: doc.advanced_property_management == 1 && doc.room == 1",
+   "fieldname": "column_break_kiwj",
+   "fieldtype": "Column Break",
+   "hidden": 1
+  },
+  {
+   "depends_on": "eval: doc.advanced_property_management == 1 && doc.room == 1 && doc.rentable == 1",
+   "fieldname": "room_name",
+   "fieldtype": "Link",
+   "label": "Room Name",
+   "options": "Property Room Names"
+  },
+  {
+   "default": "0",
+   "depends_on": "eval: doc.advanced_property_management == 1 && doc.rented == 1",
+   "fetch_from": "type.rented",
+   "fieldname": "rented",
+   "fieldtype": "Check",
+   "label": "Rented"
   }
  ],
  "icon": "octicon octicon-home",
  "image_field": "photo",
  "is_tree": 1,
  "links": [],
- "modified": "2023-01-13 20:56:33.838311",
+ "modified": "2023-01-29 19:15:51.828390",
  "modified_by": "Administrator",
  "module": "Property Management Solution",
  "name": "Property",

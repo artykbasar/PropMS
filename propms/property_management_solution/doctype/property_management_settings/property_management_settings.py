@@ -35,7 +35,7 @@ class PropertyManagementSettings(Document):
         cus_doc.fetch_to_customize()
         new_cus_doc_field_list = []
         for row in cus_doc.fields:
-            if row.fieldname in ["rentable", "room", "balcony", "showerbath", "toilet"]:
+            if row.fieldname in ["rentable", "room", "balcony", "showerbath", "toilet", "rented"]:
                 row.hidden = 0 if self.advanced_property_management == 1 else 1
                 row.in_list_view = self.advanced_property_management
                 row.in_standard_filter = self.advanced_property_management

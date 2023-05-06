@@ -14,7 +14,8 @@
   "showerbath",
   "toilet",
   "column_break_slfs",
-  "rentable"
+  "rentable",
+  "rented"
  ],
  "fields": [
   {
@@ -84,10 +85,18 @@
    "in_list_view": 1,
    "in_standard_filter": 1,
    "label": "Toilet"
+  },
+  {
+   "default": "0",
+   "description": "Tick it, if this unit is being rented from a landlord/landlady.",
+   "fieldname": "rented",
+   "fieldtype": "Check",
+   "hidden": 1,
+   "label": "Rented"
   }
  ],
  "links": [],
- "modified": "2023-01-09 19:15:09.163664",
+ "modified": "2023-01-26 19:22:12.503501",
  "modified_by": "Administrator",
  "module": "Property Management Solution",
  "name": "Unit Type",

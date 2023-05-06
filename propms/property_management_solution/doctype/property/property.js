@@ -14,6 +14,15 @@ frappe.ui.form.on('Property', {
 			};
 		});
 
+		frm.set_query("rent_uom", "unit_children", function () {
+			return {
+				filters: {
+					uom_name: ['in', ["Day", "Week", "Month", "Year"]]
+				}
+			}
+
+		})
+
 		frm.set_query("parent_property", { is_group: 1 });
 	},
 	company: function (frm) {
@@ -25,6 +34,7 @@ frappe.ui.form.on('Property', {
 	},
 	type: function (frm) {
 		name_fetcher(frm)
+		// status_fetcher(frm)
 
 	}
 });
@@ -34,7 +44,7 @@ frappe.ui.form.on('Property', {
 frappe.ui.form.on('Unit Characteristics', {
 	unit_type: function (frm, cdt, cdn) {
 		read_only_setter_rows(frm)
-	},
+	}
 });
 
 function read_only_setter_rows(frm) {
@@ -47,7 +57,7 @@ function read_only_setter_rows(frm) {
 				}
 				if (!(row.on_grid_fields_dict.rentable.value == 1)) {
 					row.get_field("rent_price").set_value()
-					row.get_field("rent_cycle").set_value()
+					row.get_field("rent_uom").set_value()
 					row.get_field("property").set_value()
 					row.get_field("room_name").set_value()
 				}
@@ -67,7 +77,7 @@ function read_only_setter_row(frm, cdt, cdn) {
 			}
 		} else {
 			row.get_field("rent_price").set_value()
-			row.get_field("rent_cycle").set_value()
+			row.get_field("rent_uom").set_value()
 			row.get_field("property").set_value()
 		}
 	});
@@ -83,6 +93,20 @@ function name_fetcher(frm) {
 			callback: function (r) {
 				if (r.docs[0].name1) {
 					frm.set_value("name1", r.docs[0].name1)
+				}
+			}
+		});
+	}
+}
+function status_fetcher(frm) {
+	if (frm.doc.advanced_property_management == 1 && frm.doc.type) {
+		return frm.call({
+			method: "status_as_common_area",
+			doc: frm.doc,
+			freeze: false,
+			callback: function (r) {
+				if (r.docs[0].status) {
+					frm.set_value("status", r.docs[0].status)
 				}
 			}
 		});

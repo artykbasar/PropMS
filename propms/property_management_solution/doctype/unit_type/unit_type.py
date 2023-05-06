@@ -36,4 +36,9 @@ class UnitType(Document):
         elif self.rentable == 0:
             new_name = str(new_name).replace("-Rentable", "")
         self.unit_type = new_name
+        if self.rented and "Rented" not in self.unit_type:
+            new_name = f"{new_name}-Rented"
+        elif self.rented == 0:
+            new_name = str(new_name).replace("-Rented", "")
+        self.unit_type = new_name
         self.new_name = new_name

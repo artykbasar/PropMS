@@ -5,5 +5,5 @@
 from frappe.tests.utils import FrappeTestCase
 
 
-class TestPropertyRoomTypes(FrappeTestCase):
+class TestPropertyRoomNames(FrappeTestCase):
 	pass
