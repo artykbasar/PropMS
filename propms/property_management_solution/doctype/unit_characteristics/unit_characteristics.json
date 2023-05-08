@@ -12,11 +12,13 @@
   "column_break_fqjy",
   "rent_price",
   "rent_uom",
+  "security_deposit_period",
   "security_deposit",
   "rentable"
  ],
  "fields": [
   {
+   "columns": 2,
    "fieldname": "unit_type",
    "fieldtype": "Link",
    "in_list_view": 1,
@@ -25,6 +27,7 @@
    "options": "Unit Type"
   },
   {
+   "columns": 1,
    "fieldname": "rent_price",
    "fieldtype": "Currency",
    "in_list_view": 1,
@@ -42,6 +45,7 @@
    "read_only": 1
   },
   {
+   "columns": 2,
    "fieldname": "property",
    "fieldtype": "Link",
    "in_list_view": 1,
@@ -52,16 +56,19 @@
    "read_only_depends_on": "eval: doc.rentable == 0"
   },
   {
+   "columns": 1,
    "fieldname": "room_name",
    "fieldtype": "Link",
    "in_list_view": 1,
    "in_preview": 1,
    "in_standard_filter": 1,
    "label": "Room Name",
+   "mandatory_depends_on": "eval: doc.rentable == 1",
    "options": "Property Room Names",
    "read_only_depends_on": "eval: doc.rentable == 0"
   },
   {
+   "columns": 1,
    "fieldname": "rent_uom",
    "fieldtype": "Link",
    "in_list_view": 1,
@@ -76,12 +83,24 @@
    "fieldtype": "Column Break"
   },
   {
+   "columns": 1,
    "fieldname": "security_deposit",
-   "fieldtype": "Select",
+   "fieldtype": "Currency",
    "in_list_view": 1,
    "in_preview": 1,
    "in_standard_filter": 1,
    "label": "Security Deposit",
+   "precision": "2",
+   "read_only_depends_on": "eval: (doc.rentable == 0 && doc.security_deposit_period != 'custom')"
+  },
+  {
+   "columns": 1,
+   "fieldname": "security_deposit_period",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_preview": 1,
+   "in_standard_filter": 1,
+   "label": "Security Deposit Period",
    "options": "\n1 Week\n2 Weeks\n3 Weeks\n4 Weeks\n5 Weeks\n6 Weeks\n1 Month\n2 Months\n3 Months\nCustom",
    "read_only_depends_on": "eval: doc.rentable == 0"
   }
@@ -89,7 +108,7 @@
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2023-01-29 19:56:55.375879",
+ "modified": "2023-05-08 01:35:24.751570",
  "modified_by": "Administrator",
  "module": "Property Management Solution",
  "name": "Unit Characteristics",

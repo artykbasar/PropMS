@@ -13,7 +13,6 @@
   "advanced_property_management",
   "identification_section",
   "address",
-  "property_use",
   "name1",
   "is_group",
   "column_break_2",
@@ -43,7 +42,9 @@
   "no_of_parking",
   "column_break_18",
   "rent",
+  "rent_uom",
   "security_deposit",
+  "security_deposit_period",
   "smoking",
   "furnished",
   "status",
@@ -178,7 +179,8 @@
    "fieldname": "security_deposit",
    "fieldtype": "Currency",
    "label": "Security Deposit",
-   "permlevel": 2
+   "permlevel": 2,
+   "read_only_depends_on": "eval: (doc.advanced_property_management == 1 && doc.security_deposit_period != \"Custom\")"
   },
   {
    "default": "0",
@@ -314,14 +316,6 @@
   },
   {
    "depends_on": "eval: doc.advanced_property_management == 1",
-   "fieldname": "property_use",
-   "fieldtype": "Select",
-   "label": "Property Use",
-   "mandatory_depends_on": "eval: doc.advanced_property_management == 1",
-   "options": "Rent-To-Rent Shared Living (HMO)"
-  },
-  {
-   "depends_on": "eval: doc.advanced_property_management == 1",
    "fieldname": "unit_children",
    "fieldtype": "Table",
    "label": "Characteristics",
@@ -365,6 +359,7 @@
    "fieldname": "room_name",
    "fieldtype": "Link",
    "label": "Room Name",
+   "mandatory_depends_on": "eval: doc.advanced_property_management == 1 && doc.room == 1 && doc.rentable == 1",
    "options": "Property Room Names"
   },
   {
@@ -374,13 +369,27 @@
    "fieldname": "rented",
    "fieldtype": "Check",
    "label": "Rented"
+  },
+  {
+   "depends_on": "eval: doc.advanced_property_management == 1 && doc.room == 1 && doc.rentable == 1",
+   "fieldname": "rent_uom",
+   "fieldtype": "Link",
+   "label": "Rent UOM",
+   "options": "UOM"
+  },
+  {
+   "depends_on": "eval: (doc.advanced_property_management == 1 && doc.rentable == 1)",
+   "fieldname": "security_deposit_period",
+   "fieldtype": "Select",
+   "label": "Security Deposit Period",
+   "options": "\n1 Week\n2 Weeks\n3 Weeks\n4 Weeks\n5 Weeks\n6 Weeks\n1 Month\n2 Months\n3 Months\nCustom"
   }
  ],
  "icon": "octicon octicon-home",
  "image_field": "photo",
  "is_tree": 1,
  "links": [],
- "modified": "2023-01-29 19:15:51.828390",
+ "modified": "2023-05-08 02:18:37.187584",
  "modified_by": "Administrator",
  "module": "Property Management Solution",
  "name": "Property",

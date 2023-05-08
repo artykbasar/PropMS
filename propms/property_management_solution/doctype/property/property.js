@@ -22,6 +22,22 @@ frappe.ui.form.on('Property', {
 			}
 
 		})
+		frm.set_query("rent_uom", function () {
+			return {
+				filters: {
+					uom_name: ['in', ["Day", "Week", "Month", "Year"]]
+				}
+			}
+
+		})
+
+		frm.set_query("property", "unit_children", function () {
+			return {
+				filters: {
+					parent_property: frm.doc.name1
+				}
+			}
+		})
 
 		frm.set_query("parent_property", { is_group: 1 });
 	},
@@ -32,10 +48,19 @@ frappe.ui.form.on('Property', {
 		name_fetcher(frm)
 
 	},
+	room_name: function (frm) {
+		name_fetcher(frm)
+
+	},
 	type: function (frm) {
 		name_fetcher(frm)
 		// status_fetcher(frm)
 
+	},
+	after_save: function (frm) {
+		if (frm.doc.name != frm.doc.name1) {
+			frappe.set_route('Form', frm.doc.doctype, frm.doc.name1)
+		}
 	}
 });
 
