@@ -91,24 +91,24 @@
    "in_standard_filter": 1,
    "label": "Security Deposit",
    "precision": "2",
-   "read_only_depends_on": "eval: (doc.rentable == 0 && doc.security_deposit_period != 'custom')"
+   "read_only_depends_on": "eval: doc.security_deposit_period != 'Custom'"
   },
   {
    "columns": 1,
    "fieldname": "security_deposit_period",
-   "fieldtype": "Select",
+   "fieldtype": "Link",
    "in_list_view": 1,
    "in_preview": 1,
    "in_standard_filter": 1,
    "label": "Security Deposit Period",
-   "options": "\n1 Week\n2 Weeks\n3 Weeks\n4 Weeks\n5 Weeks\n6 Weeks\n1 Month\n2 Months\n3 Months\nCustom",
+   "options": "UOM",
    "read_only_depends_on": "eval: doc.rentable == 0"
   }
  ],
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2023-05-08 01:35:24.751570",
+ "modified": "2023-06-13 14:30:12.583240",
  "modified_by": "Administrator",
  "module": "Property Management Solution",
  "name": "Unit Characteristics",

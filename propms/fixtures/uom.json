@@ -1,0 +1,110 @@
+[
+ {
+  "docstatus": 0,
+  "doctype": "UOM",
+  "enabled": 1,
+  "modified": "2022-04-04 13:29:21.903962",
+  "must_be_whole_number": 0,
+  "name": "Day",
+  "uom_name": "Day"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "UOM",
+  "enabled": 1,
+  "modified": "2022-04-04 13:29:21.963903",
+  "must_be_whole_number": 0,
+  "name": "Week",
+  "uom_name": "Week"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "UOM",
+  "enabled": 1,
+  "modified": "2022-06-22 19:54:10.401049",
+  "must_be_whole_number": 0,
+  "name": "Month",
+  "uom_name": "Month"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "UOM",
+  "enabled": 1,
+  "modified": "2023-06-13 14:10:25.362681",
+  "must_be_whole_number": 0,
+  "name": "1 Week",
+  "uom_name": "1 Week"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "UOM",
+  "enabled": 1,
+  "modified": "2023-06-13 14:13:23.504599",
+  "must_be_whole_number": 0,
+  "name": "2 Weeks",
+  "uom_name": "2 Weeks"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "UOM",
+  "enabled": 1,
+  "modified": "2023-06-13 14:15:59.342555",
+  "must_be_whole_number": 0,
+  "name": "3 Weeks",
+  "uom_name": "3 Weeks"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "UOM",
+  "enabled": 1,
+  "modified": "2023-06-13 14:16:18.889918",
+  "must_be_whole_number": 0,
+  "name": "4 Weeks",
+  "uom_name": "4 Weeks"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "UOM",
+  "enabled": 1,
+  "modified": "2023-06-13 14:16:46.150870",
+  "must_be_whole_number": 0,
+  "name": "6 Weeks",
+  "uom_name": "6 Weeks"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "UOM",
+  "enabled": 1,
+  "modified": "2023-06-13 14:16:59.956663",
+  "must_be_whole_number": 0,
+  "name": "5 Weeks",
+  "uom_name": "5 Weeks"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "UOM",
+  "enabled": 1,
+  "modified": "2023-06-13 14:18:19.917374",
+  "must_be_whole_number": 0,
+  "name": "1 Month",
+  "uom_name": "1 Month"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "UOM",
+  "enabled": 1,
+  "modified": "2023-06-13 14:26:46.853076",
+  "must_be_whole_number": 0,
+  "name": "Custom",
+  "uom_name": "Custom"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "UOM",
+  "enabled": 1,
+  "modified": "2023-06-14 21:20:45.613243",
+  "must_be_whole_number": 0,
+  "name": "Year",
+  "uom_name": "Year"
+ }
+]
