@@ -130,6 +130,54 @@ fixtures = [
         ],
     },
     {
+        "doctype": "UOM Category",
+        "filters": [
+            [
+                "name",
+                "in",
+                (
+                    "Rent"
+                )
+            ]
+        ]
+    },
+    {
+        "doctype": "UOM",
+        "filters": [
+            [
+                "name",
+                "in",
+                (
+                    "Week",
+                    "Day",
+                    "Month",
+                    "Year",
+                    "Custom",
+                    "1 Month",
+                    "6 Weeks",
+                    "5 Weeks",
+                    "4 Weeks",
+                    "3 Weeks",
+                    "2 Weeks",
+                    "1 Week"
+
+                )
+            ]
+        ]
+    },
+    {
+        "doctype": "UOM Conversion Factor",
+        "filters": [
+            [
+                "from_uom",
+                "in",
+                (
+                    "Week"
+                )
+            ]
+        ]
+    },
+    {
         "doctype": "Property Setter",
         "filters": [
             [

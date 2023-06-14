@@ -137,7 +137,6 @@
   },
   {
    "bold": 1,
-   "collapsible": 1,
    "fieldname": "section_break_13",
    "fieldtype": "Section Break",
    "label": "UNIT DETAILS"
@@ -203,7 +202,6 @@
   },
   {
    "bold": 1,
-   "collapsible": 1,
    "fieldname": "section_break_22",
    "fieldtype": "Section Break",
    "label": "MORE INFORMATION"
@@ -315,7 +313,7 @@
    "options": "Address"
   },
   {
-   "depends_on": "eval: doc.advanced_property_management == 1",
+   "depends_on": "eval: doc.advanced_property_management == 1 && doc.creation != undefined",
    "fieldname": "unit_children",
    "fieldtype": "Table",
    "label": "Characteristics",
@@ -380,16 +378,16 @@
   {
    "depends_on": "eval: (doc.advanced_property_management == 1 && doc.rentable == 1)",
    "fieldname": "security_deposit_period",
-   "fieldtype": "Select",
+   "fieldtype": "Link",
    "label": "Security Deposit Period",
-   "options": "\n1 Week\n2 Weeks\n3 Weeks\n4 Weeks\n5 Weeks\n6 Weeks\n1 Month\n2 Months\n3 Months\nCustom"
+   "options": "UOM"
   }
  ],
  "icon": "octicon octicon-home",
  "image_field": "photo",
  "is_tree": 1,
  "links": [],
- "modified": "2023-05-08 02:18:37.187584",
+ "modified": "2023-06-14 07:44:15.469777",
  "modified_by": "Administrator",
  "module": "Property Management Solution",
  "name": "Property",

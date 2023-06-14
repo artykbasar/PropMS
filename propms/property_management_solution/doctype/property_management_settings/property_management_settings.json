@@ -24,7 +24,11 @@
   "section_break_17",
   "self_consumption_customer",
   "section_break_5djc",
-  "advanced_property_management"
+  "advanced_property_management",
+  "section_break_ubgp",
+  "default_rent_uom",
+  "column_break_pfvd",
+  "default_security_deposit_period"
  ],
  "fields": [
   {
@@ -121,12 +125,37 @@
   {
    "fieldname": "section_break_5djc",
    "fieldtype": "Section Break"
+  },
+  {
+   "default": "Week",
+   "depends_on": "eval: doc.advanced_property_management == 1",
+   "fetch_if_empty": 1,
+   "fieldname": "default_rent_uom",
+   "fieldtype": "Link",
+   "label": "Default Rent UOM",
+   "options": "UOM"
+  },
+  {
+   "default": "1 Month",
+   "depends_on": "eval: doc.advanced_property_management == 1",
+   "fieldname": "default_security_deposit_period",
+   "fieldtype": "Link",
+   "label": "Default Security Deposit Period",
+   "options": "UOM"
+  },
+  {
+   "fieldname": "column_break_pfvd",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "section_break_ubgp",
+   "fieldtype": "Section Break"
   }
  ],
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2022-12-30 16:30:27.573672",
+ "modified": "2023-06-13 14:30:53.697366",
  "modified_by": "Administrator",
  "module": "Property Management Solution",
  "name": "Property Management Settings",

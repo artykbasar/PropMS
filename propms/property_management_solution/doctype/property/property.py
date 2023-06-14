@@ -15,11 +15,14 @@ class Property(NestedSet):
 
     def validate(self):
         self.address_as_name()
+        self.cost_center_validation()
         self.status_as_common_area()
         self.automatic_group_node()
+        self.check_child_nodes()
+        self.default_value_fetcher()
+        self.security_deposit_amount_setter()
 
     def on_update(self):
-        self.check_child_nodes()
         self.validate_rename()
 
     def validate_rename(self):
@@ -31,17 +34,18 @@ class Property(NestedSet):
     def check_child_nodes(self):
         if self.advanced_property_management == 1:
             if self.unit_children:
-                save_status = False
                 rentable_status = False
-                for each_row in self.unit_children:
+                rentable_rows = []
+                cleaned_rows = []
+                for index, each_row in enumerate(self.unit_children):
                     if each_row.rentable == 1:
                         rentable_status = True
+                        rentable_rows.append(index)
                         if not each_row.property:
                             for each_child_node in self.get_children():
                                 if each_child_node.room_name == each_row.room_name:
                                     each_row.property = each_child_node.name
                                     self.sync_parent_each_row_to_child(each_row, each_child_node)
-                                    save_status = True
                             if not each_row.property:
                                 new_doc = frappe.new_doc("Property")
                                 new_doc.address = self.address
@@ -59,13 +63,11 @@ class Property(NestedSet):
                                 new_doc.address_as_name()
                                 new_doc.save()
                                 each_row.property = new_doc.name
-                                save_status = True
                         else:
                             child_doc = frappe.get_doc("Property", each_row.property)
                             self.sync_parent_each_row_to_child(each_row, child_doc)
-                if save_status:
-                    self.save()
-                    self.reload()
+                    else:
+                        cleaned_rows.append(each_row)
                 if not rentable_status:
                     self.remove_all_child_nodes()
                 else:
@@ -76,6 +78,9 @@ class Property(NestedSet):
                                 child_node_used = True
                         if not child_node_used:
                             each_child_node.delete()
+                    
+                    self.unit_children = cleaned_rows
+                        
             else:
                 self.remove_all_child_nodes()
 
@@ -108,15 +113,61 @@ class Property(NestedSet):
         if each_row.security_deposit_period != child_doc.security_deposit_period:
             child_doc.security_deposit_period = each_row.security_deposit_period
             save_status = True
-        if each_row.security_deposit != each_row.security_deposit:
+        if each_row.security_deposit != child_doc.security_deposit:
             child_doc.security_deposit = each_row.security_deposit
             save_status = True
         if save_status:
             child_doc.save()
                     
     def remove_all_child_nodes(self):
-        for each_child_node in self.get_children():
-            each_child_node.delete()
+        if self.advanced_property_management == 1:
+            for each_child_node in self.get_children():
+                each_child_node.delete()
+            
+
+    @frappe.whitelist()
+    def security_deposit_amount_setter(self, rent_price=None, rent_uom=None, security_deposit_period=None, call=None):
+        if self.advanced_property_management == 1:
+            if not rent_price:
+                rent_price = self.rent
+            if not rent_uom:
+                rent_uom = self.rent_uom
+            if not security_deposit_period:
+                security_deposit_period = self.security_deposit_period
+            if rent_price and rent_uom and (security_deposit_period != "Custom" or not security_deposit_period):
+                uom_conversion_factor_weekly = frappe.db.get_value(
+                    "UOM Conversion Factor",
+                    {"from_uom": "Week", 
+                        "to_uom": rent_uom,
+                        "category": "Time"},
+                    "value")
+                weekly_rent_price = rent_price * uom_conversion_factor_weekly
+                uom_conversion_factor_rent = frappe.db.get_value(
+                    "UOM Conversion Factor",
+                    {"from_uom": "Week", 
+                        "to_uom": security_deposit_period,
+                        "category": "Rent"},
+                    "value")
+                security_deposit_amount = weekly_rent_price * uom_conversion_factor_rent
+                if call:
+                    return security_deposit_amount
+                else:
+                    self.security_deposit = security_deposit_amount
+            else:
+                self.security_deposit = 0
+
+    @frappe.whitelist()
+    def default_value_fetcher(self, call=False):
+        if self.advanced_property_management == 1:
+            return_value = {"default_rent_uom": frappe.db.get_single_value('Property Management Settings', 'default_rent_uom'),
+                            "default_security_deposit_period": frappe.db.get_single_value('Property Management Settings', 'default_security_deposit_period')}
+            if not call:
+                if not self.rent_uom and self.rentable:
+                    self.rent_uom = return_value["default_rent_uom"]
+                if not self.security_deposit_period and self.rentable:
+                    self.security_deposit_period = return_value["default_security_deposit_period"]
+            else:
+                return return_value
 
     @frappe.whitelist()
     def address_as_name(self):
@@ -148,6 +199,48 @@ class Property(NestedSet):
         elif self.advanced_property_management == 1 and self.rentable == 1 and self.status == "Common Area (Not for lease)":
             self.status = "Available"
 
+    @frappe.whitelist()
+    def cost_center_validation(self):
+        if self.advanced_property_management == 1:
+            if self.address and self.company and not self.cost_center:
+                address_doc = frappe.get_doc("Address", self.address)
+                if address_doc.address_line2:
+                    cost_center_name = f"{address_doc.address_line1} {address_doc.address_line2}"
+                else:
+                    cost_center_name = address_doc.address_line1
+                cost_center_doc_name = frappe.db.get_value("Cost Center", 
+                                                        {"cost_center_name": cost_center_name, 
+                                                            "company": self.company})
+                if cost_center_doc_name:
+                    self.cost_center = cost_center_doc_name
+                else:
+                    parent_cost_center_doc_name = frappe.db.get_value("Cost Center", 
+                                                                    {"cost_center_name": self.company, 
+                                                                    "company": self.company})
+                    new_cost_center = frappe.new_doc("Cost Center")
+                    new_cost_center.cost_center_name = cost_center_name
+                    new_cost_center.company = self.company
+                    new_cost_center.parent_cost_center = parent_cost_center_doc_name
+                    new_cost_center.save()
+                    self.cost_center = new_cost_center.name
+
+
+    @frappe.whitelist()
+    def show_child_nodes_as_row(self):
+        new_rows = self.get_children()
+        if new_rows:
+            for new_row in new_rows:
+                self.append("unit_children", {
+                    "unit_type": new_row.type,
+                    "property": new_row.name,
+                    "room_name": new_row.room_name,
+                    "rent_price": new_row.rent,
+                    "rent_uom": new_row.rent_uom,
+                    "security_deposit_period": new_row.security_deposit_period,
+                    "security_deposit": new_row.security_deposit,
+                    "rentable": 1
+                })
+
     def automatic_group_node(self):
         if self.advanced_property_management == 1:
             rentable = 0
@@ -172,3 +265,18 @@ def add_node():
     doc = frappe.get_doc(args)
 
     doc.save()
+
+@frappe.whitelist()
+def security_deposit_period_filter(self, txt, searchfield, start, page_len, filters):
+    print(self, txt, searchfield, start, page_len, filters)
+    filters = {'category': 'Rent'}
+    if txt:
+        filters['to_uom'] = ['like', f'%{txt}%']
+
+    return frappe.db.get_list('UOM Conversion Factor',
+                        filters=filters,
+                        fields=['to_uom'],
+                        start=start,
+                        page_length=page_len,
+                        as_list=True
+                        )

@@ -1,0 +1,122 @@
+[
+ {
+  "category": "Time",
+  "docstatus": 0,
+  "doctype": "UOM Conversion Factor",
+  "from_uom": "Week",
+  "modified": "2023-06-08 21:43:27.869471",
+  "name": "MAT-UOM-CNV-00241",
+  "to_uom": "Day",
+  "value": 7.0
+ },
+ {
+  "category": "Time",
+  "docstatus": 0,
+  "doctype": "UOM Conversion Factor",
+  "from_uom": "Week",
+  "modified": "2023-06-08 22:07:30.245291",
+  "name": "MAT-UOM-CNV-00242",
+  "to_uom": "Month",
+  "value": 0.230769231
+ },
+ {
+  "category": "Time",
+  "docstatus": 0,
+  "doctype": "UOM Conversion Factor",
+  "from_uom": "Week",
+  "modified": "2023-06-13 14:07:14.832509",
+  "name": "MAT-UOM-CNV-00243",
+  "to_uom": "Week",
+  "value": 1.0
+ },
+ {
+  "category": "Rent",
+  "docstatus": 0,
+  "doctype": "UOM Conversion Factor",
+  "from_uom": "Week",
+  "modified": "2023-06-13 14:11:13.515983",
+  "name": "MAT-UOM-CNV-00244",
+  "to_uom": "1 Week",
+  "value": 1.0
+ },
+ {
+  "category": "Rent",
+  "docstatus": 0,
+  "doctype": "UOM Conversion Factor",
+  "from_uom": "Week",
+  "modified": "2023-06-13 14:14:38.708981",
+  "name": "MAT-UOM-CNV-00245",
+  "to_uom": "2 Weeks",
+  "value": 2.0
+ },
+ {
+  "category": "Rent",
+  "docstatus": 0,
+  "doctype": "UOM Conversion Factor",
+  "from_uom": "Week",
+  "modified": "2023-06-13 14:21:00.231506",
+  "name": "MAT-UOM-CNV-00246",
+  "to_uom": "3 Weeks",
+  "value": 3.0
+ },
+ {
+  "category": "Rent",
+  "docstatus": 0,
+  "doctype": "UOM Conversion Factor",
+  "from_uom": "Week",
+  "modified": "2023-06-13 14:22:27.902115",
+  "name": "MAT-UOM-CNV-00247",
+  "to_uom": "4 Weeks",
+  "value": 4.0
+ },
+ {
+  "category": "Rent",
+  "docstatus": 0,
+  "doctype": "UOM Conversion Factor",
+  "from_uom": "Week",
+  "modified": "2023-06-13 14:22:38.636081",
+  "name": "MAT-UOM-CNV-00248",
+  "to_uom": "5 Weeks",
+  "value": 5.0
+ },
+ {
+  "category": "Rent",
+  "docstatus": 0,
+  "doctype": "UOM Conversion Factor",
+  "from_uom": "Week",
+  "modified": "2023-06-13 14:22:50.082943",
+  "name": "MAT-UOM-CNV-00249",
+  "to_uom": "6 Weeks",
+  "value": 6.0
+ },
+ {
+  "category": "Rent",
+  "docstatus": 0,
+  "doctype": "UOM Conversion Factor",
+  "from_uom": "Week",
+  "modified": "2023-06-13 14:23:06.159897",
+  "name": "MAT-UOM-CNV-00250",
+  "to_uom": "1 Month",
+  "value": 4.333333333
+ },
+ {
+  "category": "Rent",
+  "docstatus": 0,
+  "doctype": "UOM Conversion Factor",
+  "from_uom": "Week",
+  "modified": "2023-06-13 14:26:51.414173",
+  "name": "MAT-UOM-CNV-00251",
+  "to_uom": "Custom",
+  "value": 1.0
+ },
+ {
+  "category": "Time",
+  "docstatus": 0,
+  "doctype": "UOM Conversion Factor",
+  "from_uom": "Week",
+  "modified": "2023-06-14 21:36:48.139053",
+  "name": "MAT-UOM-CNV-00252",
+  "to_uom": "Year",
+  "value": 0.019230769
+ }
+]
