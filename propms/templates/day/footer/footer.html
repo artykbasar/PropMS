@@ -1,0 +1,26 @@
+<footer class="web-footer" id="footer">
+	<div class="footer-top">
+		<div class="container">
+			<div class="row">
+				
+				
+				{% include "templates/day/footer/footer_info.html" %}
+				{% if footer_items -%}
+				{% include "templates/day/footer/footer_grouped_links.html" %}
+				{% endif %}
+				
+				{% include "templates/day/footer/footer_links.html" %}
+				{% include "templates/day/footer/footer_extension.html" %}
+			</div>
+		{% if copyright %}
+			<div class="container">
+				<div class="copyright">
+					&copy; Copyright {{ copyright }}. All Rights Reserved
+				</div>
+			</div>
+		{% endif %}
+	</div>
+</footer>
+
+<a href="#" class="back-to-top d-flex align-items-center justify-content-center"><i class="bi bi-arrow-up-short"></i></a>
+<div id="preloader"></div>

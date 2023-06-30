@@ -1,0 +1,29 @@
+{
+ "__unsaved": 1,
+ "creation": "2023-06-28 20:38:42.319350",
+ "docstatus": 0,
+ "doctype": "Web Template",
+ "fields": [
+  {
+   "fieldname": "image_list",
+   "fieldtype": "Table Break",
+   "label": "image_list",
+   "reqd": 0
+  },
+  {
+   "fieldname": "image_url",
+   "fieldtype": "Attach Image",
+   "label": "image_url",
+   "reqd": 0
+  }
+ ],
+ "idx": 0,
+ "modified": "2023-06-29 12:38:15.871064",
+ "modified_by": "Administrator",
+ "module": "Property Management Solution",
+ "name": "Areas Day",
+ "owner": "Administrator",
+ "standard": 1,
+ "template": "",
+ "type": "Section"
+}

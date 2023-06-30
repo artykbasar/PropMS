@@ -1,0 +1,16 @@
+{%- if image_list -%}
+    <section id="clients" class="clients">
+      <div class="container" data-aos="zoom-in">
+
+        <div class="row d-flex align-items-center">
+            {%- for each in image_list -%}
+                <div class="col-lg-2 col-md-4 col-6">
+                    <img src="{{ each.image_url }}" class="img-fluid" alt="">
+                </div>
+            {%- endfor -%}
+
+        </div>
+
+      </div>
+    </section><!-- End Clients Section -->
+{%- endif -%}

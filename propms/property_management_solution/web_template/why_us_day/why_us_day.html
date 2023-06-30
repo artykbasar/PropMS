@@ -1,0 +1,21 @@
+    {%- if why_us_table -%}
+        <!-- ======= Why Us Section ======= -->
+        <section id="why-us" class="why-us">
+          <div class="container">
+            {% set data_delay = [0] %}
+            <div class="row">
+                {%- for each in why_us_table -%}
+                    <div class="col-lg-4" data-aos="fade-up" data-aos-delay="{{ data_delay[0] }}">
+                        <div class="box">
+                            <span>{{ "{:02d}".format(each.idx) }}</span>
+                            <h4>{{ _(each.main_reason) }}</h4>
+                            <p> {{ _(each.reason_explained) }}</p>
+                        </div>
+                    </div>
+                    {% if data_delay.append(data_delay.pop() + 150) %}{% endif %}
+                {%- endfor -%}
+            </div>
+    
+          </div>
+        </section><!-- End Why Us Section -->
+    {%- endif -%}

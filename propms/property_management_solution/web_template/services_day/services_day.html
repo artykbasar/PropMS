@@ -1,0 +1,29 @@
+<!-- ======= Services Section ======= -->
+    <section id="services" class="services">
+      <div class="container">
+        <div class="section-title">
+            {%- if section_label -%}
+                <span>{{ _(section_label) }}</span>
+                <h2>{{ _(section_label) }}</h2>
+            {%- endif -%}
+            {%- if section_description -%}
+                <p>{{ _(section_description) }}</p>
+            {%- endif -%}
+        </div>
+        {%- if service_cards -%}
+            {% set data_delay = [0] %}
+            <div class="row">
+                {%- for each in service_cards -%}
+                    <div class="col-lg-4 col-md-6 d-flex align-items-stretch mt-4 mt-md-0" data-aos="fade-up" data-aos-delay="{{ data_delay[0] }}">
+                        <div class="icon-box">
+                          <div class="icon"><i class="bx {{ each.box_icon }}"></i></div>
+                          <h4><a href="">{{ _(each.box_title) }}</a></h4>
+                          <p>{{ _(each.box_description) }}</p></p>
+                        </div>
+                      </div>
+                    {% if data_delay.append(data_delay.pop() + 150) %}{% endif %}
+                {%- endfor -%}
+            </div>
+        {%- endif -%}
+      </div>
+    </section><!-- End Services Section -->

@@ -1,0 +1,59 @@
+{
+ "__unsaved": 1,
+ "creation": "2023-06-28 12:23:46.815692",
+ "docstatus": 0,
+ "doctype": "Web Template",
+ "fields": [
+  {
+   "fieldname": "image",
+   "fieldtype": "Attach Image",
+   "label": "image",
+   "reqd": 0
+  },
+  {
+   "fieldname": "introduction",
+   "fieldtype": "Small Text",
+   "label": "introduction",
+   "reqd": 0
+  },
+  {
+   "fieldname": "intro_description",
+   "fieldtype": "Small Text",
+   "label": "intro_description",
+   "reqd": 0
+  },
+  {
+   "fieldname": "bullet_points",
+   "fieldtype": "Table Break",
+   "label": "bullet_points",
+   "reqd": 0
+  },
+  {
+   "fieldname": "bullet_point",
+   "fieldtype": "Small Text",
+   "label": "bullet_point",
+   "reqd": 0
+  },
+  {
+   "fieldname": "section_break",
+   "fieldtype": "Section Break",
+   "label": "section_break",
+   "reqd": 0
+  },
+  {
+   "fieldname": "conclusion",
+   "fieldtype": "Small Text",
+   "label": "conclusion",
+   "reqd": 0
+  }
+ ],
+ "idx": 0,
+ "modified": "2023-06-29 12:37:32.123809",
+ "modified_by": "Administrator",
+ "module": "Property Management Solution",
+ "name": "About Day",
+ "owner": "Administrator",
+ "standard": 1,
+ "template": "",
+ "type": "Section"
+}

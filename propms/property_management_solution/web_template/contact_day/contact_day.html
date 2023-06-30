@@ -1,0 +1,124 @@
+{%- set doc = frappe.get_doc('Contact Us Settings', 'Contact Us Settings').as_dict() -%}
+{%- if doc.query_options -%}
+  {%- set query_options = [] -%}
+  {%- for opt in doc.query_options.split(",") -%}
+    {%- if opt -%}
+      {{ query_options.append(opt) }}
+    {%- endif -%}
+  {%- endfor -%}
+{%- else -%}
+  {%- set query_options = ["Support", "General"] -%}
+{%- endif -%}
+<!-- ======= Contact Section ======= -->
+<section id="contact" class="contact">
+      <div class="container">
+
+        <div class="section-title">
+          <span>{{ _("Contact") }}</span>
+          <h2>{{ _("Contact") }}</h2>
+          {% if doc.introduction %}
+          <p>
+            {{ _(doc.introduction) }}
+          </p>
+          {% endif %}
+        </div>
+        <div class="row" data-aos="fade-up">
+          {% if doc.address_title %}
+            <div class="col-lg-6">
+              <div class="info-box mb-4">
+                <i class="bx bx-map"></i>
+                <h3>Our Address</h3>
+                <p>
+                  {% if doc.address_line1 %}
+                  {{ doc.address_line1 }},
+                  {% endif %}
+                  {% if doc.address_line2 %}
+                    {{ doc.address_line2 }},
+                  {% endif %}
+                  {% if doc.city %}
+                    {{ doc.city }},
+                  {% endif %}
+                  {% if doc.state %}
+                    {{ doc.state }},
+                  {% endif %}
+                  {% if doc.pincode %}
+                    {{ doc.pincode }},
+                  {% endif %}
+                  {% if doc.country %}
+                    {{ doc.country }}
+                  {% endif %}
+                </p>
+              </div>
+            </div>
+          {% endif %}
+          {% if doc.email_id %}
+            <div class="col-lg-3 col-md-6">
+              <div class="info-box  mb-4">
+                <i class="bx bx-envelope"></i>
+                <h3>Email Us</h3>
+                <a href="mailto:{{ doc.email_id }}">
+                  {{ doc.email_id }}
+                </a>
+              </div>
+            </div>
+          {% endif %}
+          {% if doc.phone %}
+            <div class="col-lg-3 col-md-6">
+              <div class="info-box  mb-4">
+                <i class="bx bx-phone-call"></i>
+                <h3>Call Us</h3>
+                <a href="tel:{{ doc.phone }}">
+                  {{ doc.phone }}
+                </a>
+              </div>
+            </div>
+		      {% endif %}
+            
+
+          </div>
+
+        <div class="row" data-aos="fade-up">
+
+          <div class="col-lg-6 ">
+            <iframe class="mb-4 mb-lg-0" src="{{ google_maps_embed_link }}" frameborder="0" style="border:0; width: 100%; height: 384px;" allowfullscreen></iframe>
+          </div>
+
+          <div class="col-lg-6">
+            <form action="" method="" role="form" class="php-email-form">
+              <div class="row">
+                <div class="col-md-6 form-group">
+                  <input type="text" name="name" class="form-control" id="name" placeholder="Your Name" required>
+                </div>
+                <div class="col-md-6 form-group mt-3 mt-md-0">
+                  <input type="email" class="form-control" name="email" id="email" placeholder="Your Email" required>
+                </div>
+              </div>
+              <div class="form-group mt-3">
+                <select type="text" class="form-control" name="subject" id="subject" placeholder="Subject" required>
+                  {% if query_options -%}
+                    {% for option in query_options -%}
+                      <option value="{{ option }}">{{ _(option) }}</option>
+                    {%- endfor %}
+                  {% else %}
+                    <option value="General">{{ _("General")}}</option>
+                  {% endif %}
+                </select>
+              </div>
+              <div class="form-group mt-3">
+                <textarea class="form-control" name="message" rows="5" placeholder="Message" required></textarea>
+              </div>
+              <div class="my-3">
+
+              </div>
+              <div class="text-center"><button class="btn-send" type="submit">{{ _("Send Message") }}</button></div>
+            </form>
+          </div>
+
+        </div>
+
+      </div>
+    </section>
+
+<script>
+	{% include "templates/includes/contact.js" %}
+</script>

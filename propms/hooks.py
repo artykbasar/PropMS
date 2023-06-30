@@ -19,8 +19,20 @@ app_license = "MIT"
 # app_include_js = "/assets/propms/js/propms.js"
 
 # include js, css files in header of web template
-# web_include_css = "/assets/propms/css/propms.css"
-# web_include_js = "/assets/propms/js/propms.js"
+web_include_css = ["/assets/propms/day/assets/vendor/aos/aos.css",
+                   "/assets/propms/day/assets/vendor/bootstrap/css/bootstrap.min.css",
+                   "/assets/propms/day/assets/vendor/bootstrap-icons/bootstrap-icons.css",
+                   "/assets/propms/day/assets/vendor/boxicons/css/boxicons.min.css",
+                   "/assets/propms/day/assets/vendor/glightbox/css/glightbox.min.css",
+                   "/assets/propms/day/assets/vendor/swiper/swiper-bundle.min.css",
+                   "/assets/propms/day/assets/css/style.css"]
+web_include_js = ["/assets/propms/day/assets/vendor/aos/aos.js",
+                  "/assets/propms/day/assets/vendor/bootstrap/js/bootstrap.bundle.min.js",
+                  "/assets/propms/day/assets/vendor/glightbox/js/glightbox.min.js",
+                  "/assets/propms/day/assets/vendor/isotope-layout/isotope.pkgd.min.js",
+                  "/assets/propms/day/assets/vendor/swiper/swiper-bundle.min.js",
+                  "/assets/propms/day/assets/vendor/php-email-form/validate.js",
+                  "/assets/propms/day/assets/js/main.js"]
 
 # include js in page
 # page_js = {"page" : "public/js/file.js"}
