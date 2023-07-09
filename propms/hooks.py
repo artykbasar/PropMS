@@ -25,7 +25,8 @@ web_include_css = ["/assets/propms/day/assets/vendor/aos/aos.css",
                    "/assets/propms/day/assets/vendor/boxicons/css/boxicons.min.css",
                    "/assets/propms/day/assets/vendor/glightbox/css/glightbox.min.css",
                    "/assets/propms/day/assets/vendor/swiper/swiper-bundle.min.css",
-                   "/assets/propms/day/assets/css/style.css"]
+                   "/assets/propms/day/assets/css/style.css",
+                   "propms_website.bundle.css"]
 web_include_js = ["/assets/propms/day/assets/vendor/aos/aos.js",
                   "/assets/propms/day/assets/vendor/bootstrap/js/bootstrap.bundle.min.js",
                   "/assets/propms/day/assets/vendor/glightbox/js/glightbox.min.js",

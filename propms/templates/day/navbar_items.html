@@ -5,7 +5,7 @@
 
 {%- set dropdown_id = 'id-' + frappe.utils.generate_hash(length=12) -%}
 <li class="nav-item dropdown {% if submenu %} dropdown-submenu {% endif %}">
-	<a class="nav-link dropdown-toggle" href="#" id="{{ dropdown_id }}" role="button"
+	<a class="nav-link scrollto dropdown-toggle" href="#" id="{{ dropdown_id }}" role="button"
 		data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
 		{{ _(item.label) }}
 	</a>
@@ -37,7 +37,7 @@
 
 {% if parent %}
 <li class="nav-item">
-	<a class="nav-link" href="{{ url }}"
+	<a class="nav-link scrollto" href="{{ url }}"
 		{% if item.open_in_new_tab %} target="_blank" {% endif %}>
 		{{ _(item.label) }}
 	</a>
