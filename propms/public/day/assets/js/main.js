@@ -118,6 +118,15 @@
     this.classList.toggle('bi-x')
   })
 
+  document.onclick = function (e) {
+    if (e.target.className == "navbar navbar-mobile") {
+      select('#navbar').classList.toggle('navbar-mobile')
+      let mobile_nav_toggle = select('.mobile-nav-toggle')
+      mobile_nav_toggle.classList.toggle('bi-list')
+      mobile_nav_toggle.classList.toggle('bi-x')
+    }
+  }
+
   /**
    * Mobile nav dropdowns activate
    */
