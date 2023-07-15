@@ -4,7 +4,13 @@
 
       <!-- <h1 class="logo"><a href="index.html">Day</a></h1> -->
       <!-- Uncomment below if you prefer to use an image logo -->
-      <a href="{{ url_prefix }}{{ home_page or "/" }}" class="logo"><img src="{{ banner_image }}" alt="" class="img-fluid"></a>
+      {%- if brand_html -%}
+				{{ brand_html }}
+			{%- elif banner_image -%}
+        <a href="{{ url_prefix }}{{ home_page or "/" }}" class="logo"><img src="{{ banner_image }}" alt="" class="img-fluid"></a>
+			{%- else -%}
+				<span>{{ (frappe.get_hooks("brand_html") or [_("Home")])[0] }}</span>
+			{%- endif -%}
 
       <nav id="navbar" class="navbar">
         {% include "templates/day/navbar_items.html"%}
