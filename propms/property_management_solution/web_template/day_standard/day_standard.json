@@ -3,9 +3,18 @@
  "creation": "2023-06-27 20:57:36.440396",
  "docstatus": 0,
  "doctype": "Web Template",
- "fields": [],
- "idx": 0,
- "modified": "2023-06-29 12:33:41.188225",
+ "fields": [
+  {
+   "__islocal": 1,
+   "__unsaved": 1,
+   "fieldname": "company_details",
+   "fieldtype": "Small Text",
+   "label": "company_details",
+   "reqd": 0
+  }
+ ],
+ "idx": 3,
+ "modified": "2024-05-20 22:37:19.841304",
  "modified_by": "Administrator",
  "module": "Property Management Solution",
  "name": "Day Standard",

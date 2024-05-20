@@ -1,11 +1,21 @@
 {%- if image_list -%}
     <section id="clients" class="clients">
       <div class="container" data-aos="zoom-in">
-
-        <div class="row d-flex align-items-center">
+        {%- if section_label or section_description -%}
+          <div class="section-title">
+            {%- if section_label -%}
+                <span>{{ _(section_label) }}</span>
+                <h2>{{ _(section_label) }}</h2>
+            {%- endif -%}
+            {%- if section_description -%}
+                <p>{{ _(section_description) }}</p>
+            {%- endif -%}
+          </div>
+        {%- endif -%}
+        <div class="row d-flex align-items-center justify-content-center">
             {%- for each in image_list -%}
                 <div class="col-lg-2 col-md-4 col-6">
-                    <img src="{{ each.image_url }}" class="img-fluid" alt="">
+                  <a href="{{ each.redirect_on_press or '#'}}"><img src="{{ each.image_url }}" class="img-fluid" alt=""></a>
                 </div>
             {%- endfor -%}
 

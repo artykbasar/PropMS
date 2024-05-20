@@ -5,6 +5,21 @@
  "doctype": "Web Template",
  "fields": [
   {
+   "__unsaved": 1,
+   "fieldname": "section_label",
+   "fieldtype": "Small Text",
+   "label": "section_label",
+   "reqd": 0
+  },
+  {
+   "__islocal": 1,
+   "__unsaved": 1,
+   "fieldname": "section_description",
+   "fieldtype": "Text",
+   "label": "section_description",
+   "reqd": 0
+  },
+  {
    "fieldname": "image_list",
    "fieldtype": "Table Break",
    "label": "image_list",
@@ -15,10 +30,17 @@
    "fieldtype": "Attach Image",
    "label": "image_url",
    "reqd": 0
+  },
+  {
+   "__unsaved": 1,
+   "fieldname": "redirect_on_press",
+   "fieldtype": "Text",
+   "label": "redirect_on_press",
+   "reqd": 0
   }
  ],
  "idx": 0,
- "modified": "2023-06-29 12:38:15.871064",
+ "modified": "2024-05-20 21:55:11.051991",
  "modified_by": "Administrator",
  "module": "Property Management Solution",
  "name": "Areas Day",
