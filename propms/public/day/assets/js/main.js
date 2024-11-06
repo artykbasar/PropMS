@@ -217,6 +217,7 @@
      * Portfolio details slider
      */
     new Swiper('.portfolio-details-slider', {
+      autoHeight: true,
       speed: 400,
       loop: true,
       autoplay: {
