@@ -243,10 +243,11 @@ class Property(NestedSet):
 
     def automatic_group_node(self):
         if self.advanced_property_management == 1:
-            rentable = 0
+            group_status = 0
             for each_child in self.unit_children:
-                rentable += each_child.rentable
-            if rentable > 0:
+                group_status += each_child.rentable
+                group_status += each_child.for_sale
+            if group_status > 0:
                 self.is_group = 1
             else:
                 self.is_group = 0
