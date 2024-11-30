@@ -12,9 +12,10 @@
  "field_order": [
   "advanced_property_management",
   "identification_section",
-  "address",
   "name1",
+  "address",
   "is_group",
+  "location",
   "column_break_2",
   "photo",
   "company",
@@ -32,6 +33,9 @@
   "common_bathroom",
   "column_break_kiwj",
   "room_name",
+  "for_sale",
+  "new_development",
+  "development_project",
   "section_break_qdws",
   "unit_children",
   "images",
@@ -72,8 +76,8 @@
    "fieldname": "name1",
    "fieldtype": "Data",
    "label": "Name",
-   "mandatory_depends_on": "eval:doc.advanced_property_management == 0;",
-   "read_only_depends_on": "eval:doc.advanced_property_management == 1;",
+   "mandatory_depends_on": "eval:doc.advanced_property_management == 0 || doc.new_development == 1 || doc.development_project == 1;",
+   "read_only_depends_on": "eval:doc.advanced_property_management == 1 && doc.new_development == 0 && doc.development_project == 0;",
    "reqd": 1,
    "unique": 1
   },
@@ -247,8 +251,7 @@
    "fieldtype": "Link",
    "in_list_view": 1,
    "label": "Cost Center",
-   "options": "Cost Center",
-   "reqd": 1
+   "options": "Cost Center"
   },
   {
    "fieldname": "company",
@@ -309,7 +312,7 @@
    "fieldname": "address",
    "fieldtype": "Link",
    "label": "Address",
-   "mandatory_depends_on": "eval: doc.advanced_property_management == 1",
+   "mandatory_depends_on": "eval: doc.advanced_property_management == 1 && doc.new_development == 0 && doc.development_project == 0",
    "options": "Address"
   },
   {
@@ -381,13 +384,46 @@
    "fieldtype": "Link",
    "label": "Security Deposit Period",
    "options": "UOM"
+  },
+  {
+   "default": "0",
+   "depends_on": "eval: doc.advanced_property_management == 1 && doc.for_sale == 1",
+   "fetch_from": "type.for_sale",
+   "fieldname": "for_sale",
+   "fieldtype": "Check",
+   "label": "For Sale",
+   "read_only": 1
+  },
+  {
+   "default": "0",
+   "depends_on": "eval: doc.advanced_property_management == 1 && doc.new_development == 1",
+   "fetch_from": "type.new_development",
+   "fieldname": "new_development",
+   "fieldtype": "Check",
+   "label": "New Development",
+   "read_only": 1
+  },
+  {
+   "depends_on": "eval: doc.advanced_property_management == 1",
+   "fieldname": "location",
+   "fieldtype": "Data",
+   "label": "Location"
+  },
+  {
+   "default": "0",
+   "depends_on": "eval: doc.advanced_property_management == 1 && doc.development_project == 1",
+   "fetch_from": "type.development_project",
+   "fieldname": "development_project",
+   "fieldtype": "Check",
+   "label": "Development Project",
+   "read_only": 1
   }
  ],
  "icon": "octicon octicon-home",
  "image_field": "photo",
  "is_tree": 1,
  "links": [],
- "modified": "2023-06-14 07:44:15.469777",
+ "modified": "2024-11-12 18:15:21.995515",
  "modified_by": "Administrator",
  "module": "Property Management Solution",
  "name": "Property",

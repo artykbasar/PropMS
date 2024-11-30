@@ -41,4 +41,19 @@ class UnitType(Document):
         elif self.rented == 0:
             new_name = str(new_name).replace("-Rented", "")
         self.unit_type = new_name
+        if self.for_sale and "For Sale" not in self.unit_type:
+            new_name = f"{new_name}-For Sale"
+        elif self.for_sale == 0:
+            new_name = str(new_name).replace("-For Sale", "")
+        self.unit_type = new_name
+        if self.new_development and "New Development" not in self.unit_type:
+            new_name = f"{new_name}-New Development"
+        elif self.new_development == 0:
+            new_name = str(new_name).replace("-New Development", "")
+        self.unit_type = new_name
+        if self.development_project and "Development Project" not in self.unit_type:
+            new_name = f"{new_name}-Development Project"
+        elif self.development_project == 0:
+            new_name = str(new_name).replace("-Development Project", "")
+        self.unit_type = new_name
         self.new_name = new_name

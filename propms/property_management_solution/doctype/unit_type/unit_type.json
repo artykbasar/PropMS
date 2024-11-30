@@ -14,8 +14,11 @@
   "showerbath",
   "toilet",
   "column_break_slfs",
+  "development_project",
   "rentable",
-  "rented"
+  "rented",
+  "for_sale",
+  "new_development"
  ],
  "fields": [
   {
@@ -31,11 +34,15 @@
    "fieldtype": "Section Break"
   },
   {
+   "allow_in_quick_entry": 1,
    "default": "0",
+   "depends_on": "eval: doc.unit_type != \"\" && doc.unit_type != undefined && doc.development_project == 0",
    "description": "Tick it, if this unit is a room of a property.",
    "fieldname": "room",
    "fieldtype": "Check",
    "hidden": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1,
    "label": "Room"
   },
   {
@@ -43,7 +50,9 @@
    "fieldtype": "Column Break"
   },
   {
+   "allow_in_quick_entry": 1,
    "default": "0",
+   "depends_on": "eval: doc.unit_type != \"\" && doc.unit_type != undefined && doc.development_project == 0",
    "description": "Tick it, if this unit is rentable.",
    "fieldname": "rentable",
    "fieldtype": "Check",
@@ -87,16 +96,50 @@
    "label": "Toilet"
   },
   {
+   "allow_in_quick_entry": 1,
    "default": "0",
+   "depends_on": "eval: doc.unit_type != \"\" && doc.unit_type != undefined && doc.development_project == 0",
    "description": "Tick it, if this unit is being rented from a landlord/landlady.",
    "fieldname": "rented",
    "fieldtype": "Check",
    "hidden": 1,
    "label": "Rented"
+  },
+  {
+   "allow_in_quick_entry": 1,
+   "default": "0",
+   "depends_on": "eval: doc.unit_type != \"\" && doc.unit_type != undefined && doc.development_project == 0",
+   "description": "Tick it, if this unit is for Sale",
+   "fieldname": "for_sale",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "For Sale"
+  },
+  {
+   "allow_in_quick_entry": 1,
+   "default": "0",
+   "depends_on": "eval: doc.for_sale == 1",
+   "description": "Tick it, if this unit is New Development",
+   "fieldname": "new_development",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "New Development"
+  },
+  {
+   "default": "0",
+   "depends_on": "eval: doc.unit_type != \"\" && doc.unit_type != undefined",
+   "description": "Tick it, if this unit is Development Project.",
+   "fieldname": "development_project",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Development Project"
   }
  ],
  "links": [],
- "modified": "2023-01-26 19:22:12.503501",
+ "modified": "2024-11-12 15:32:31.459552",
  "modified_by": "Administrator",
  "module": "Property Management Solution",
  "name": "Unit Type",

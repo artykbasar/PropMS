@@ -195,8 +195,8 @@ class Property(NestedSet):
     @frappe.whitelist()
     def status_as_common_area(self):
         if self.advanced_property_management == 1 and self.rentable == 0:
-            self.status = "Common Area (Not for lease)"
-        elif self.advanced_property_management == 1 and self.rentable == 1 and self.status == "Common Area (Not for lease)":
+            self.status = "Common Area (Not for sale/lease)"
+        elif self.advanced_property_management == 1 and self.rentable == 1 and self.status == "Common Area (Not for sale/lease)":
             self.status = "Available"
 
     @frappe.whitelist()
@@ -280,3 +280,4 @@ def security_deposit_period_filter(self, txt, searchfield, start, page_len, filt
                         page_length=page_len,
                         as_list=True
                         )
+

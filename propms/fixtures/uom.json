@@ -12,24 +12,6 @@
   "docstatus": 0,
   "doctype": "UOM",
   "enabled": 1,
-  "modified": "2022-04-04 13:29:21.963903",
-  "must_be_whole_number": 0,
-  "name": "Week",
-  "uom_name": "Week"
- },
- {
-  "docstatus": 0,
-  "doctype": "UOM",
-  "enabled": 1,
-  "modified": "2022-06-22 19:54:10.401049",
-  "must_be_whole_number": 0,
-  "name": "Month",
-  "uom_name": "Month"
- },
- {
-  "docstatus": 0,
-  "doctype": "UOM",
-  "enabled": 1,
   "modified": "2023-06-13 14:10:25.362681",
   "must_be_whole_number": 0,
   "name": "1 Week",
@@ -75,15 +57,6 @@
   "docstatus": 0,
   "doctype": "UOM",
   "enabled": 1,
-  "modified": "2023-06-13 14:16:59.956663",
-  "must_be_whole_number": 0,
-  "name": "5 Weeks",
-  "uom_name": "5 Weeks"
- },
- {
-  "docstatus": 0,
-  "doctype": "UOM",
-  "enabled": 1,
   "modified": "2023-06-13 14:18:19.917374",
   "must_be_whole_number": 0,
   "name": "1 Month",
@@ -106,5 +79,32 @@
   "must_be_whole_number": 0,
   "name": "Year",
   "uom_name": "Year"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "UOM",
+  "enabled": 1,
+  "modified": "2022-06-22 19:54:10.401049",
+  "must_be_whole_number": 0,
+  "name": "Month",
+  "uom_name": "Month"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "UOM",
+  "enabled": 1,
+  "modified": "2022-04-04 13:29:21.963903",
+  "must_be_whole_number": 0,
+  "name": "Week",
+  "uom_name": "Week"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "UOM",
+  "enabled": 1,
+  "modified": "2023-06-13 14:16:59.956663",
+  "must_be_whole_number": 0,
+  "name": "5 Weeks",
+  "uom_name": "5 Weeks"
  }
 ]

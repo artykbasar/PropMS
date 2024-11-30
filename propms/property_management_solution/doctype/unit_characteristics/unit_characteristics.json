@@ -14,7 +14,12 @@
   "rent_uom",
   "security_deposit_period",
   "security_deposit",
-  "rentable"
+  "rentable",
+  "section_break_snly",
+  "column_break_pdqp",
+  "for_sale",
+  "new_development",
+  "column_break_jryy"
  ],
  "fields": [
   {
@@ -30,11 +35,10 @@
    "columns": 1,
    "fieldname": "rent_price",
    "fieldtype": "Currency",
-   "in_list_view": 1,
    "in_preview": 1,
    "in_standard_filter": 1,
    "label": "Rent Price",
-   "read_only_depends_on": "eval: doc.rentable == 0"
+   "read_only_depends_on": "eval: doc.rentable != 1"
   },
   {
    "default": "0",
@@ -48,35 +52,32 @@
    "columns": 2,
    "fieldname": "property",
    "fieldtype": "Link",
-   "in_list_view": 1,
    "in_preview": 1,
    "in_standard_filter": 1,
    "label": "Property",
    "options": "Property",
-   "read_only_depends_on": "eval: doc.rentable == 0"
+   "read_only_depends_on": "eval: doc.rentable == 0 && doc.new_development == 0"
   },
   {
    "columns": 1,
    "fieldname": "room_name",
    "fieldtype": "Link",
-   "in_list_view": 1,
    "in_preview": 1,
    "in_standard_filter": 1,
    "label": "Room Name",
    "mandatory_depends_on": "eval: doc.rentable == 1",
    "options": "Property Room Names",
-   "read_only_depends_on": "eval: doc.rentable == 0"
+   "read_only_depends_on": "eval: doc.rentable != 1"
   },
   {
    "columns": 1,
    "fieldname": "rent_uom",
    "fieldtype": "Link",
-   "in_list_view": 1,
    "in_preview": 1,
    "in_standard_filter": 1,
    "label": "Rent UOM",
    "options": "UOM",
-   "read_only_depends_on": "eval: doc.rentable == 0"
+   "read_only_depends_on": "eval: doc.rentable != 1"
   },
   {
    "fieldname": "column_break_fqjy",
@@ -86,7 +87,6 @@
    "columns": 1,
    "fieldname": "security_deposit",
    "fieldtype": "Currency",
-   "in_list_view": 1,
    "in_preview": 1,
    "in_standard_filter": 1,
    "label": "Security Deposit",
@@ -97,18 +97,47 @@
    "columns": 1,
    "fieldname": "security_deposit_period",
    "fieldtype": "Link",
-   "in_list_view": 1,
    "in_preview": 1,
    "in_standard_filter": 1,
    "label": "Security Deposit Period",
    "options": "UOM",
-   "read_only_depends_on": "eval: doc.rentable == 0"
+   "read_only_depends_on": "eval: doc.rentable != 1"
+  },
+  {
+   "fieldname": "section_break_snly",
+   "fieldtype": "Section Break"
+  },
+  {
+   "columns": 1,
+   "fieldname": "column_break_pdqp",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "fetch_from": "unit_type.for_sale",
+   "fieldname": "for_sale",
+   "fieldtype": "Check",
+   "label": "For Sale",
+   "read_only": 1
+  },
+  {
+   "default": "0",
+   "fetch_from": "unit_type.new_development",
+   "fieldname": "new_development",
+   "fieldtype": "Check",
+   "label": "New Development",
+   "read_only": 1
+  },
+  {
+   "columns": 9,
+   "fieldname": "column_break_jryy",
+   "fieldtype": "Column Break"
   }
  ],
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2023-06-13 14:30:12.583240",
+ "modified": "2024-11-28 21:38:34.345461",
  "modified_by": "Administrator",
  "module": "Property Management Solution",
  "name": "Unit Characteristics",
