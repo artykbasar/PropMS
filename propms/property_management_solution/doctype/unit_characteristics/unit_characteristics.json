@@ -7,8 +7,11 @@
  "engine": "InnoDB",
  "field_order": [
   "unit_type",
+  "web_name",
   "property",
   "room_name",
+  "facing",
+  "publish_online",
   "column_break_fqjy",
   "rent_price",
   "rent_uom",
@@ -132,12 +135,35 @@
    "columns": 9,
    "fieldname": "column_break_jryy",
    "fieldtype": "Column Break"
+  },
+  {
+   "columns": 2,
+   "fieldname": "web_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "in_preview": 1,
+   "label": "Web Name",
+   "mandatory_depends_on": "eval: doc.publish_online == 1"
+  },
+  {
+   "columns": 1,
+   "fieldname": "facing",
+   "fieldtype": "Select",
+   "label": "Facing",
+   "options": "\nNorth\nNorth-East\nEast\nSouth-East\nWest\nNorth-West\nSouth-West\nSouth"
+  },
+  {
+   "default": "0",
+   "fieldname": "publish_online",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Publish Online"
   }
  ],
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2024-11-28 21:38:34.345461",
+ "modified": "2024-12-03 22:35:52.398750",
  "modified_by": "Administrator",
  "module": "Property Management Solution",
  "name": "Unit Characteristics",

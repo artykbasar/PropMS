@@ -36,9 +36,12 @@
   "for_sale",
   "new_development",
   "development_project",
+  "web_name",
+  "publish_online",
   "section_break_qdws",
   "unit_children",
   "images",
+  "bullet_points",
   "section_break_13",
   "builtup_area",
   "carpet_area",
@@ -76,7 +79,7 @@
    "fieldname": "name1",
    "fieldtype": "Data",
    "label": "Name",
-   "mandatory_depends_on": "eval:doc.advanced_property_management == 0 || doc.new_development == 1 || doc.development_project == 1;",
+   "mandatory_depends_on": "eval:doc.advanced_property_management == 0 || doc.parent_property == undefined || doc.parent_property == \"\"",
    "read_only_depends_on": "eval:doc.advanced_property_management == 1 && doc.new_development == 0 && doc.development_project == 0;",
    "reqd": 1,
    "unique": 1
@@ -159,7 +162,7 @@
    "fieldname": "facing",
    "fieldtype": "Select",
    "label": "Facing",
-   "options": "North\nNorth-East\nEast\nSouth-East\nWest\nNorth-West\nSouth-West\nSouth"
+   "options": "\nNorth\nNorth-East\nEast\nSouth-East\nWest\nNorth-West\nSouth-West\nSouth"
   },
   {
    "fieldname": "no_of_parking",
@@ -417,13 +420,33 @@
    "fieldtype": "Check",
    "label": "Development Project",
    "read_only": 1
+  },
+  {
+   "depends_on": "eval: doc.advanced_property_management == 1",
+   "fieldname": "web_name",
+   "fieldtype": "Data",
+   "label": "Web Name",
+   "mandatory_depends_on": "eval: doc.advanced_property_management == 1 && doc.publish_online == 1"
+  },
+  {
+   "default": "0",
+   "depends_on": "eval: doc.advanced_property_management == 1",
+   "fieldname": "publish_online",
+   "fieldtype": "Check",
+   "label": "Publish Online"
+  },
+  {
+   "fieldname": "bullet_points",
+   "fieldtype": "Table",
+   "label": "Bullet Points",
+   "options": "Property Bullet Points"
   }
  ],
  "icon": "octicon octicon-home",
  "image_field": "photo",
  "is_tree": 1,
  "links": [],
- "modified": "2024-11-12 18:15:21.995515",
+ "modified": "2024-12-03 22:31:45.485633",
  "modified_by": "Administrator",
  "module": "Property Management Solution",
  "name": "Property",

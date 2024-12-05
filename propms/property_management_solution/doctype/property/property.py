@@ -14,7 +14,7 @@ class Property(NestedSet):
         super().on_trash(allow_root_deletion)
 
     def validate(self):
-        self.address_as_name()
+        self.name_validation()
         self.cost_center_validation()
         self.status_as_common_area()
         self.automatic_group_node()
@@ -34,16 +34,17 @@ class Property(NestedSet):
     def check_child_nodes(self):
         if self.advanced_property_management == 1:
             if self.unit_children:
-                rentable_status = False
-                rentable_rows = []
+                child_status = False
                 cleaned_rows = []
                 for index, each_row in enumerate(self.unit_children):
-                    if each_row.rentable == 1:
-                        rentable_status = True
-                        rentable_rows.append(index)
+                    if each_row.rentable == 1 or each_row.for_sale == 1:
+                        if each_row.rentable == 1:
+                            child_status = True
+                        if each_row.for_sale == 1:
+                            child_status = True
                         if not each_row.property:
                             for each_child_node in self.get_children():
-                                if each_child_node.room_name == each_row.room_name:
+                                if each_row.new_development == 0 and each_child_node.room_name == each_row.room_name:
                                     each_row.property = each_child_node.name
                                     self.sync_parent_each_row_to_child(each_row, each_child_node)
                             if not each_row.property:
@@ -53,14 +54,20 @@ class Property(NestedSet):
                                 new_doc.cost_center = self.cost_center
                                 new_doc.type = each_row.unit_type
                                 new_doc.rentable = each_row.rentable
-                                new_doc.room = 1
-                                new_doc.room_name = each_row.room_name
+                                new_doc.for_sale = each_row.for_sale
+                                new_doc.new_development = each_row.new_development
+                                new_doc.facing = each_row.facing
+                                new_doc.publish_online = each_row.publish_online
+                                new_doc.web_name = each_row.web_name
+                                if each_row.rentable == 1:
+                                    new_doc.room = 1
+                                    new_doc.room_name = each_row.room_name
+                                    new_doc.rent = each_row.rent_price
+                                    new_doc.rent_uom = each_row.rent_uom
+                                    new_doc.security_deposit_period = each_row.security_deposit_period
+                                    new_doc.security_deposit = each_row.security_deposit
                                 new_doc.parent_property = self.name
-                                new_doc.rent = each_row.rent_price
-                                new_doc.rent_uom = each_row.rent_uom
-                                new_doc.security_deposit_period = each_row.security_deposit_period
-                                new_doc.security_deposit = each_row.security_deposit
-                                new_doc.address_as_name()
+                                new_doc.name_validation()
                                 new_doc.save()
                                 each_row.property = new_doc.name
                         else:
@@ -68,13 +75,15 @@ class Property(NestedSet):
                             self.sync_parent_each_row_to_child(each_row, child_doc)
                     else:
                         cleaned_rows.append(each_row)
-                if not rentable_status:
+                if not child_status:
                     self.remove_all_child_nodes()
                 else:
                     for each_child_node in self.get_children():
                         child_node_used = False
                         for each_row in self.unit_children:
                             if each_row.room_name == each_child_node.room_name:
+                                child_node_used = True
+                            if each_row.for_sale == 1 and each_row.new_development == 1 and each_row.property == each_child_node.name:
                                 child_node_used = True
                         if not child_node_used:
                             each_child_node.delete()
@@ -86,36 +95,30 @@ class Property(NestedSet):
 
     def sync_parent_each_row_to_child(self, each_row, child_doc):
         save_status = False
-        if self.address != child_doc.address:
-            child_doc.address = self.address
-            child_doc.address_as_name()
-            save_status = True
-        if self.company != child_doc.company:
-            child_doc.company = self.company
-            save_status = True
-        if self.cost_center != child_doc.cost_center:
-            child_doc.cost_center = self.cost_center
-            save_status = True
-        if each_row.unit_type != child_doc.type:
-            child_doc.type = each_row.unit_type
-            child_doc.address_as_name()
-            save_status = True
-        if each_row.room_name != child_doc.room_name:
-            child_doc.room_name = each_row.room_name
-            child_doc.address_as_name()
-            save_status = True
-        if each_row.rent_price != child_doc.rent:
-            child_doc.rent = each_row.rent_price
-            save_status = True
-        if each_row.rent_uom != child_doc.rent_uom:
-            child_doc.rent_uom = each_row.rent_uom
-            save_status = True
-        if each_row.security_deposit_period != child_doc.security_deposit_period:
-            child_doc.security_deposit_period = each_row.security_deposit_period
-            save_status = True
-        if each_row.security_deposit != child_doc.security_deposit:
-            child_doc.security_deposit = each_row.security_deposit
-            save_status = True
+        parent_to_child_field_list = ['address', 'company', 'cost_center']
+        for each_field in parent_to_child_field_list:
+            if self.__dict__[each_field] != child_doc.__dict__[each_field]:
+                child_doc.__dict__[each_field] = self.__dict__[each_field]
+                child_doc.name_validation()
+                save_status = True
+        row_to_child_docfield_list = [
+            {"row_field_name": "unit_type", "child_docfield_name": "type"},
+            {"row_field_name": "room_name", "child_docfield_name": "room_name"},
+            {"row_field_name": "rent_price", "child_docfield_name": "rent"},
+            {"row_field_name": "rent_uom", "child_docfield_name": "rent_uom"},
+            {"row_field_name": "security_deposit_period", "child_docfield_name": "security_deposit_period"},
+            {"row_field_name": "for_sale", "child_docfield_name": "for_sale"},
+            {"row_field_name": "new_development", "child_docfield_name": "new_development"},
+            {"row_field_name": "facing", "child_docfield_name": "facing"},
+            {"row_field_name": "web_name", "child_docfield_name": "web_name"},
+            {"row_field_name": "publish_online", "child_docfield_name": "publish_online"},
+            {"row_field_name": "security_deposit", "child_docfield_name": "security_deposit"}
+        ]
+        for each_row_field in row_to_child_docfield_list:
+            if each_row.__dict__[each_row_field["row_field_name"]] != child_doc.__dict__[each_row_field["child_docfield_name"]]:
+                child_doc.__dict__[each_row_field["child_docfield_name"]] = each_row.__dict__[each_row_field["row_field_name"]]
+                child_doc.name_validation()
+                save_status = True
         if save_status:
             child_doc.save()
                     
@@ -170,33 +173,39 @@ class Property(NestedSet):
                 return return_value
 
     @frappe.whitelist()
-    def address_as_name(self):
+    def name_validation(self):
         if self.advanced_property_management == 1:
-            if self.type and self.address:
+            if self.type:
                 type_doc = frappe.get_doc("Unit Type", self.type)
-                address_doc = frappe.get_doc("Address", self.address)
-                if not type_doc.room:
-                    if self.room_name:
+                if self.address and not self.new_development:
+                    address_doc = frappe.get_doc("Address", self.address)
+                    if not type_doc.room:
+                        if self.room_name:
+                            self.room_name = None
+                        if address_doc.address_line2:
+                            self.name1 = f"{address_doc.address_line1} {address_doc.address_line2}"
+                        else:
+                            self.name1 = address_doc.address_line1
+                    elif self.room_name:
+                        if address_doc.address_line2:
+                            self.name1 = f"{address_doc.address_line1} {address_doc.address_line2} Room {self.room_name}"
+                        else:
+                            self.name1 = f"{address_doc.address_line1} Room {self.room_name}"
+                    else:
+                        self.name1 = None
                         self.room_name = None
-                    if address_doc.address_line2:
-                        self.name1 = f"{address_doc.address_line1} {address_doc.address_line2}"
+                elif self.new_development and self.parent_property:
+                    if self.facing:
+                        self.name1 = f"{self.parent_property} {type_doc.name_without_tags()} Facing {self.facing}"
                     else:
-                        self.name1 = address_doc.address_line1
-                elif self.room_name:
-                    if address_doc.address_line2:
-                        self.name1 = f"{address_doc.address_line1} {address_doc.address_line2} Room {self.room_name}"
-                    else:
-                        self.name1 = f"{address_doc.address_line1} Room {self.room_name}"
-                else:
-                    self.name1 = None
-                    self.room_name = None
+                        self.name1 = f"{self.parent_property} {type_doc.name_without_tags()}"
             self.new_name = self.name1
 
     @frappe.whitelist()
     def status_as_common_area(self):
-        if self.advanced_property_management == 1 and self.rentable == 0:
+        if self.advanced_property_management == 1 and self.rentable == 0 and self.for_sale == 0:
             self.status = "Common Area (Not for sale/lease)"
-        elif self.advanced_property_management == 1 and self.rentable == 1 and self.status == "Common Area (Not for sale/lease)":
+        elif self.advanced_property_management == 1 and (self.rentable == 1 or self.for_sale == 1) and self.status == "Common Area (Not for sale/lease)":
             self.status = "Available"
 
     @frappe.whitelist()
@@ -238,7 +247,12 @@ class Property(NestedSet):
                     "rent_uom": new_row.rent_uom,
                     "security_deposit_period": new_row.security_deposit_period,
                     "security_deposit": new_row.security_deposit,
-                    "rentable": 1
+                    "rentable": new_row.rentable,
+                    "for_sale": new_row.for_sale,
+                    "new_development": new_row.new_development,
+                    "facing": new_row.facing,
+                    "publish_online": new_row.publish_online,
+                    "web_name": new_row.web_name
                 })
 
     def automatic_group_node(self):
@@ -269,7 +283,7 @@ def add_node():
 
 @frappe.whitelist()
 def security_deposit_period_filter(self, txt, searchfield, start, page_len, filters):
-    print(self, txt, searchfield, start, page_len, filters)
+    # print(self, txt, searchfield, start, page_len, filters)
     filters = {'category': 'Rent'}
     if txt:
         filters['to_uom'] = ['like', f'%{txt}%']

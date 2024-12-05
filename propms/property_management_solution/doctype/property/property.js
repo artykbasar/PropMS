@@ -182,6 +182,10 @@ frappe.ui.form.on('Property', {
 		name_fetcher(frm)
 
 	},
+	parent_property: function (frm) {
+		name_fetcher(frm)
+
+	},
 	after_save: function (frm) {
 		if (frm.doc.name != frm.doc.name1) {
 			frappe.set_route('Form', frm.doc.doctype, frm.doc.name1)
@@ -203,14 +207,17 @@ frappe.ui.form.on('Property', {
 });
 
 const unit_children_columns = {
-	rentable: ["unit_type", "property", 'room_name', 'rent_price', 'rent_uom', 'security_deposit_period', 'security_deposit'],
-	new_development: ["unit_type", "property"]
+	rentable: ["unit_type", "web_name", "property", 'room_name', 'rent_price', 'rent_uom', 'security_deposit_period', 'security_deposit'],
+	new_development: ["unit_type", "web_name", "property", "facing", 'publish_online']
 }
 
 
 frappe.ui.form.on('Unit Characteristics', {
 
 	unit_type: function (frm, cdt, cdn) {
+		show_relevant_table_columns(frm, 'unit_children', unit_children_column_list(frm))
+	},
+	publish_online: function (frm, cdt, cdn) {
 		show_relevant_table_columns(frm, 'unit_children', unit_children_column_list(frm))
 	},
 	unit_children_remove: function (frm, cdt, cdn) {
@@ -267,10 +274,9 @@ function show_relevant_table_columns(frm, table_field_name, selected_fields=[]) 
 }
 
 function name_fetcher(frm) {
-	if (frm.doc.advanced_property_management == 1 &&
-		frm.doc.address && frm.doc.type) {
+	if (frm.doc.advanced_property_management == 1 && frm.doc.type) {
 		return frm.call({
-			method: "address_as_name",
+			method: "name_validation",
 			doc: frm.doc,
 			freeze: false,
 			callback: function (r) {

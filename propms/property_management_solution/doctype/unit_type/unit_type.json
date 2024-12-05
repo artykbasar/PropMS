@@ -10,6 +10,7 @@
   "unit_type",
   "column_break_baiq",
   "room",
+  "bedroom",
   "balcony",
   "showerbath",
   "toilet",
@@ -23,6 +24,7 @@
  "fields": [
   {
    "allow_in_quick_entry": 1,
+   "columns": 4,
    "fieldname": "unit_type",
    "fieldtype": "Data",
    "label": "Unit Type",
@@ -51,6 +53,7 @@
   },
   {
    "allow_in_quick_entry": 1,
+   "bold": 1,
    "default": "0",
    "depends_on": "eval: doc.unit_type != \"\" && doc.unit_type != undefined && doc.development_project == 0",
    "description": "Tick it, if this unit is rentable.",
@@ -61,6 +64,7 @@
   },
   {
    "allow_in_quick_entry": 1,
+   "bold": 1,
    "default": "0",
    "depends_on": "eval: doc.room == 1",
    "description": "Tick this if only this room has the access to the balcony!",
@@ -73,6 +77,7 @@
   },
   {
    "allow_in_quick_entry": 1,
+   "bold": 1,
    "default": "0",
    "depends_on": "eval: doc.room == 1",
    "description": "Tick this if only this room has the access to the shower/bath!",
@@ -85,6 +90,7 @@
   },
   {
    "allow_in_quick_entry": 1,
+   "bold": 1,
    "default": "0",
    "depends_on": "eval: doc.room == 1",
    "description": "Tick this if only this room has the access to the toilet!",
@@ -97,6 +103,7 @@
   },
   {
    "allow_in_quick_entry": 1,
+   "bold": 1,
    "default": "0",
    "depends_on": "eval: doc.unit_type != \"\" && doc.unit_type != undefined && doc.development_project == 0",
    "description": "Tick it, if this unit is being rented from a landlord/landlady.",
@@ -107,6 +114,7 @@
   },
   {
    "allow_in_quick_entry": 1,
+   "bold": 1,
    "default": "0",
    "depends_on": "eval: doc.unit_type != \"\" && doc.unit_type != undefined && doc.development_project == 0",
    "description": "Tick it, if this unit is for Sale",
@@ -118,6 +126,7 @@
   },
   {
    "allow_in_quick_entry": 1,
+   "bold": 1,
    "default": "0",
    "depends_on": "eval: doc.for_sale == 1",
    "description": "Tick it, if this unit is New Development",
@@ -128,6 +137,7 @@
    "label": "New Development"
   },
   {
+   "bold": 1,
    "default": "0",
    "depends_on": "eval: doc.unit_type != \"\" && doc.unit_type != undefined",
    "description": "Tick it, if this unit is Development Project.",
@@ -136,10 +146,21 @@
    "in_list_view": 1,
    "in_standard_filter": 1,
    "label": "Development Project"
+  },
+  {
+   "allow_in_quick_entry": 1,
+   "default": "0",
+   "depends_on": "eval: doc.room == 1",
+   "description": "Tick this if the room is a bedroom",
+   "fieldname": "bedroom",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Bedroom"
   }
  ],
  "links": [],
- "modified": "2024-11-12 15:32:31.459552",
+ "modified": "2024-12-02 15:09:23.270002",
  "modified_by": "Administrator",
  "module": "Property Management Solution",
  "name": "Unit Type",
