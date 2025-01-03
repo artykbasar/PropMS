@@ -15,6 +15,9 @@
    "app": "csf_tz"
   },
   {
+   "app": "doppio"
+  },
+  {
    "app": "ecommerce_integrations"
   },
   {
@@ -22,6 +25,12 @@
   },
   {
    "app": "erpnext"
+  },
+  {
+   "app": "builder"
+  },
+  {
+   "app": "crm"
   },
   {
    "app": "frappe"
@@ -36,6 +45,12 @@
    "app": "lms"
   },
   {
+   "app": "gameplan"
+  },
+  {
+   "app": "helpdesk"
+  },
+  {
    "app": "non_profit"
   },
   {
@@ -43,7 +58,7 @@
   }
  ],
  "js": "",
- "modified": "2024-11-07 16:22:27.411503",
+ "modified": "2024-12-17 11:44:00.959248",
  "modified_by": "Administrator",
  "module": "Property Management Solution",
  "name": "Day Theme",

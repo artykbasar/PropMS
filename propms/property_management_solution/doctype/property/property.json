@@ -1,5 +1,6 @@
 {
  "actions": [],
+ "allow_guest_to_view": 1,
  "allow_import": 1,
  "allow_rename": 1,
  "autoname": "field:name1",
@@ -38,6 +39,7 @@
   "development_project",
   "web_name",
   "publish_online",
+  "route",
   "section_break_qdws",
   "unit_children",
   "images",
@@ -440,13 +442,20 @@
    "fieldtype": "Table",
    "label": "Bullet Points",
    "options": "Property Bullet Points"
+  },
+  {
+   "fieldname": "route",
+   "fieldtype": "Small Text",
+   "label": "route"
   }
  ],
+ "has_web_view": 1,
  "icon": "octicon octicon-home",
  "image_field": "photo",
+ "is_published_field": "publish_online",
  "is_tree": 1,
  "links": [],
- "modified": "2024-12-03 22:31:45.485633",
+ "modified": "2024-12-29 09:09:52.027561",
  "modified_by": "Administrator",
  "module": "Property Management Solution",
  "name": "Property",
@@ -528,6 +537,10 @@
    "role": "Property Manager",
    "share": 1,
    "write": 1
+  },
+  {
+   "read": 1,
+   "role": "Guest"
   }
  ],
  "sort_field": "modified",

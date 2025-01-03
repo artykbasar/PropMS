@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 from . import __version__ as app_version
+import frappe
+
 
 app_name = "propms"
 app_title = "Property Management Solution"
@@ -41,7 +43,9 @@ page_js = {
     "pos": "property_management_solution/point_of_sale.js",
     "point-of-sale": "property_management_solution/point_of_sale.js",
 }
-
+treeviews = [
+	"Property"
+]
 # include js in doctype views
 # doctype_js = {"doctype" : "public/js/doctype.js"}
 doctype_js = {
@@ -311,3 +315,25 @@ scheduler_events = {
 # override_whitelisted_methods = {
 # 	"frappe.desk.doctype.event.event.get_events": "propms.event.get_events"
 # }
+
+website_path_resolver = "propms.property_management_solution.doctype.property.property.resolve_path"
+page_renderer = "propms.property_management_solution.doctype.property.property.PropertyPageRenderer"
+
+
+# get_web_pages_with_dynamic_routes = (
+# 	"builder.builder.doctype.builder_page.builder_page.get_web_pages_with_dynamic_routes"
+# )
+
+# get_website_user_home_page = (
+# 	"builder.builder.doctype.builder_settings.builder_settings.get_website_user_home_page"
+# )
+
+# add_to_apps_screen = [
+# 	{
+# 		"name": "builder",
+# 		"logo": "/assets/builder/frontend/builder_logo.png",
+# 		"title": "Builder",
+# 		"route": f"/{development_path}",
+# 		"has_permission": "builder.api.check_app_permission",
+# 	}
+# ]

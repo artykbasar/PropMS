@@ -1,0 +1,18 @@
+{% extends "templates/web.html" %}
+
+{% block page_content %}
+    {%- if doc.development_project == 1 -%}
+        {% include "templates/day/development_project.html"%}
+    {%- elif doc.new_development == 1 %}
+        <h1> New Development </h1>
+    {%- else -%}
+        {% include "404.html"%}
+    {%- endif -%}
+{% endblock %}
+    {% block style %}
+        <style> {% include "templates/day/development_project.css"%} </style>
+    {% endblock %}
+
+
+
+<!-- this is a sample default web page template -->

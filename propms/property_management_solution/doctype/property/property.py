@@ -4,7 +4,40 @@
 
 from __future__ import unicode_literals
 from frappe.utils.nestedset import NestedSet
+from frappe.website.page_renderers.document_page import DocumentPage
 import frappe
+from urllib.parse import unquote
+from frappe.utils.caching import redis_cache
+from frappe.website.path_resolver import evaluate_dynamic_routes
+from frappe.website.path_resolver import resolve_path as original_resolve_path
+from builder.utils import (
+    ColonRule
+)
+
+
+class PropertyPageRenderer(DocumentPage):
+    def can_render(self):
+        if page := find_page_with_path(self.path):
+            self.doctype = "Property"
+            self.docname = page
+            return True
+
+        for d in get_web_pages_with_dynamic_routes():
+            try:
+                if evaluate_dynamic_routes([ColonRule(f"/{d.route}", endpoint=d.name)], self.path):
+                    self.doctype = "Property"
+                    self.docname = d.name
+                    return True
+            except ValueError:
+                return False
+
+        return False
+    
+    # def render(self):
+    #     property_doc = frappe.get_doc(self.doctype, self.docname)
+    #     if property_doc.development_project == 1:
+    #         pass
+    #     return self.build_response(property_doc.as_json())
 
 
 class Property(NestedSet):
@@ -21,15 +54,39 @@ class Property(NestedSet):
         self.check_child_nodes()
         self.default_value_fetcher()
         self.security_deposit_amount_setter()
+        self.defaul_web_name()
+        self.web_view_validation()
+
+    def get_page_info(self):
+        published_children = False
+        if any(child.publish_online == 1 for child in self.get_children()):
+            published_children = True
+        return {"title": self.name, "full_width": 1, "published_children": published_children}
 
     def on_update(self):
         self.validate_rename()
+
+    def defaul_web_name(self):
+        if self.advanced_property_management == 1:
+            if not self.web_name:
+                self.web_name = self.name
 
     def validate_rename(self):
         if self.advanced_property_management == 1:
             if self.name != self.new_name:
                 self.rename(self.new_name)
             self.reload()
+
+    def web_view_validation(self):
+        if self.advanced_property_management == 1:
+            if self.publish_online == 1 and self.web_name:
+                parent_route = ""
+                parent_doc = self.get_parent()
+                while parent_doc:
+                    parent_route = f"/{parent_doc.web_name}"
+                    parent_doc = parent_doc.get_parent()
+                self.route = f"/Property{parent_route}/{self.web_name}"
+                    
 
     def check_child_nodes(self):
         if self.advanced_property_management == 1:
@@ -295,4 +352,53 @@ def security_deposit_period_filter(self, txt, searchfield, start, page_len, filt
                         page_length=page_len,
                         as_list=True
                         )
+
+@frappe.whitelist()
+def has_website_permission_for_property(doc, ptype, user, verbose=True):
+	# Check item group permissions for website
+
+	if user == "Administrator":
+		return True
+
+	if frappe.has_permission("Property", ptype=ptype, doc=doc, user=user):
+		return True
+
+	if not frappe.db.get_single_value("Property Management Settings", "advanced_property_management"):
+		return True
+
+	return True
+
+
+@redis_cache(ttl=60 * 60)
+def find_page_with_path(route):
+    try:
+        return frappe.db.get_value("Property", dict(route=f"/{unquote(route)}", publish_online=1), "name", cache=True)
+    except frappe.DoesNotExistError:
+        pass
+
+
+@redis_cache(ttl=60 * 60)
+def get_web_pages_with_dynamic_routes() -> dict[str, str]:
+    return frappe.get_all(
+        "Property",
+        fields=["name", "route", "modified", "web_name"],
+        filters=dict(publish_online=1),
+        update={"doctype": "Property"},
+    )
+
+
+def resolve_path(path):
+    print(path)
+    try:
+        if find_page_with_path(path):
+            return path
+        elif evaluate_dynamic_routes(
+            [ColonRule(f"/{d.route}", endpoint=d.name) for d in get_web_pages_with_dynamic_routes()],
+            path,
+        ):
+            return path
+    except Exception:
+        pass
+
+    return original_resolve_path(path)
 
