@@ -13,6 +13,12 @@ app_color = "grey"
 app_email = "info@aakvatech.com"
 app_license = "MIT"
 
+jinja = {
+    "methods": [
+        "propms.utils.optional_dependencies.get_value_if_field_exists",
+    ]
+}
+
 # Includes in <head>
 # ------------------
 
