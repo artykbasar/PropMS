@@ -1,4 +1,4 @@
-{%- set doc = frappe.get_doc('Contact Us Settings', 'Contact Us Settings').as_dict() -%}
+{%- set doc = frappe.get_doc('Contact Us Settings', 'Contact Us Settings') -%}
 {%- if doc.query_options -%}
   {%- set query_options = [] -%}
   {%- for opt in doc.query_options.split(",") -%}
