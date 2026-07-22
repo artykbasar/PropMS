@@ -205,6 +205,9 @@ class TestPropertyInstruction(FrappeTestCase):
 		self.assertIn("Check-In", html)
 		self.assertIn("Parking", html)
 		self.assertIn("Open map", html)
+		self.assertIn("property-instruction-print", html)
+		self.assertIn("Print or save guide", html)
+		self.assertNotIn('href="javascript:', html)
 		self.assertNotIn("guest-wifi-only", html)
 
 	def test_rendered_output_excludes_unpublished_content(self):
