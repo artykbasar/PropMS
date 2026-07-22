@@ -131,7 +131,6 @@ class PropertyInstruction(WebsiteGenerator):
 		context.check_in_time = self.check_in_time
 		context.check_out_time = self.check_out_time
 		context.wifi_name = self.wifi_name
-		context.wifi_password = self.get_password("wifi_password", raise_exception=False)
 		context.emergency_contact = self.emergency_contact
 		context.last_reviewed_on = self.last_reviewed_on
 		return context
