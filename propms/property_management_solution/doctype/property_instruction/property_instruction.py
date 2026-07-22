@@ -2,14 +2,17 @@
 
 from __future__ import annotations
 
-from urllib.parse import urlparse
+import os
+from urllib.parse import urlencode, urlparse
 
 import frappe
 from frappe import _
 from frappe.model.naming import make_autoname
-from frappe.utils import sanitize_html, validate_url
+from frappe.utils import cint, sanitize_html, validate_url
 from frappe.website.website_generator import WebsiteGenerator
 from markupsafe import Markup
+
+from propms.property_management_solution.doctype.property_instruction import translation_service
 
 
 SECTION_OPTIONS = [
@@ -23,6 +26,13 @@ SECTION_OPTIONS = [
 	"Check-Out",
 	"Emergency",
 ]
+
+MAP_TYPES = {"roadmap", "satellite"}
+DEFAULT_MAP_ZOOM = 16
+MIN_MAP_ZOOM = 0
+MAX_MAP_ZOOM = 21
+TRANSLATION_READY = "Ready"
+TRANSLATION_STALE = "Stale"
 
 
 class PropertyInstruction(WebsiteGenerator):
@@ -41,9 +51,14 @@ class PropertyInstruction(WebsiteGenerator):
 		self.set_slug()
 		self.set_route_from_slug()
 		self.validate_unique_slug_and_route()
+		self.normalize_map_fields()
 		self.normalize_blocks()
 		self.validate_links()
+		self.flags.translation_source_changed = self.translation_source_changed()
 		super().validate()
+
+	def on_update(self):
+		self.mark_translations_stale_if_needed()
 
 	def make_route(self):
 		return f"instructions/{self.slug}"
@@ -119,60 +134,346 @@ class PropertyInstruction(WebsiteGenerator):
 		return page_info
 
 	def get_context(self, context):
+		language_code = self.get_requested_language()
+		translation = self.get_ready_translation(language_code)
+		display_content = self.get_display_content(translation)
+
 		context.no_cache = 1
 		context.no_breadcrumbs = 1
-		context.title = self.title
-		context.page_title = self.title
-		context.sections = self.get_grouped_blocks()
+		context.title = display_content.title
+		context.page_title = display_content.title
+		context.sections = display_content.sections
 		context.has_sections = bool(context.sections)
-		context.address = self.address
+		context.address = display_content.address
 		context.cover_image = self.cover_image
 		context.google_maps_url = self.google_maps_url
+		context.map_embed_url = self.get_map_embed_url()
+		context.map_embed_enabled = bool(context.map_embed_url)
+		context.map_display_query = self.get_map_display_query()
 		context.check_in_time = self.check_in_time
 		context.check_out_time = self.check_out_time
 		context.wifi_name = self.wifi_name
-		context.emergency_contact = self.emergency_contact
+		context.emergency_contact = display_content.emergency_contact
 		context.last_reviewed_on = self.last_reviewed_on
+		context.available_languages = self.get_available_languages()
+		context.selected_language_code = display_content.language_code
+		context.selected_language_name = display_content.language_name
+		context.translation_enabled = len(context.available_languages) > 1
+		if not getattr(context, "boot", None):
+			context.boot = frappe._dict()
+		elif isinstance(context.boot, dict) and not isinstance(context.boot, frappe._dict):
+			context.boot = frappe._dict(context.boot)
+		context.boot.lang = display_content.language_code
 		return context
 
 	def get_grouped_blocks(self):
+		return self.build_grouped_blocks(self.instruction_blocks or [])
+
+	def build_grouped_blocks(self, ordered_blocks, translation_map=None):
 		grouped = []
-		ordered_blocks = sorted(
-			self.instruction_blocks or [],
+		translation_map = translation_map or {}
+		sorted_rows = sorted(
+			ordered_blocks or [],
 			key=lambda row: ((row.sort_order or row.idx or 0), row.idx or 0),
 		)
 
 		for section in SECTION_OPTIONS:
 			section_blocks = []
 			step_counter = 0
-			for row in ordered_blocks:
+			section_label = section
+			for row in sorted_rows:
 				if row.section != section:
 					continue
 				if not self.block_has_content(row):
 					continue
+				translated_row = translation_map.get(row.name)
+				title = translated_row.title if translated_row and translated_row.title is not None else row.title
+				body = translated_row.body if translated_row and translated_row.body is not None else row.body
+				caption = (
+					translated_row.caption if translated_row and translated_row.caption is not None else row.caption
+				)
+				link_label = (
+					translated_row.link_label
+					if translated_row and translated_row.link_label is not None
+					else row.link_label
+				)
+				section_label = (
+					translated_row.section if translated_row and translated_row.section else section_label
+				)
 				if row.block_type == "Step":
 					step_counter += 1
 				section_blocks.append(
 					frappe._dict(
 						row.as_dict(),
-						safe_body=self.get_safe_body(row.body),
-						anchor=self.scrub(section),
+						title=title,
+						body=body,
+						caption=caption,
+						display_section=section_label,
+						safe_body=self.get_safe_body(body),
+						anchor=self.scrub(section_label),
 						display_step_number=row.step_number or step_counter or None,
-						display_link_label=row.link_label or row.link_url,
-						image_alt=row.caption or row.title or f"{self.title} - {section}",
+						display_link_label=link_label or row.link_url,
+						image_alt=caption or title or f"{self.title} - {section_label}",
 					)
 				)
 
 			if section_blocks:
 				grouped.append(
 					frappe._dict(
-						section=section,
-						anchor=self.scrub(section),
+						section=section_label,
+						anchor=self.scrub(section_label),
 						blocks=section_blocks,
 					)
 				)
 
 		return grouped
+
+	def normalize_map_fields(self):
+		self.show_embedded_map = cint(self.show_embedded_map or 0)
+		self.google_maps_place_id = (self.google_maps_place_id or "").strip()
+		self.map_search_query = (self.map_search_query or "").strip()
+		self.map_zoom = self.normalize_map_zoom(self.map_zoom)
+		if (self.map_type or "").strip().lower() not in MAP_TYPES:
+			self.map_type = "roadmap"
+		else:
+			self.map_type = self.map_type.strip().lower()
+
+	def normalize_map_zoom(self, value):
+		zoom = cint(value or DEFAULT_MAP_ZOOM)
+		if zoom < MIN_MAP_ZOOM or zoom > MAX_MAP_ZOOM:
+			return DEFAULT_MAP_ZOOM
+		return zoom
+
+	def get_map_embed_api_key(self):
+		return frappe.conf.get("google_maps_embed_api_key") or os.environ.get("GOOGLE_MAPS_EMBED_API_KEY")
+
+	def get_map_display_query(self):
+		if self.google_maps_place_id:
+			return f"place_id:{self.google_maps_place_id}"
+		return (self.map_search_query or self.address or "").strip()
+
+	def get_map_embed_url(self):
+		if not cint(self.show_embedded_map):
+			return None
+
+		api_key = self.get_map_embed_api_key()
+		if not api_key:
+			return None
+
+		query = self.get_map_display_query()
+		if not query:
+			return None
+
+		params = {
+			"key": api_key,
+			"q": query,
+			"zoom": self.normalize_map_zoom(self.map_zoom),
+			"maptype": self.map_type if self.map_type in MAP_TYPES else "roadmap",
+		}
+		return f"https://www.google.com/maps/embed/v1/place?{urlencode(params)}"
+
+	def get_requested_language(self):
+		language_code = None
+		request = getattr(frappe.local, "request", None)
+		if request and getattr(request, "args", None):
+			language_code = request.args.get("lang")
+		if not language_code:
+			language_code = (frappe.form_dict or {}).get("lang")
+		return (language_code or "en").strip().lower() or "en"
+
+	def get_ready_translation(self, language_code):
+		if not language_code or language_code == "en":
+			return None
+
+		name = frappe.db.get_value(
+			"Property Instruction Translation",
+			{
+				"property_instruction": self.name,
+				"language_code": language_code,
+				"status": TRANSLATION_READY,
+			},
+			"name",
+		)
+		return frappe.get_doc("Property Instruction Translation", name) if name else None
+
+	def get_available_languages(self):
+		options = [
+			frappe._dict(
+				language_code="en",
+				language_name="English",
+				url=f"/{self.route}",
+			)
+		]
+
+		for row in frappe.get_all(
+			"Property Instruction Translation",
+			filters={
+				"property_instruction": self.name,
+				"status": TRANSLATION_READY,
+			},
+			fields=["language_code", "language_name"],
+			order_by="language_name asc, language_code asc",
+		):
+			options.append(
+				frappe._dict(
+					language_code=row.language_code,
+					language_name=row.language_name or row.language_code.upper(),
+					url=f"/{self.route}?lang={row.language_code}",
+				)
+			)
+
+		return options
+
+	def get_display_content(self, translation=None):
+		if not translation:
+			return frappe._dict(
+				language_code="en",
+				language_name="English",
+				title=self.title,
+				address=self.address,
+				emergency_contact=self.emergency_contact,
+				sections=self.get_grouped_blocks(),
+			)
+
+		translation_map = {
+			row.source_block_name: row for row in (translation.blocks or []) if row.source_block_name
+		}
+		return frappe._dict(
+			language_code=translation.language_code,
+			language_name=translation.language_name or translation.language_code.upper(),
+			title=translation.title or self.title,
+			address=translation.address or self.address,
+			emergency_contact=translation.emergency_contact or self.emergency_contact,
+			sections=self.build_grouped_blocks(self.instruction_blocks or [], translation_map=translation_map),
+		)
+
+	def get_translation_source_payload(self):
+		return {
+			"title": self.title,
+			"address": self.address,
+			"emergency_contact": self.emergency_contact,
+			"blocks": [
+				{
+					"source_block_name": row.name,
+					"section": row.section,
+					"title": row.title,
+					"body": row.body,
+					"caption": row.caption,
+					"link_label": row.link_label,
+					"sort_order": row.sort_order or row.idx,
+				}
+				for row in sorted(
+					self.instruction_blocks or [],
+					key=lambda block: ((block.sort_order or block.idx or 0), block.idx or 0),
+				)
+				if self.block_has_content(row)
+			],
+		}
+
+	def generate_translation(self, language_code, language_name=None):
+		if self.is_new():
+			frappe.throw(_("Please save the Property Instruction before generating a translation."))
+
+		language_code = (language_code or "").strip().lower()
+		if not language_code or language_code == "en":
+			frappe.throw(_("Please choose a non-English target language."))
+
+		translated = translation_service.translate_property_instruction(
+			self.get_translation_source_payload(),
+			target_language=language_code,
+			source_language="en",
+		)
+
+		existing_name = frappe.db.get_value(
+			"Property Instruction Translation",
+			{
+				"property_instruction": self.name,
+				"language_code": language_code,
+			},
+			"name",
+		)
+		doc = (
+			frappe.get_doc("Property Instruction Translation", existing_name)
+			if existing_name
+			else frappe.new_doc("Property Instruction Translation")
+		)
+		doc.property_instruction = self.name
+		doc.language_code = language_code
+		doc.language_name = (language_name or doc.language_name or language_code.upper()).strip()
+		doc.status = "Draft"
+		doc.source_modified = self.modified
+		doc.title = translated.get("title") or self.title
+		doc.address = translated.get("address") or self.address
+		doc.emergency_contact = translated.get("emergency_contact") or self.emergency_contact
+		doc.blocks = []
+		for block in translated.get("blocks") or []:
+			doc.append("blocks", block)
+		doc.save(ignore_permissions=True)
+		return {
+			"name": doc.name,
+			"status": doc.status,
+			"language_code": doc.language_code,
+		}
+
+	def translation_source_changed(self):
+		previous = self.get_doc_before_save()
+		if not previous:
+			return False
+		return self.get_source_signature(previous) != self.get_source_signature(self)
+
+	def get_source_signature(self, doc):
+		return {
+			"title": doc.title,
+			"address": doc.address,
+			"google_maps_url": doc.google_maps_url,
+			"show_embedded_map": cint(doc.show_embedded_map or 0),
+			"google_maps_place_id": doc.google_maps_place_id,
+			"map_search_query": doc.map_search_query,
+			"map_zoom": cint(doc.map_zoom or 0),
+			"map_type": doc.map_type,
+			"check_in_time": str(doc.check_in_time or ""),
+			"check_out_time": str(doc.check_out_time or ""),
+			"wifi_name": doc.wifi_name,
+			"emergency_contact": doc.emergency_contact,
+			"published": cint(doc.published or 0),
+			"blocks": [
+				{
+					"name": row.name,
+					"section": row.section,
+					"block_type": row.block_type,
+					"step_number": row.step_number,
+					"title": row.title,
+					"body": row.body,
+					"image": row.image,
+					"caption": row.caption,
+					"link_url": row.link_url,
+					"link_label": row.link_label,
+					"sort_order": row.sort_order,
+					"idx": row.idx,
+				}
+				for row in doc.instruction_blocks or []
+			],
+		}
+
+	def mark_translations_stale_if_needed(self):
+		if not self.flags.translation_source_changed:
+			return
+
+		for name in frappe.get_all(
+			"Property Instruction Translation",
+			filters={
+				"property_instruction": self.name,
+				"status": ["!=", TRANSLATION_STALE],
+			},
+			pluck="name",
+		):
+			frappe.db.set_value(
+				"Property Instruction Translation",
+				name,
+				"status",
+				TRANSLATION_STALE,
+				update_modified=False,
+			)
 
 	def get_safe_body(self, body):
 		if not body:
@@ -189,3 +490,10 @@ class PropertyInstruction(WebsiteGenerator):
 				row.link_url,
 			]
 		)
+
+
+@frappe.whitelist()
+def generate_translation(property_instruction, language_code, language_name=None):
+	doc = frappe.get_doc("Property Instruction", property_instruction)
+	doc.check_permission("write")
+	return doc.generate_translation(language_code=language_code, language_name=language_name)

@@ -204,6 +204,62 @@
     text-align: center;
     color: var(--pi-muted);
   }
+  .pi-map-card {
+    margin-bottom: 1.25rem;
+    padding: 1rem;
+  }
+  .pi-map-shell {
+    aspect-ratio: 16 / 9;
+    min-height: 320px;
+    overflow: hidden;
+    border-radius: 20px;
+    border: 1px solid var(--pi-border);
+    background: #e7ecef;
+  }
+  .pi-map {
+    width: 100%;
+    height: 100%;
+    border: 0;
+    display: block;
+  }
+  .pi-language-switcher {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .5rem;
+    margin-bottom: 1rem;
+    align-items: center;
+  }
+  .pi-language-label {
+    margin: 0;
+    color: var(--pi-muted);
+    font-size: .88rem;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+  }
+  .pi-language-option {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: .5rem .85rem;
+    border-radius: 999px;
+    border: 1px solid var(--pi-border);
+    color: var(--pi-ink);
+    text-decoration: none;
+    font-weight: 600;
+    background: rgba(255, 255, 255, 0.75);
+  }
+  .pi-language-option.is-active {
+    background: var(--pi-accent);
+    border-color: var(--pi-accent);
+    color: #fff;
+  }
+  .pi-print-header {
+    display: none;
+  }
+  .pi-print-map-url {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
   @media (max-width: 860px) {
     .pi-grid {
       grid-template-columns: 1fr;
@@ -211,22 +267,122 @@
     .pi-nav {
       position: static;
     }
+    .pi-map-shell {
+      min-height: 260px;
+    }
   }
   @media print {
+    @page {
+      size: A4 portrait;
+      margin: 12mm;
+    }
     .pi-page {
       background: #fff;
       padding: 0;
+      color: #111827;
+      font-size: 11pt;
     }
     .pi-shell {
       width: 100%;
     }
     .pi-nav,
-    .pi-actions {
+    .pi-actions,
+    .pi-map-card,
+    .property-instruction-print,
+    .pi-language-switcher {
       display: none;
     }
-    .pi-hero, .pi-card, .pi-block {
+    .pi-grid,
+    .pi-sections {
+      display: block;
+      width: 100%;
+    }
+    .pi-hero {
+      border: 0;
+      box-shadow: none;
+      margin: 0 0 8mm;
+      background: transparent;
+    }
+    .pi-cover {
+      display: none;
+    }
+    .pi-hero-body {
+      padding: 0;
+    }
+    .pi-print-header {
+      display: block;
+      margin-bottom: 6mm;
+      padding-bottom: 4mm;
+      border-bottom: 1px solid #9ca3af;
+    }
+    .pi-print-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 3mm 6mm;
+      margin-top: 4mm;
+    }
+    .pi-print-row {
+      break-inside: avoid;
+    }
+    .pi-print-header .pi-title {
+      font-size: 18pt;
+      margin: 0 0 2mm;
+    }
+    .pi-print-header .pi-value {
+      font-weight: 500;
+    }
+    .pi-hero,
+    .pi-card,
+    .pi-block {
       box-shadow: none;
       border-color: #c8c8c8;
+      border-radius: 4mm;
+    }
+    .pi-card {
+      margin-bottom: 5mm;
+      padding: 5mm;
+      break-inside: auto;
+    }
+    .pi-section-title {
+      margin: 0 0 3mm;
+      break-after: avoid;
+      page-break-after: avoid;
+    }
+    .pi-blocks {
+      display: block;
+    }
+    .pi-block {
+      margin-bottom: 3.5mm;
+      break-inside: avoid;
+      padding: 4mm;
+    }
+    .pi-block-warning {
+      border-left: 3mm solid #b45309;
+      background: #fff7ed;
+      print-color-adjust: exact;
+      -webkit-print-color-adjust: exact;
+    }
+    .pi-step-head {
+      margin-bottom: 2mm;
+    }
+    .pi-step-badge {
+      width: 9mm;
+      height: 9mm;
+      font-size: 10pt;
+    }
+    .pi-image {
+      max-height: 55mm;
+      width: auto;
+      max-width: 100%;
+      object-fit: contain;
+      break-inside: avoid;
+    }
+    .pi-body,
+    .pi-caption,
+    .pi-value,
+    .pi-link {
+      orphans: 3;
+      widows: 3;
     }
   }
 </style>
@@ -235,6 +391,43 @@
 {% block page_content %}
 <div class="pi-page">
   <div class="pi-shell">
+    {% if translation_enabled %}
+    <nav class="pi-language-switcher" aria-label="Language selector">
+      <p class="pi-language-label">Language</p>
+      {% for language in available_languages %}
+      <a
+        class="pi-language-option{% if language.language_code == selected_language_code %} is-active{% endif %}"
+        href="{{ language.url }}">
+        {{ language.language_name }}
+      </a>
+      {% endfor %}
+    </nav>
+    {% endif %}
+
+    <section class="pi-print-header" aria-hidden="true">
+      <h1 class="pi-title">{{ title }}</h1>
+      {% if address %}
+      <div class="pi-value">{{ address }}</div>
+      {% endif %}
+      <div class="pi-print-grid">
+        {% if check_in_time %}
+        <div class="pi-print-row"><span class="pi-label">Check-In</span><span class="pi-value">{{ check_in_time }}</span></div>
+        {% endif %}
+        {% if check_out_time %}
+        <div class="pi-print-row"><span class="pi-label">Check-Out</span><span class="pi-value">{{ check_out_time }}</span></div>
+        {% endif %}
+        {% if wifi_name %}
+        <div class="pi-print-row"><span class="pi-label">Wi-Fi Name</span><span class="pi-value">{{ wifi_name }}</span></div>
+        {% endif %}
+        {% if last_reviewed_on %}
+        <div class="pi-print-row"><span class="pi-label">Last Reviewed</span><span class="pi-value">{{ last_reviewed_on }}</span></div>
+        {% endif %}
+        {% if google_maps_url %}
+        <div class="pi-print-row pi-print-map-url"><span class="pi-label">Map URL</span><span class="pi-value">{{ google_maps_url }}</span></div>
+        {% endif %}
+      </div>
+    </section>
+
     <article class="pi-hero">
       {% if cover_image %}
       <img class="pi-cover" src="{{ cover_image }}" alt="{{ title }} cover image">
@@ -287,6 +480,21 @@
         </div>
       </div>
     </article>
+
+    {% if map_embed_url %}
+    <section class="pi-card pi-map-card" aria-label="Property map">
+      <div class="pi-map-shell">
+        <iframe
+          class="pi-map"
+          title="Map showing the property location"
+          loading="lazy"
+          allowfullscreen
+          referrerpolicy="strict-origin-when-cross-origin"
+          src="{{ map_embed_url }}">
+        </iframe>
+      </div>
+    </section>
+    {% endif %}
 
     {% if has_sections %}
     <div class="pi-grid">

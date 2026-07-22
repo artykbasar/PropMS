@@ -17,6 +17,11 @@
   "address",
   "cover_image",
   "google_maps_url",
+  "show_embedded_map",
+  "google_maps_place_id",
+  "map_search_query",
+  "map_zoom",
+  "map_type",
   "column_break_visit_details",
   "check_in_time",
   "check_out_time",
@@ -90,6 +95,35 @@
    "fieldname": "google_maps_url",
    "fieldtype": "Data",
    "label": "Google Maps URL"
+  },
+  {
+   "default": "1",
+   "fieldname": "show_embedded_map",
+   "fieldtype": "Check",
+   "label": "Show Embedded Map"
+  },
+  {
+   "fieldname": "google_maps_place_id",
+   "fieldtype": "Data",
+   "label": "Google Maps Place ID"
+  },
+  {
+   "fieldname": "map_search_query",
+   "fieldtype": "Data",
+   "label": "Map Search Query"
+  },
+  {
+   "default": "16",
+   "fieldname": "map_zoom",
+   "fieldtype": "Int",
+   "label": "Map Zoom"
+  },
+  {
+   "default": "roadmap",
+   "fieldname": "map_type",
+   "fieldtype": "Select",
+   "label": "Map Type",
+   "options": "roadmap\nsatellite"
   },
   {
    "fieldname": "column_break_visit_details",
