@@ -319,8 +319,8 @@
   .pi-print-meta-grid {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 4mm 6mm;
-    margin-top: 5mm;
+    gap: 2.5mm 5mm;
+    margin-top: 2.5mm;
   }
   .pi-print-meta-item {
     break-inside: avoid;
@@ -331,12 +331,15 @@
     word-break: break-word;
   }
   .pi-print-section {
-    margin-top: 7mm;
+    margin: 0 0 5mm;
     break-inside: auto;
   }
+  .pi-print-section + .pi-print-section {
+    margin-top: 5mm;
+  }
   .pi-print-section-title {
-    margin: 0 0 3mm;
-    padding-bottom: 2mm;
+    margin: 0 0 2mm;
+    padding-bottom: 1.5mm;
     border-bottom: 1px solid #cbd5e1;
     font-size: 13pt;
     break-after: avoid;
@@ -348,9 +351,13 @@
   .pi-print-block {
     border: 1px solid #d8dee6;
     border-radius: 3mm;
-    padding: 3.5mm;
+    padding: 3mm;
     background: #fff;
     break-inside: avoid;
+    margin-bottom: 2.5mm;
+  }
+  .pi-print-block:last-child {
+    margin-bottom: 0;
   }
   .pi-print-block-warning {
     border-left: 3mm solid #92400e;
@@ -400,6 +407,18 @@
     object-fit: contain;
     border-radius: 2mm;
     break-inside: avoid;
+  }
+  .pi-print-image-block {
+    display: grid;
+    grid-template-columns: 60mm minmax(0, 1fr);
+    gap: 4mm;
+    align-items: start;
+  }
+  .pi-print-image-figure {
+    margin: 0;
+  }
+  .pi-print-image-content {
+    min-width: 0;
   }
   .pi-print-link {
     margin-top: 2mm;
@@ -453,6 +472,9 @@
     .pi-print-blocks {
       width: 100%;
     }
+    .pi-print-blocks {
+      display: block;
+    }
     .pi-print-meta-grid {
       grid-template-columns: repeat(2, minmax(0, 1fr));
     }
@@ -477,6 +499,9 @@
     .pi-print-layout .pi-value {
       orphans: 3;
       widows: 3;
+    }
+    .pi-print-image-block {
+      grid-template-columns: 55mm minmax(0, 1fr);
     }
   }
 </style>
@@ -514,8 +539,31 @@
 {% endmacro %}
 
 {% macro render_print_block(block) %}
+  {% if block.hide_in_print %}
+  {% else %}
   <div class="pi-print-block pi-print-block-{{ block.block_type | lower | replace(' ', '-') }}">
-    {% if block.block_type == "Step" %}
+    {% if block.block_type == "Image" %}
+    <div class="pi-print-image-block">
+      <figure class="pi-print-image-figure">
+        <img class="pi-print-image" src="{{ block.image }}" alt="{{ block.image_alt }}">
+      </figure>
+      <div class="pi-print-image-content">
+        {% if block.title %}<h3 class="pi-print-block-title">{{ block.title }}</h3>{% endif %}
+        {% if block.safe_body %}
+        <div class="pi-print-body">{{ block.safe_body }}</div>
+        {% endif %}
+        {% if block.caption %}
+        <div class="pi-print-caption">{{ block.caption }}</div>
+        {% endif %}
+        {% if block.link_url %}
+        <div class="pi-print-link">
+          <strong>{{ block.display_link_label }}</strong>
+          <div class="pi-print-link-url">{{ block.link_url }}</div>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+    {% elif block.block_type == "Step" %}
     <div class="pi-print-step-head">
       <span class="pi-print-step-number">{{ block.display_step_number }}</span>
       {% if block.title %}<h3 class="pi-print-block-title">{{ block.title }}</h3>{% endif %}
@@ -528,11 +576,11 @@
     <div class="pi-print-body">{{ block.safe_body }}</div>
     {% endif %}
 
-    {% if block.image %}
+    {% if block.image and block.block_type != "Image" %}
     <img class="pi-print-image" src="{{ block.image }}" alt="{{ block.image_alt }}">
     {% endif %}
 
-    {% if block.caption %}
+    {% if block.caption and block.block_type != "Image" %}
     <div class="pi-print-caption">{{ block.caption }}</div>
     {% endif %}
 
@@ -543,6 +591,7 @@
     </div>
     {% endif %}
   </div>
+  {% endif %}
 {% endmacro %}
 
 {% block page_content %}

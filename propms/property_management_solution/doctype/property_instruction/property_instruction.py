@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+from datetime import timedelta
 from urllib.parse import urlencode, urlparse, urlunparse
 
 import frappe
@@ -161,8 +162,8 @@ class PropertyInstruction(WebsiteGenerator):
 		context.map_embed_enabled = bool(property_map.embed_url)
 		context.map_display_query = self.get_map_display_query()
 		context.property_map = property_map
-		context.check_in_time = self.check_in_time
-		context.check_out_time = self.check_out_time
+		context.check_in_time = self.format_display_time(self.check_in_time)
+		context.check_out_time = self.format_display_time(self.check_out_time)
 		context.wifi_name = self.wifi_name
 		context.emergency_contact = display_content.emergency_contact
 		context.last_reviewed_on = self.last_reviewed_on
@@ -184,6 +185,7 @@ class PropertyInstruction(WebsiteGenerator):
 	def build_grouped_blocks(self, ordered_blocks, translation_map=None):
 		grouped = []
 		translation_map = translation_map or {}
+		property_map = self.get_property_map()
 		sorted_rows = sorted(
 			ordered_blocks or [],
 			key=lambda row: ((row.sort_order or row.idx or 0), row.idx or 0),
@@ -226,6 +228,7 @@ class PropertyInstruction(WebsiteGenerator):
 						display_step_number=row.step_number or step_counter or None,
 						display_link_label=link_label or row.link_url,
 						image_alt=caption or title or f"{self.title} - {section_label}",
+						hide_in_print=self.should_hide_block_in_print(row, property_map.external_url),
 					)
 				)
 
@@ -342,6 +345,49 @@ class PropertyInstruction(WebsiteGenerator):
 			if code and code not in languages:
 				languages.append(code)
 		return languages
+
+	def format_display_time(self, value):
+		if not value:
+			return None
+
+		if isinstance(value, timedelta):
+			total_seconds = int(value.total_seconds())
+			hours, remainder = divmod(total_seconds, 3600)
+			minutes, seconds = divmod(remainder, 60)
+		else:
+			text = str(value).strip()
+			parts = text.split(":")
+			if len(parts) < 2:
+				return text
+			hours = cint(parts[0])
+			minutes = cint(parts[1])
+			seconds = cint(parts[2].split(".")[0]) if len(parts) > 2 else 0
+
+		if seconds:
+			return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+		return f"{hours:02d}:{minutes:02d}"
+
+	def should_hide_block_in_print(self, row, print_map_url=None):
+		if row.block_type != "Link" or row.section != "Finding the Property" or not row.link_url or not print_map_url:
+			return False
+		return self.urls_match_for_print(row.link_url, print_map_url)
+
+	def urls_match_for_print(self, left, right):
+		left_url = urlparse((left or "").strip())
+		right_url = urlparse((right or "").strip())
+		if not left_url.scheme or not right_url.scheme:
+			return False
+		return (
+			left_url.scheme.lower(),
+			(left_url.netloc or "").lower(),
+			left_url.path.rstrip("/"),
+			left_url.query,
+		) == (
+			right_url.scheme.lower(),
+			(right_url.netloc or "").lower(),
+			right_url.path.rstrip("/"),
+			right_url.query,
+		)
 
 	def get_requested_language(self):
 		language_code = None

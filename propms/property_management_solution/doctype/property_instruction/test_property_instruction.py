@@ -349,13 +349,16 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 		self.assertIn("Print or save guide", html)
 		self.assertNotIn('href="javascript:', html)
 		self.assertNotIn("guest-wifi-only", html)
+		self.assertNotIn("15:00:00", html)
 		self.assertIn("@page {", html)
 		self.assertIn("pi-screen-layout", html)
 		self.assertIn("pi-print-layout", html)
 		self.assertIn("pi-print-title", html)
 		self.assertIn("break-inside: avoid;", html)
+		self.assertIn(">15:00<", html)
 		print_slice = html.split('class="pi-print-layout"', 1)[1]
 		self.assertNotIn("<iframe", print_slice)
+		self.assertEqual(print_slice.count("https://www.google.com/maps/place/99A+Burlington+Road"), 1)
 
 	def test_print_layout_has_dedicated_wrappers(self):
 		doc = self.make_instruction()
@@ -364,6 +367,32 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 		self.assertIn(".pi-screen-layout {\n      display: none !important;", html)
 		self.assertIn(".pi-print-layout {\n      display: block !important;", html)
 		self.assertIn(".pi-print-meta-grid", html)
+		self.assertIn(".pi-print-image-block", html)
+
+	def test_print_hides_duplicate_map_link_block(self):
+		doc = self.make_instruction(
+			google_maps_url="https://www.google.com/maps/place/99A+Burlington+Road",
+			instruction_blocks=[
+				{
+					"section": "Finding the Property",
+					"block_type": "Link",
+					"title": "Map",
+					"link_url": "https://www.google.com/maps/place/99A+Burlington+Road",
+					"link_label": "Open map",
+				},
+				{
+					"section": "Finding the Property",
+					"block_type": "Text",
+					"title": "Find the entrance",
+					"body": "<p>Look for the black gate beside the shopfront.</p>",
+				},
+			],
+		)
+		html = self.render_instruction(doc)
+		print_slice = html.split('class="pi-print-layout"', 1)[1]
+		self.assertEqual(print_slice.count("https://www.google.com/maps/place/99A+Burlington+Road"), 1)
+		self.assertNotIn("<strong>Open map</strong>", print_slice)
+		self.assertIn("Find the entrance", print_slice)
 
 	def test_rendered_output_excludes_unpublished_content(self):
 		published_doc = self.make_instruction(title="Published Guide")
@@ -378,6 +407,7 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 		self.assertNotIn(unpublished_doc.title, html)
 
 	def test_google_translate_widget_disabled_by_default(self):
+		self.set_property_management_setting("enable_guest_guide_google_translate", 0)
 		doc = self.make_instruction()
 		html = self.render_instruction(doc)
 		self.assertNotIn("translate.google.com/translate_a/element.js", html)
