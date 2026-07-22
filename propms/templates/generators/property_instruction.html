@@ -1,4 +1,10 @@
 {% extends "templates/web.html" %}
+{% set google_translate = google_translate if google_translate is defined and google_translate else {"enabled": 0} %}
+{% set property_map = property_map if property_map is defined and property_map else {"embed_url": map_embed_url if map_embed_url is defined else None, "external_url": google_maps_url if google_maps_url is defined else None} %}
+{% set screen_map_query = ("place_id:" ~ google_maps_place_id) if google_maps_place_id else (map_search_query or address) %}
+{% set screen_map_zoom = map_zoom or 16 %}
+{% set screen_map_embed_url = property_map.embed_url if property_map and property_map.embed_url else (map_embed_url if map_embed_url is defined and map_embed_url else (("https://www.google.com/maps?q=" ~ (screen_map_query | urlencode) ~ "&z=" ~ screen_map_zoom ~ "&output=embed" ~ ("&t=k" if map_type == "satellite" else "")) if show_embedded_map and screen_map_query else None)) %}
+{% set screen_map_external_url = property_map.external_url if property_map and property_map.external_url else (google_maps_url if google_maps_url is defined and google_maps_url else (("https://www.google.com/maps/search/?api=1&query=" ~ (screen_map_query | urlencode)) if screen_map_query else None)) %}
 
 {% block navbar %}{% endblock %}
 {% block footer %}{% endblock %}
@@ -22,11 +28,20 @@
     width: min(1080px, calc(100% - 2rem));
     margin: 0 auto;
   }
-  .pi-hero, .pi-card, .pi-nav {
+  .pi-hero,
+  .pi-card,
+  .pi-nav,
+  .pi-translate-shell {
     background: var(--pi-card);
     border: 1px solid var(--pi-border);
     border-radius: 24px;
     box-shadow: 0 18px 40px rgba(15, 23, 42, 0.06);
+  }
+  .pi-screen-layout {
+    display: block;
+  }
+  .pi-print-layout {
+    display: none;
   }
   .pi-hero {
     overflow: hidden;
@@ -62,7 +77,8 @@
     gap: .9rem;
     margin-top: 1.25rem;
   }
-  .pi-meta-item, .pi-card {
+  .pi-meta-item,
+  .pi-card {
     padding: 1rem 1.1rem;
   }
   .pi-label {
@@ -282,12 +298,116 @@
     background: #fff;
     color: var(--pi-ink);
   }
-  .pi-print-header {
-    display: none;
+  .pi-print-kicker {
+    margin: 0 0 2mm;
+    font-size: 9pt;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: #475569;
+    font-weight: 700;
   }
-  .pi-print-map-url {
+  .pi-print-title {
+    margin: 0;
+    font-size: 20pt;
+    line-height: 1.08;
+  }
+  .pi-print-address {
+    margin: 2mm 0 0;
+    font-size: 10.5pt;
+    color: #334155;
+  }
+  .pi-print-meta-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 4mm 6mm;
+    margin-top: 5mm;
+  }
+  .pi-print-meta-item {
+    break-inside: avoid;
+  }
+  .pi-print-map-url,
+  .pi-print-link-url {
     overflow-wrap: anywhere;
     word-break: break-word;
+  }
+  .pi-print-section {
+    margin-top: 7mm;
+    break-inside: auto;
+  }
+  .pi-print-section-title {
+    margin: 0 0 3mm;
+    padding-bottom: 2mm;
+    border-bottom: 1px solid #cbd5e1;
+    font-size: 13pt;
+    break-after: avoid;
+  }
+  .pi-print-blocks {
+    display: grid;
+    gap: 3mm;
+  }
+  .pi-print-block {
+    border: 1px solid #d8dee6;
+    border-radius: 3mm;
+    padding: 3.5mm;
+    background: #fff;
+    break-inside: avoid;
+  }
+  .pi-print-block-warning {
+    border-left: 3mm solid #92400e;
+    background: #fffaf0;
+  }
+  .pi-print-step-head {
+    display: flex;
+    gap: 3mm;
+    align-items: flex-start;
+    margin-bottom: 2mm;
+  }
+  .pi-print-step-number {
+    width: 8mm;
+    height: 8mm;
+    border-radius: 999px;
+    background: #0f766e;
+    color: #fff;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 9pt;
+    font-weight: 700;
+    flex: 0 0 auto;
+  }
+  .pi-print-block-title {
+    margin: 0;
+    font-size: 10.5pt;
+    line-height: 1.35;
+  }
+  .pi-print-body :first-child {
+    margin-top: 0;
+  }
+  .pi-print-body :last-child {
+    margin-bottom: 0;
+  }
+  .pi-print-caption {
+    margin-top: 1.5mm;
+    color: #475569;
+    font-size: 9pt;
+  }
+  .pi-print-image {
+    display: block;
+    max-width: 100%;
+    width: auto;
+    max-height: 55mm;
+    margin-top: 2.5mm;
+    object-fit: contain;
+    border-radius: 2mm;
+    break-inside: avoid;
+  }
+  .pi-print-link {
+    margin-top: 2mm;
+    font-size: 9pt;
+  }
+  .pi-print-link a {
+    color: inherit;
+    text-decoration: underline;
   }
   @media (max-width: 860px) {
     .pi-grid {
@@ -303,114 +423,58 @@
   @media print {
     @page {
       size: A4 portrait;
-      margin: 12mm;
+      margin: 12mm 13mm;
+    }
+    html,
+    body,
+    .page-content-wrapper,
+    .page_content,
+    .pi-page {
+      min-height: 0 !important;
+      height: auto !important;
     }
     .pi-page {
       background: #fff;
-      padding: 0;
       color: #111827;
-      font-size: 11pt;
+      padding: 0;
+      font-size: 10pt;
     }
     .pi-shell {
       width: 100%;
     }
-    .pi-nav,
-    .pi-actions,
-    .pi-map-card,
-    .property-instruction-print,
-    .pi-language-switcher,
-    .pi-translate-shell {
-      display: none;
+    .pi-screen-layout {
+      display: none !important;
     }
-    .pi-grid,
-    .pi-sections {
-      display: block;
+    .pi-print-layout {
+      display: block !important;
+    }
+    .pi-print-layout,
+    .pi-print-section,
+    .pi-print-blocks {
       width: 100%;
     }
-    .pi-hero {
-      border: 0;
-      box-shadow: none;
-      margin: 0 0 8mm;
-      background: transparent;
-    }
-    .pi-cover {
-      display: none;
-    }
-    .pi-hero-body {
-      padding: 0;
-    }
-    .pi-print-header {
-      display: block;
-      margin-bottom: 6mm;
-      padding-bottom: 4mm;
-      border-bottom: 1px solid #9ca3af;
-    }
-    .pi-print-grid {
-      display: grid;
+    .pi-print-meta-grid {
       grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 3mm 6mm;
-      margin-top: 4mm;
     }
-    .pi-print-row {
+    .pi-print-block,
+    .pi-print-image,
+    .pi-print-step-head {
       break-inside: avoid;
     }
-    .pi-print-header .pi-title {
-      font-size: 18pt;
-      margin: 0 0 2mm;
-    }
-    .pi-print-header .pi-value {
-      font-weight: 500;
-    }
-    .pi-hero,
-    .pi-card,
-    .pi-block {
-      box-shadow: none;
-      border-color: #c8c8c8;
-      border-radius: 4mm;
-    }
-    .pi-card {
-      margin-bottom: 5mm;
-      padding: 5mm;
-      break-inside: auto;
-    }
-    .pi-section-title {
-      margin: 0 0 3mm;
+    .pi-print-section-title {
       break-after: avoid;
-      page-break-after: avoid;
     }
-    .pi-blocks {
-      display: block;
-    }
-    .pi-block {
-      margin-bottom: 3.5mm;
-      break-inside: avoid;
-      padding: 4mm;
-    }
-    .pi-block-warning {
-      border-left: 3mm solid #b45309;
-      background: #fff7ed;
+    .pi-print-block-warning {
       print-color-adjust: exact;
       -webkit-print-color-adjust: exact;
     }
-    .pi-step-head {
-      margin-bottom: 2mm;
+    .pi-print-layout a {
+      color: inherit;
     }
-    .pi-step-badge {
-      width: 9mm;
-      height: 9mm;
-      font-size: 10pt;
-    }
-    .pi-image {
-      max-height: 55mm;
-      width: auto;
-      max-width: 100%;
-      object-fit: contain;
-      break-inside: avoid;
-    }
-    .pi-body,
-    .pi-caption,
-    .pi-value,
-    .pi-link {
+    .pi-print-layout .pi-print-body,
+    .pi-print-layout .pi-print-caption,
+    .pi-print-layout .pi-print-link,
+    .pi-print-layout .pi-value {
       orphans: 3;
       widows: 3;
     }
@@ -418,185 +482,248 @@
 </style>
 {% endblock %}
 
+{% macro render_screen_block(block) %}
+  <div class="pi-block pi-block-{{ block.block_type | lower | replace(' ', '-') }}">
+    {% if block.block_type == "Step" %}
+    <div class="pi-step-head">
+      <span class="pi-step-badge">{{ block.display_step_number }}</span>
+      {% if block.title %}<h3>{{ block.title }}</h3>{% endif %}
+    </div>
+    {% elif block.title %}
+    <h3>{{ block.title }}</h3>
+    {% endif %}
+
+    {% if block.safe_body %}
+    <div class="pi-body">{{ block.safe_body }}</div>
+    {% endif %}
+
+    {% if block.image %}
+    <img class="pi-image" src="{{ block.image }}" alt="{{ block.image_alt }}">
+    {% endif %}
+
+    {% if block.caption %}
+    <div class="pi-caption">{{ block.caption }}</div>
+    {% endif %}
+
+    {% if block.link_url %}
+    <div class="pi-link">
+      <a href="{{ block.link_url }}" target="_blank" rel="noopener noreferrer nofollow">{{ block.display_link_label }}</a>
+    </div>
+    {% endif %}
+  </div>
+{% endmacro %}
+
+{% macro render_print_block(block) %}
+  <div class="pi-print-block pi-print-block-{{ block.block_type | lower | replace(' ', '-') }}">
+    {% if block.block_type == "Step" %}
+    <div class="pi-print-step-head">
+      <span class="pi-print-step-number">{{ block.display_step_number }}</span>
+      {% if block.title %}<h3 class="pi-print-block-title">{{ block.title }}</h3>{% endif %}
+    </div>
+    {% elif block.title %}
+    <h3 class="pi-print-block-title">{{ block.title }}</h3>
+    {% endif %}
+
+    {% if block.safe_body %}
+    <div class="pi-print-body">{{ block.safe_body }}</div>
+    {% endif %}
+
+    {% if block.image %}
+    <img class="pi-print-image" src="{{ block.image }}" alt="{{ block.image_alt }}">
+    {% endif %}
+
+    {% if block.caption %}
+    <div class="pi-print-caption">{{ block.caption }}</div>
+    {% endif %}
+
+    {% if block.link_url %}
+    <div class="pi-print-link">
+      <strong>{{ block.display_link_label }}</strong>
+      <div class="pi-print-link-url">{{ block.link_url }}</div>
+    </div>
+    {% endif %}
+  </div>
+{% endmacro %}
+
 {% block page_content %}
 <div class="pi-page" lang="{{ selected_language_code or 'en' }}">
   <div class="pi-shell">
-    {% if google_translate.enabled %}
-    <section class="pi-card pi-translate-shell" aria-label="Instant translation">
-      <p class="pi-translate-copy">Translate this guide instantly</p>
-      <div id="{{ google_translate.container_id }}" class="pi-translate-widget"></div>
-    </section>
-    {% endif %}
-
-    {% if translation_enabled %}
-    <nav class="pi-language-switcher" aria-label="Language selector">
-      <p class="pi-language-label">Language</p>
-      {% for language in available_languages %}
-      <a
-        class="pi-language-option{% if language.language_code == selected_language_code %} is-active{% endif %}"
-        href="{{ language.url }}">
-        {{ language.language_name }}
-      </a>
-      {% endfor %}
-    </nav>
-    {% endif %}
-
-    <section class="pi-print-header" aria-hidden="true">
-      <h1 class="pi-title">{{ title }}</h1>
-      {% if address %}
-      <div class="pi-value">{{ address }}</div>
+    <div class="pi-screen-layout">
+      {% if google_translate and google_translate.enabled %}
+      <section class="pi-translate-shell" aria-label="Instant translation">
+        <p class="pi-translate-copy">Translate this guide instantly</p>
+        <div id="{{ google_translate.container_id }}" class="pi-translate-widget"></div>
+      </section>
       {% endif %}
-      <div class="pi-print-grid">
-        {% if check_in_time %}
-        <div class="pi-print-row"><span class="pi-label">Check-In</span><span class="pi-value">{{ check_in_time }}</span></div>
-        {% endif %}
-        {% if check_out_time %}
-        <div class="pi-print-row"><span class="pi-label">Check-Out</span><span class="pi-value">{{ check_out_time }}</span></div>
-        {% endif %}
-        {% if wifi_name %}
-        <div class="pi-print-row"><span class="pi-label">Wi-Fi Name</span><span class="pi-value">{{ wifi_name }}</span></div>
-        {% endif %}
-        {% if last_reviewed_on %}
-        <div class="pi-print-row"><span class="pi-label">Last Reviewed</span><span class="pi-value">{{ last_reviewed_on }}</span></div>
-        {% endif %}
-        {% if google_maps_url %}
-        <div class="pi-print-row pi-print-map-url"><span class="pi-label">Map URL</span><span class="pi-value">{{ google_maps_url }}</span></div>
-        {% endif %}
-      </div>
-    </section>
 
-    <article class="pi-hero">
-      {% if cover_image %}
-      <img class="pi-cover" src="{{ cover_image }}" alt="{{ title }} cover image">
+      {% if translation_enabled %}
+      <nav class="pi-language-switcher" aria-label="Language selector">
+        <p class="pi-language-label">Language</p>
+        {% for language in available_languages %}
+        <a
+          class="pi-language-option{% if language.language_code == selected_language_code %} is-active{% endif %}"
+          href="{{ language.url }}">
+          {{ language.language_name }}
+        </a>
+        {% endfor %}
+      </nav>
       {% endif %}
-      <div class="pi-hero-body">
-        <div class="pi-eyebrow">Guest Instructions</div>
-        <h1 class="pi-title">{{ title }}</h1>
-        {% if address %}
-        <p class="pi-value">{{ address }}</p>
-        {% endif %}
 
-        <div class="pi-meta">
-          {% if check_in_time %}
-          <div class="pi-meta-item">
-            <span class="pi-label">Check-In</span>
-            <span class="pi-value">{{ check_in_time }}</span>
+      <article class="pi-hero">
+        {% if cover_image %}
+        <img class="pi-cover" src="{{ cover_image }}" alt="{{ title }} cover image">
+        {% endif %}
+        <div class="pi-hero-body">
+          <div class="pi-eyebrow">Guest Instructions</div>
+          <h1 class="pi-title">{{ title }}</h1>
+          {% if address %}
+          <p class="pi-value">{{ address }}</p>
+          {% endif %}
+
+          <div class="pi-meta">
+            {% if check_in_time %}
+            <div class="pi-meta-item">
+              <span class="pi-label">Check-In</span>
+              <span class="pi-value">{{ check_in_time }}</span>
+            </div>
+            {% endif %}
+            {% if check_out_time %}
+            <div class="pi-meta-item">
+              <span class="pi-label">Check-Out</span>
+              <span class="pi-value">{{ check_out_time }}</span>
+            </div>
+            {% endif %}
+            {% if wifi_name %}
+            <div class="pi-meta-item">
+              <span class="pi-label">Wi-Fi Name</span>
+              <span class="pi-value">{{ wifi_name }}</span>
+            </div>
+            {% endif %}
+            {% if emergency_contact %}
+            <div class="pi-meta-item">
+              <span class="pi-label">Emergency Contact</span>
+              <span class="pi-value">{{ emergency_contact }}</span>
+            </div>
+            {% endif %}
+            {% if last_reviewed_on %}
+            <div class="pi-meta-item">
+              <span class="pi-label">Last Reviewed</span>
+              <span class="pi-value">{{ last_reviewed_on }}</span>
+            </div>
+            {% endif %}
           </div>
+
+          <div class="pi-actions">
+            {% if screen_map_external_url %}
+            <a class="pi-btn pi-btn-primary" href="{{ screen_map_external_url }}" target="_blank" rel="noopener noreferrer nofollow">Open in Google Maps</a>
+            {% endif %}
+            <button type="button" class="pi-btn pi-btn-secondary property-instruction-print" onclick="window.print()">Print or save guide</button>
+          </div>
+        </div>
+      </article>
+
+      {% if screen_map_embed_url %}
+      <section class="pi-card pi-map-card" aria-label="Property map">
+        <div class="pi-map-shell">
+          <iframe
+            class="pi-map"
+            title="Map showing the property location"
+            loading="lazy"
+            allowfullscreen
+            referrerpolicy="strict-origin-when-cross-origin"
+            src="{{ screen_map_embed_url }}">
+          </iframe>
+        </div>
+        {% if screen_map_external_url %}
+        <div class="pi-actions">
+          <a class="pi-btn pi-btn-secondary" href="{{ screen_map_external_url }}" target="_blank" rel="noopener noreferrer nofollow">Open in Google Maps</a>
+        </div>
+        {% endif %}
+      </section>
+      {% endif %}
+
+      {% if has_sections %}
+      <div class="pi-grid">
+        <nav class="pi-nav" aria-label="Instruction sections">
+          <strong class="pi-label">Jump to Section</strong>
+          <ul>
+            {% for section in sections %}
+            <li><a href="#{{ section.anchor }}">{{ section.section }}</a></li>
+            {% endfor %}
+          </ul>
+        </nav>
+
+        <div class="pi-sections">
+          {% for section in sections %}
+          <section id="{{ section.anchor }}" class="pi-card">
+            <h2 class="pi-section-title">{{ section.section }}</h2>
+            <div class="pi-blocks">
+              {% for block in section.blocks %}
+              {{ render_screen_block(block) }}
+              {% endfor %}
+            </div>
+          </section>
+          {% endfor %}
+        </div>
+      </div>
+      {% else %}
+      <div class="pi-card pi-empty">
+        <p>No published instruction content is available for this property yet.</p>
+      </div>
+      {% endif %}
+    </div>
+
+    <div class="pi-print-layout" aria-hidden="true">
+      <header class="pi-print-header">
+        <p class="pi-print-kicker">Estaex Guest Guide</p>
+        <h1 class="pi-print-title">{{ title }}</h1>
+        {% if address %}
+        <p class="pi-print-address">{{ address }}</p>
+        {% endif %}
+        <div class="pi-print-meta-grid">
+          {% if check_in_time %}
+          <div class="pi-print-meta-item"><span class="pi-label">Check-In</span><span class="pi-value">{{ check_in_time }}</span></div>
           {% endif %}
           {% if check_out_time %}
-          <div class="pi-meta-item">
-            <span class="pi-label">Check-Out</span>
-            <span class="pi-value">{{ check_out_time }}</span>
-          </div>
+          <div class="pi-print-meta-item"><span class="pi-label">Check-Out</span><span class="pi-value">{{ check_out_time }}</span></div>
           {% endif %}
           {% if wifi_name %}
-          <div class="pi-meta-item">
-            <span class="pi-label">Wi-Fi Name</span>
-            <span class="pi-value">{{ wifi_name }}</span>
-          </div>
+          <div class="pi-print-meta-item"><span class="pi-label">Wi-Fi Name</span><span class="pi-value">{{ wifi_name }}</span></div>
           {% endif %}
           {% if emergency_contact %}
-          <div class="pi-meta-item">
-            <span class="pi-label">Emergency Contact</span>
-            <span class="pi-value">{{ emergency_contact }}</span>
-          </div>
+          <div class="pi-print-meta-item"><span class="pi-label">Emergency Contact</span><span class="pi-value">{{ emergency_contact }}</span></div>
           {% endif %}
           {% if last_reviewed_on %}
-          <div class="pi-meta-item">
-            <span class="pi-label">Last Reviewed</span>
-            <span class="pi-value">{{ last_reviewed_on }}</span>
-          </div>
+          <div class="pi-print-meta-item"><span class="pi-label">Last Reviewed</span><span class="pi-value">{{ last_reviewed_on }}</span></div>
+          {% endif %}
+          {% if screen_map_external_url %}
+          <div class="pi-print-meta-item pi-print-map-url"><span class="pi-label">Property Location</span><span class="pi-value">{{ screen_map_external_url }}</span></div>
           {% endif %}
         </div>
+      </header>
 
-        <div class="pi-actions">
-          {% if property_map.external_url %}
-          <a class="pi-btn pi-btn-primary" href="{{ property_map.external_url }}" target="_blank" rel="noopener noreferrer nofollow">Open in Google Maps</a>
-          {% endif %}
-          <button type="button" class="pi-btn pi-btn-secondary property-instruction-print" onclick="window.print()">Print or save guide</button>
-        </div>
-      </div>
-    </article>
-
-    {% if property_map.embed_url %}
-    <section class="pi-card pi-map-card" aria-label="Property map">
-      <div class="pi-map-shell">
-        <iframe
-          class="pi-map"
-          title="Map showing the property location"
-          loading="lazy"
-          allowfullscreen
-          referrerpolicy="strict-origin-when-cross-origin"
-          src="{{ property_map.embed_url }}">
-        </iframe>
-      </div>
-      {% if property_map.external_url %}
-      <div class="pi-actions">
-        <a class="pi-btn pi-btn-secondary" href="{{ property_map.external_url }}" target="_blank" rel="noopener noreferrer nofollow">Open in Google Maps</a>
-      </div>
-      {% endif %}
-    </section>
-    {% endif %}
-
-    {% if has_sections %}
-    <div class="pi-grid">
-      <nav class="pi-nav" aria-label="Instruction sections">
-        <strong class="pi-label">Jump to Section</strong>
-        <ul>
-          {% for section in sections %}
-          <li><a href="#{{ section.anchor }}">{{ section.section }}</a></li>
-          {% endfor %}
-        </ul>
-      </nav>
-
-      <div class="pi-sections">
+      {% if has_sections %}
         {% for section in sections %}
-        <section id="{{ section.anchor }}" class="pi-card">
-          <h2 class="pi-section-title">{{ section.section }}</h2>
-          <div class="pi-blocks">
+        <section class="pi-print-section">
+          <h2 class="pi-print-section-title">{{ section.section }}</h2>
+          <div class="pi-print-blocks">
             {% for block in section.blocks %}
-            <div class="pi-block pi-block-{{ block.block_type | lower | replace(' ', '-') }}">
-              {% if block.block_type == "Step" %}
-              <div class="pi-step-head">
-                <span class="pi-step-badge">{{ block.display_step_number }}</span>
-                {% if block.title %}<h3>{{ block.title }}</h3>{% endif %}
-              </div>
-              {% elif block.title %}
-              <h3>{{ block.title }}</h3>
-              {% endif %}
-
-              {% if block.safe_body %}
-              <div class="pi-body">{{ block.safe_body }}</div>
-              {% endif %}
-
-              {% if block.image %}
-              <img class="pi-image" src="{{ block.image }}" alt="{{ block.image_alt }}">
-              {% endif %}
-
-              {% if block.caption %}
-              <div class="pi-caption">{{ block.caption }}</div>
-              {% endif %}
-
-              {% if block.link_url %}
-              <div class="pi-link">
-                <a href="{{ block.link_url }}" target="_blank" rel="noopener noreferrer nofollow">{{ block.display_link_label }}</a>
-              </div>
-              {% endif %}
-            </div>
+            {{ render_print_block(block) }}
             {% endfor %}
           </div>
         </section>
         {% endfor %}
-      </div>
+      {% else %}
+      <section class="pi-print-section">
+        <div class="pi-empty">
+          <p>No published instruction content is available for this property yet.</p>
+        </div>
+      </section>
+      {% endif %}
     </div>
-    {% else %}
-    <div class="pi-card pi-empty">
-      <p>No published instruction content is available for this property yet.</p>
-    </div>
-    {% endif %}
   </div>
 </div>
-{% if google_translate.enabled %}
+{% if google_translate and google_translate.enabled %}
 <script>
   window.googleTranslateElementInit = window.googleTranslateElementInit || function () {
     if (!window.google || !google.translate || !google.translate.TranslateElement) {

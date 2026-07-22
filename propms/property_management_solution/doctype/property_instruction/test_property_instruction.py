@@ -350,10 +350,20 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 		self.assertNotIn('href="javascript:', html)
 		self.assertNotIn("guest-wifi-only", html)
 		self.assertIn("@page {", html)
-		self.assertIn(".pi-grid,", html)
-		self.assertIn("display: block;", html)
-		self.assertIn(".pi-map-card,", html)
+		self.assertIn("pi-screen-layout", html)
+		self.assertIn("pi-print-layout", html)
+		self.assertIn("pi-print-title", html)
 		self.assertIn("break-inside: avoid;", html)
+		print_slice = html.split('class="pi-print-layout"', 1)[1]
+		self.assertNotIn("<iframe", print_slice)
+
+	def test_print_layout_has_dedicated_wrappers(self):
+		doc = self.make_instruction()
+		html = self.render_instruction(doc)
+		self.assertEqual(html.count('class="pi-print-title"'), 1)
+		self.assertIn(".pi-screen-layout {\n      display: none !important;", html)
+		self.assertIn(".pi-print-layout {\n      display: block !important;", html)
+		self.assertIn(".pi-print-meta-grid", html)
 
 	def test_rendered_output_excludes_unpublished_content(self):
 		published_doc = self.make_instruction(title="Published Guide")
