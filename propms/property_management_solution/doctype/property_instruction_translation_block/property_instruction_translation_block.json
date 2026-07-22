@@ -1,0 +1,71 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2026-07-22 00:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "source_block_name",
+  "section",
+  "title",
+  "body",
+  "caption",
+  "link_label",
+  "sort_order"
+ ],
+ "fields": [
+  {
+   "fieldname": "source_block_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Source Block Name",
+   "reqd": 1
+  },
+  {
+   "fieldname": "section",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Section"
+  },
+  {
+   "fieldname": "title",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Title"
+  },
+  {
+   "fieldname": "body",
+   "fieldtype": "Text Editor",
+   "label": "Body"
+  },
+  {
+   "fieldname": "caption",
+   "fieldtype": "Data",
+   "label": "Caption"
+  },
+  {
+   "fieldname": "link_label",
+   "fieldtype": "Data",
+   "label": "Link Label"
+  },
+  {
+   "fieldname": "sort_order",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "Sort Order"
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-07-22 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Property Management Solution",
+ "name": "Property Instruction Translation Block",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
