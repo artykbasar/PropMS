@@ -253,6 +253,35 @@
     border-color: var(--pi-accent);
     color: #fff;
   }
+  .pi-translate-shell {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: .75rem;
+    margin-bottom: 1rem;
+    padding: .9rem 1rem;
+  }
+  .pi-translate-copy {
+    margin: 0;
+    color: var(--pi-muted);
+    font-size: .95rem;
+  }
+  .pi-translate-widget {
+    min-height: 2.5rem;
+  }
+  .pi-translate-widget .goog-te-gadget {
+    color: var(--pi-ink) !important;
+    font-family: inherit;
+    font-size: .95rem !important;
+  }
+  .pi-translate-widget .goog-te-combo {
+    min-width: 220px;
+    border: 1px solid var(--pi-border);
+    border-radius: 999px;
+    padding: .55rem .9rem;
+    background: #fff;
+    color: var(--pi-ink);
+  }
   .pi-print-header {
     display: none;
   }
@@ -289,7 +318,8 @@
     .pi-actions,
     .pi-map-card,
     .property-instruction-print,
-    .pi-language-switcher {
+    .pi-language-switcher,
+    .pi-translate-shell {
       display: none;
     }
     .pi-grid,
@@ -389,8 +419,15 @@
 {% endblock %}
 
 {% block page_content %}
-<div class="pi-page">
+<div class="pi-page" lang="{{ selected_language_code or 'en' }}">
   <div class="pi-shell">
+    {% if google_translate.enabled %}
+    <section class="pi-card pi-translate-shell" aria-label="Instant translation">
+      <p class="pi-translate-copy">Translate this guide instantly</p>
+      <div id="{{ google_translate.container_id }}" class="pi-translate-widget"></div>
+    </section>
+    {% endif %}
+
     {% if translation_enabled %}
     <nav class="pi-language-switcher" aria-label="Language selector">
       <p class="pi-language-label">Language</p>
@@ -473,15 +510,15 @@
         </div>
 
         <div class="pi-actions">
-          {% if google_maps_url %}
-          <a class="pi-btn pi-btn-primary" href="{{ google_maps_url }}" target="_blank" rel="noopener noreferrer nofollow">Open in Google Maps</a>
+          {% if property_map.external_url %}
+          <a class="pi-btn pi-btn-primary" href="{{ property_map.external_url }}" target="_blank" rel="noopener noreferrer nofollow">Open in Google Maps</a>
           {% endif %}
           <button type="button" class="pi-btn pi-btn-secondary property-instruction-print" onclick="window.print()">Print or save guide</button>
         </div>
       </div>
     </article>
 
-    {% if map_embed_url %}
+    {% if property_map.embed_url %}
     <section class="pi-card pi-map-card" aria-label="Property map">
       <div class="pi-map-shell">
         <iframe
@@ -490,9 +527,14 @@
           loading="lazy"
           allowfullscreen
           referrerpolicy="strict-origin-when-cross-origin"
-          src="{{ map_embed_url }}">
+          src="{{ property_map.embed_url }}">
         </iframe>
       </div>
+      {% if property_map.external_url %}
+      <div class="pi-actions">
+        <a class="pi-btn pi-btn-secondary" href="{{ property_map.external_url }}" target="_blank" rel="noopener noreferrer nofollow">Open in Google Maps</a>
+      </div>
+      {% endif %}
     </section>
     {% endif %}
 
@@ -554,4 +596,23 @@
     {% endif %}
   </div>
 </div>
+{% if google_translate.enabled %}
+<script>
+  window.googleTranslateElementInit = window.googleTranslateElementInit || function () {
+    if (!window.google || !google.translate || !google.translate.TranslateElement) {
+      return;
+    }
+
+    const config = {
+      pageLanguage: "{{ google_translate.source_language }}"
+    };
+    {% if google_translate.included_languages_csv %}
+    config.includedLanguages = "{{ google_translate.included_languages_csv }}";
+    {% endif %}
+
+    new google.translate.TranslateElement(config, "{{ google_translate.container_id }}");
+  };
+</script>
+<script src="{{ google_translate.script_url }}"></script>
+{% endif %}
 {% endblock %}

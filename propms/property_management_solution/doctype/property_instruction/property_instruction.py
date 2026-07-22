@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import os
-from urllib.parse import urlencode, urlparse
+from urllib.parse import urlencode, urlparse, urlunparse
 
 import frappe
 from frappe import _
@@ -33,6 +33,8 @@ MIN_MAP_ZOOM = 0
 MAX_MAP_ZOOM = 21
 TRANSLATION_READY = "Ready"
 TRANSLATION_STALE = "Stale"
+GOOGLE_TRANSLATE_SCRIPT_URL = "https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"
+TRUSTED_GOOGLE_MAP_HOSTS = {"www.google.com", "google.com", "maps.google.com"}
 
 
 class PropertyInstruction(WebsiteGenerator):
@@ -113,7 +115,7 @@ class PropertyInstruction(WebsiteGenerator):
 
 	def validate_links(self):
 		if self.google_maps_url:
-			self.validate_external_link(self.google_maps_url, _("Google Maps URL"))
+			self.validate_google_maps_url()
 
 		for row in self.instruction_blocks or []:
 			if row.link_url:
@@ -127,6 +129,12 @@ class PropertyInstruction(WebsiteGenerator):
 			frappe.throw(_("{0} cannot use a javascript: URL.").format(label))
 		validate_url(url, throw=True, valid_schemes={"http", "https"})
 
+	def validate_google_maps_url(self):
+		self.validate_external_link(self.google_maps_url, _("Google Maps URL"))
+		hostname = (urlparse((self.google_maps_url or "").strip()).hostname or "").lower()
+		if hostname not in TRUSTED_GOOGLE_MAP_HOSTS:
+			frappe.throw(_("Google Maps URL must use a trusted Google Maps hostname."))
+
 	def get_page_info(self):
 		page_info = super().get_page_info()
 		page_info.full_width = 1
@@ -137,6 +145,8 @@ class PropertyInstruction(WebsiteGenerator):
 		language_code = self.get_requested_language()
 		translation = self.get_ready_translation(language_code)
 		display_content = self.get_display_content(translation)
+		property_map = self.get_property_map()
+		google_translate = self.get_google_translate_settings()
 
 		context.no_cache = 1
 		context.no_breadcrumbs = 1
@@ -146,10 +156,11 @@ class PropertyInstruction(WebsiteGenerator):
 		context.has_sections = bool(context.sections)
 		context.address = display_content.address
 		context.cover_image = self.cover_image
-		context.google_maps_url = self.google_maps_url
-		context.map_embed_url = self.get_map_embed_url()
-		context.map_embed_enabled = bool(context.map_embed_url)
+		context.google_maps_url = property_map.external_url
+		context.map_embed_url = property_map.embed_url
+		context.map_embed_enabled = bool(property_map.embed_url)
 		context.map_display_query = self.get_map_display_query()
+		context.property_map = property_map
 		context.check_in_time = self.check_in_time
 		context.check_out_time = self.check_out_time
 		context.wifi_name = self.wifi_name
@@ -164,6 +175,7 @@ class PropertyInstruction(WebsiteGenerator):
 		elif isinstance(context.boot, dict) and not isinstance(context.boot, frappe._dict):
 			context.boot = frappe._dict(context.boot)
 		context.boot.lang = display_content.language_code
+		context.google_translate = google_translate
 		return context
 
 	def get_grouped_blocks(self):
@@ -252,25 +264,84 @@ class PropertyInstruction(WebsiteGenerator):
 			return f"place_id:{self.google_maps_place_id}"
 		return (self.map_search_query or self.address or "").strip()
 
-	def get_map_embed_url(self):
-		if not cint(self.show_embedded_map):
+	def get_property_map(self):
+		embed_url = self.get_map_embed_url()
+		return frappe._dict(
+			embed_url=embed_url,
+			external_url=self.get_map_external_url(),
+			uses_api_key=bool(embed_url and "embed/v1/place" in embed_url),
+		)
+
+	def get_map_external_url(self):
+		if self.google_maps_url:
+			return self.google_maps_url
+
+		query = (self.map_search_query or self.address or "").strip()
+		if not query:
 			return None
 
-		api_key = self.get_map_embed_api_key()
-		if not api_key:
+		params = {"api": 1, "query": query}
+		if self.google_maps_place_id:
+			params["query_place_id"] = self.google_maps_place_id
+		return f"https://www.google.com/maps/search/?{urlencode(params)}"
+
+	def get_map_embed_url(self):
+		if not cint(self.show_embedded_map):
 			return None
 
 		query = self.get_map_display_query()
 		if not query:
 			return None
 
+		api_key = self.get_map_embed_api_key()
+		if api_key:
+			params = {
+				"key": api_key,
+				"q": query,
+				"zoom": self.normalize_map_zoom(self.map_zoom),
+				"maptype": self.map_type if self.map_type in MAP_TYPES else "roadmap",
+			}
+			return f"https://www.google.com/maps/embed/v1/place?{urlencode(params)}"
+
 		params = {
-			"key": api_key,
 			"q": query,
-			"zoom": self.normalize_map_zoom(self.map_zoom),
-			"maptype": self.map_type if self.map_type in MAP_TYPES else "roadmap",
+			"z": self.normalize_map_zoom(self.map_zoom),
+			"output": "embed",
 		}
-		return f"https://www.google.com/maps/embed/v1/place?{urlencode(params)}"
+		if self.map_type == "satellite":
+			params["t"] = "k"
+		return urlunparse(("https", "www.google.com", "/maps", "", urlencode(params), ""))
+
+	def get_google_translate_settings(self):
+		enabled = cint(self.get_property_management_setting("enable_guest_guide_google_translate") or 0)
+		source_language = (
+			self.get_property_management_setting("guest_guide_source_language") or "en"
+		).strip().lower() or "en"
+		language_codes = self.parse_google_translate_languages(
+			self.get_property_management_setting("guest_guide_translate_languages")
+		)
+		return frappe._dict(
+			enabled=bool(enabled),
+			container_id="google_translate_element" if enabled else None,
+			script_url=GOOGLE_TRANSLATE_SCRIPT_URL if enabled else None,
+			source_language=source_language,
+			included_languages=language_codes,
+			included_languages_csv=",".join(language_codes) if language_codes else "",
+		)
+
+	def get_property_management_setting(self, fieldname):
+		try:
+			return frappe.db.get_single_value("Property Management Settings", fieldname)
+		except Exception:
+			return None
+
+	def parse_google_translate_languages(self, raw_value):
+		languages = []
+		for value in (raw_value or "").split(","):
+			code = (value or "").strip().lower()
+			if code and code not in languages:
+				languages.append(code)
+		return languages
 
 	def get_requested_language(self):
 		language_code = None

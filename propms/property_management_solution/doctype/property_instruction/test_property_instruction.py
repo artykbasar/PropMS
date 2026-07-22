@@ -22,6 +22,7 @@ class PropertyInstructionTestMixin:
 		frappe.set_user("Administrator")
 		self.to_delete = []
 		self.conf_backup = {}
+		self.single_backup = {}
 		self.original_form_dict = frappe._dict(getattr(frappe.local, "form_dict", {}) or {})
 		self.original_request = getattr(frappe.local, "request", None)
 		self.original_request_args = getattr(self.original_request, "args", None) if self.original_request else None
@@ -36,6 +37,8 @@ class PropertyInstructionTestMixin:
 				frappe.conf.pop(key, None)
 			else:
 				frappe.conf[key] = value
+		for key, value in self.single_backup.items():
+			frappe.db.set_single_value("Property Management Settings", key, value)
 		frappe.local.form_dict = self.original_form_dict
 		if self.original_request is not None:
 			self.original_request.args = self.original_request_args
@@ -57,6 +60,11 @@ class PropertyInstructionTestMixin:
 		else:
 			frappe.conf[key] = value
 
+	def set_property_management_setting(self, key, value):
+		if key not in self.single_backup:
+			self.single_backup[key] = frappe.db.get_single_value("Property Management Settings", key)
+		frappe.db.set_single_value("Property Management Settings", key, value)
+
 	def make_property(self):
 		doc = frappe.get_doc(
 			{
@@ -76,7 +84,10 @@ class PropertyInstructionTestMixin:
 				"property": property_name,
 				"published": overrides.pop("published", 1),
 				"address": overrides.pop("address", "99A Burlington Road"),
-				"google_maps_url": overrides.pop("google_maps_url", "https://maps.example.com/test"),
+				"google_maps_url": overrides.pop(
+					"google_maps_url",
+					"https://www.google.com/maps/place/99A+Burlington+Road",
+				),
 				"show_embedded_map": overrides.pop("show_embedded_map", 1),
 				"google_maps_place_id": overrides.pop("google_maps_place_id", None),
 				"map_search_query": overrides.pop("map_search_query", None),
@@ -294,8 +305,9 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 		self.set_conf("google_maps_embed_api_key", None)
 		doc = self.make_instruction()
 		html = self.render_instruction(doc)
-		self.assertIsNone(doc.get_map_embed_url())
-		self.assertNotIn("www.google.com/maps/embed/v1/place", html)
+		self.assertIn("https://www.google.com/maps?", doc.get_map_embed_url())
+		self.assertIn("<iframe", html)
+		self.assertIn("output=embed", html)
 		self.assertNotIn("key=", html)
 
 	def test_map_embed_url_not_rendered_when_disabled(self):
@@ -312,6 +324,16 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 		url = doc.get_map_embed_url()
 		self.assertIn("maptype=roadmap", url)
 		self.assertIn("zoom=16", url)
+
+	def test_google_maps_url_rejects_untrusted_host(self):
+		with self.assertRaises(frappe.ValidationError):
+			self.make_instruction(google_maps_url="https://example.com/map")
+
+	def test_map_external_url_is_generated_from_address(self):
+		doc = self.make_instruction(google_maps_url=None, address="99A Burlington Road, New Malden")
+		property_map = doc.get_property_map()
+		self.assertIn("www.google.com/maps/search/", property_map.external_url)
+		self.assertIn("99A+Burlington+Road%2C+New+Malden", property_map.external_url)
 
 	def test_rendered_output_includes_expected_section_content(self):
 		self.set_conf("google_maps_embed_api_key", "test-key")
@@ -344,6 +366,30 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 		html = self.render_instruction(published_doc)
 		self.assertIn("Published Guide", html)
 		self.assertNotIn(unpublished_doc.title, html)
+
+	def test_google_translate_widget_disabled_by_default(self):
+		doc = self.make_instruction()
+		html = self.render_instruction(doc)
+		self.assertNotIn("translate.google.com/translate_a/element.js", html)
+		self.assertNotIn("google_translate_element", html)
+
+	def test_google_translate_widget_renders_when_enabled(self):
+		self.set_property_management_setting("enable_guest_guide_google_translate", 1)
+		self.set_property_management_setting("guest_guide_source_language", "en")
+		self.set_property_management_setting("guest_guide_translate_languages", "es,fr,de")
+		doc = self.make_instruction()
+		context = self.get_context(doc)
+		html = self.render_instruction(doc)
+		self.assertTrue(context.google_translate.enabled)
+		self.assertEqual(context.google_translate.included_languages, ["es", "fr", "de"])
+		self.assertEqual(html.count("translate.google.com/translate_a/element.js"), 1)
+		self.assertIn("id=\"google_translate_element\"", html)
+		self.assertIn('config.includedLanguages = "es,fr,de";', html)
+
+	def test_no_key_map_embed_uses_trusted_google_host(self):
+		self.set_conf("google_maps_embed_api_key", None)
+		doc = self.make_instruction(address="99A Burlington Road, New Malden")
+		self.assertTrue(doc.get_map_embed_url().startswith("https://www.google.com/maps?"))
 
 
 class TestPropertyInstructionTranslations(PropertyInstructionTestMixin, FrappeTestCase):
