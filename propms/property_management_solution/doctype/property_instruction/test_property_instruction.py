@@ -365,8 +365,10 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 		print_slice = html.split('class="pi-print-layout"', 1)[1]
 		self.assertNotIn("<iframe", print_slice)
 		self.assertEqual(print_slice.count("https://www.google.com/maps/place/99A+Burlington+Road"), 1)
-		self.assertIn('data-copy-value="99A Burlington Road"', html)
-		self.assertIn('data-copy-value="TestWifi"', html)
+		self.assertIn('data-copy-target="property-address"', html)
+		self.assertIn('data-copy-target="wifi-network-name"', html)
+		self.assertIn('id="property-address"', html)
+		self.assertIn('id="wifi-network-name"', html)
 
 	def test_print_layout_has_dedicated_wrappers(self):
 		doc = self.make_instruction()
@@ -466,6 +468,38 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 		html = self.render_instruction(doc)
 		self.assertIn("guest-wifi-only", html)
 		self.assertIn("Copy password", html)
+		self.assertIn('id="wifi-password-public"', html)
+		self.assertIn('data-copy-target="wifi-password-public"', html)
+		self.assertIn('class="pi-copy-value notranslate"', html)
+		self.assertIn('translate="no">guest-wifi-only</span>', html)
+
+	def test_protected_identifier_values_are_marked_notranslate(self):
+		doc = self.make_instruction(emergency_contact="+44 20 7946 0958")
+		html = self.render_instruction(doc)
+		self.assertIn('id="property-address"', html)
+		self.assertIn('id="wifi-network-name"', html)
+		self.assertIn('class="pi-copy-value notranslate"', html)
+		self.assertIn('id="property-address"', html)
+		self.assertIn('translate="no">99A Burlington Road</span>', html)
+		self.assertIn('translate="no">TestWifi</span>', html)
+		self.assertIn('class="pi-value notranslate"', html)
+		self.assertIn('translate="no">+44 20 7946 0958</span>', html)
+
+	def test_copy_buttons_reference_visible_targets(self):
+		doc = self.make_instruction()
+		html = self.render_instruction(doc)
+		self.assertIn('data-copy-target="property-address"', html)
+		self.assertIn('data-copy-target="wifi-network-name"', html)
+		self.assertNotIn("data-copy-value=", html)
+		self.assertIn('document.getElementById(copyTarget)', html)
+		self.assertIn("targetElement.textContent.trim()", html)
+
+	def test_password_remains_hidden_without_public_opt_in(self):
+		doc = self.make_instruction(show_wifi_password_publicly=0)
+		html = self.render_instruction(doc)
+		self.assertNotIn("guest-wifi-only", html)
+		self.assertNotIn("Copy password", html)
+		self.assertNotIn("wifi-password-public", html)
 
 	def test_copy_script_is_included_once(self):
 		doc = self.make_instruction()
@@ -691,6 +725,63 @@ class TestPropertyInstructionTranslations(PropertyInstructionTestMixin, FrappeTe
 		self.assertEqual(translation.status, "Draft")
 		self.assertEqual(translation.language_code, "es")
 		self.assertEqual(translation.title, "Guia de huespedes")
+		self.assertEqual(translation.address, doc.address)
+
+	def test_reviewed_translation_keeps_original_address_and_wifi_name(self):
+		doc = self.make_instruction()
+		self.make_translation(
+			doc,
+			language_code="es",
+			status="Ready",
+			address="Direccion traducida",
+			blocks=[
+				{
+					"source_block_name": row["source_block_name"],
+					"section": f"{row['section']} ES",
+					"title": f"{(row.get('title') or row['section'])} ES",
+					"body": row.get("body"),
+					"caption": row.get("caption"),
+					"link_label": row.get("link_label"),
+					"sort_order": row.get("sort_order"),
+				}
+				for row in doc.get_translation_source_payload()["blocks"]
+			],
+		)
+		html = self.render_instruction(doc, lang="es")
+		self.assertIn("99A Burlington Road", html)
+		self.assertIn("TestWifi", html)
+		self.assertNotIn("Direccion traducida", html)
+
+	def test_identifier_values_are_preserved_during_translation(self):
+		payload = {
+			"title": "Guest guide",
+			"address": "99A Burlington Road",
+			"emergency_contact": "+44 20 7946 0958",
+			"blocks": [
+				{
+					"source_block_name": "ROW-1",
+					"section": "Check-In",
+					"title": "Call +44 20 7946 0958",
+					"body": "<p>Contact us on +44 20 7946 0958 or email host@example.com.</p>",
+					"caption": "host@example.com",
+					"link_label": "https://example.com/guide",
+					"sort_order": 1,
+				}
+			],
+		}
+		with patch.object(
+			translation_service,
+			"translate_jobs",
+			return_value=["Guia", "Registro", "<p>Contact us on [[PROPMS_TOKEN_0]] or email [[PROPMS_TOKEN_1]].</p>"],
+		):
+			result = translation_service.translate_property_instruction(payload, target_language="es")
+		self.assertEqual(result["address"], "99A Burlington Road")
+		self.assertEqual(result["emergency_contact"], "+44 20 7946 0958")
+		self.assertEqual(result["blocks"][0]["caption"], "host@example.com")
+		self.assertEqual(result["blocks"][0]["link_label"], "https://example.com/guide")
+		self.assertEqual(result["blocks"][0]["title"], "Call +44 20 7946 0958")
+		self.assertIn("+44 20 7946 0958", result["blocks"][0]["body"])
+		self.assertIn("host@example.com", result["blocks"][0]["body"])
 
 	def test_missing_google_credentials_error_does_not_break_english_page(self):
 		doc = self.make_instruction()

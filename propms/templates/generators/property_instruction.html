@@ -569,16 +569,19 @@
 </style>
 {% endblock %}
 
-{% macro render_copy_row(label, value, button_label, aria_label) %}
+{% macro render_copy_row(label, value, button_label, aria_label, target_id, protect_value=False) %}
   <div class="pi-copy-row">
     <div class="pi-copy-text">
       <span class="pi-label">{{ label }}</span>
-      <span class="pi-copy-value">{{ value }}</span>
+      <span
+        id="{{ target_id }}"
+        class="pi-copy-value{% if protect_value %} notranslate{% endif %}"
+        {% if protect_value %}translate="no"{% endif %}>{{ value }}</span>
     </div>
     <button
       type="button"
       class="pi-copy-button"
-      data-copy-value="{{ value | e }}"
+      data-copy-target="{{ target_id }}"
       data-default-label="{{ button_label | e }}"
       aria-label="{{ aria_label }}">
       {{ button_label }}
@@ -591,10 +594,10 @@
     {% if block.block_type == "Step" %}
     <div class="pi-step-head">
       <span class="pi-step-badge">{{ block.display_step_number }}</span>
-      {% if block.title %}<h3>{{ block.title }}</h3>{% endif %}
+      {% if block.title %}<h3{% if block.title_translation_protected %} class="notranslate" translate="no"{% endif %}>{{ block.title }}</h3>{% endif %}
     </div>
     {% elif block.title %}
-    <h3>{{ block.title }}</h3>
+    <h3{% if block.title_translation_protected %} class="notranslate" translate="no"{% endif %}>{{ block.title }}</h3>
     {% endif %}
 
     {% if block.safe_body %}
@@ -606,12 +609,12 @@
     {% endif %}
 
     {% if block.caption %}
-    <div class="pi-caption">{{ block.caption }}</div>
+    <div class="pi-caption{% if block.caption_translation_protected %} notranslate{% endif %}"{% if block.caption_translation_protected %} translate="no"{% endif %}>{{ block.caption }}</div>
     {% endif %}
 
     {% if block.link_url %}
     <div class="pi-link">
-      <a href="{{ block.link_url }}" target="_blank" rel="noopener noreferrer nofollow">{{ block.display_link_label }}</a>
+      <a href="{{ block.link_url }}" target="_blank" rel="noopener noreferrer nofollow"{% if block.display_link_label_translation_protected %} class="notranslate" translate="no"{% endif %}>{{ block.display_link_label }}</a>
     </div>
     {% endif %}
   </div>
@@ -706,7 +709,7 @@
           <h1 class="pi-title">{{ title }}</h1>
           {% if address %}
           <div class="pi-address-row">
-            {{ render_copy_row("Address", address_copy_value, "Copy address", "Copy property address") }}
+            {{ render_copy_row("Address", address, "Copy address", "Copy property address", "property-address", True) }}
           </div>
           {% endif %}
 
@@ -725,18 +728,18 @@
             {% endif %}
             {% if wifi_name %}
             <div class="pi-meta-item">
-              {{ render_copy_row("Wi-Fi Name", wifi_name, "Copy network", "Copy Wi-Fi network name") }}
+              {{ render_copy_row("Wi-Fi Name", wifi_name, "Copy network", "Copy Wi-Fi network name", "wifi-network-name", True) }}
             </div>
             {% endif %}
             {% if wifi_password_public %}
             <div class="pi-meta-item">
-              {{ render_copy_row("Wi-Fi Password", wifi_password_public, "Copy password", "Copy Wi-Fi password") }}
+              {{ render_copy_row("Wi-Fi Password", wifi_password_public, "Copy password", "Copy Wi-Fi password", "wifi-password-public", True) }}
             </div>
             {% endif %}
             {% if emergency_contact %}
             <div class="pi-meta-item">
               <span class="pi-label">Emergency Contact</span>
-              <span class="pi-value">{{ emergency_contact }}</span>
+              <span class="pi-value{% if emergency_contact_translation_protected %} notranslate{% endif %}"{% if emergency_contact_translation_protected %} translate="no"{% endif %}>{{ emergency_contact }}</span>
             </div>
             {% endif %}
             {% if last_reviewed_on %}
@@ -898,8 +901,10 @@
     document.addEventListener("click", async function (event) {
       const copyButton = event.target.closest(".pi-copy-button");
       if (copyButton) {
-        const value = copyButton.getAttribute("data-copy-value");
+        const copyTarget = copyButton.getAttribute("data-copy-target");
         const defaultLabel = copyButton.getAttribute("data-default-label") || "Copy";
+        const targetElement = copyTarget ? document.getElementById(copyTarget) : null;
+        const value = targetElement ? targetElement.textContent.trim() : "";
         if (!value) {
           return;
         }

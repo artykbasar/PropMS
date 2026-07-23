@@ -42,6 +42,8 @@ TRANSLATION_STALE = "Stale"
 GOOGLE_TRANSLATE_SCRIPT_URL = "https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"
 TRUSTED_GOOGLE_MAP_HOSTS = {"www.google.com", "google.com", "maps.google.com"}
 LANGUAGE_CODE_PATTERN = re.compile(r"^[a-z]{2,3}(?:-[a-z]{2,8})*$")
+PHONE_PATTERN = re.compile(r"(?:\+?\d[\d\s().-]{6,}\d)")
+EMAIL_PATTERN = re.compile(r"\b[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}\b")
 
 
 class PropertyInstruction(WebsiteGenerator):
@@ -175,7 +177,6 @@ class PropertyInstruction(WebsiteGenerator):
 			sections=display_content.sections,
 			has_sections=bool(display_content.sections),
 			address=display_content.address,
-			address_copy_value=display_content.address,
 			cover_image=self.cover_image,
 			google_maps_url=property_map.external_url,
 			map_embed_url=property_map.embed_url,
@@ -188,6 +189,9 @@ class PropertyInstruction(WebsiteGenerator):
 			wifi_password_public=wifi_password_public,
 			show_wifi_password_publicly=bool(cint(self.show_wifi_password_publicly or 0)),
 			emergency_contact=display_content.emergency_contact,
+			emergency_contact_translation_protected=self.should_protect_identifier_value(
+				display_content.emergency_contact
+			),
 			last_reviewed_on=self.last_reviewed_on,
 			last_reviewed_on_display=formatdate(self.last_reviewed_on) if self.last_reviewed_on else None,
 			available_languages=available_languages,
@@ -240,13 +244,18 @@ class PropertyInstruction(WebsiteGenerator):
 					frappe._dict(
 						row.as_dict(),
 						title=title,
+						title_translation_protected=self.should_protect_identifier_value(title),
 						body=body,
 						caption=caption,
+						caption_translation_protected=self.should_protect_identifier_value(caption),
 						display_section=section_label,
 						safe_body=self.get_safe_body(body),
 						anchor=self.scrub(section_label),
 						display_step_number=row.step_number or step_counter or None,
 						display_link_label=link_label or row.link_url,
+						display_link_label_translation_protected=self.should_protect_identifier_value(
+							link_label or row.link_url
+						),
 						image_alt=caption or title or f"{self.title} - {section_label}",
 						hide_in_print=self.should_hide_block_in_print(row, property_map.external_url),
 					)
@@ -481,6 +490,18 @@ class PropertyInstruction(WebsiteGenerator):
 			return None
 		return self.get_password("wifi_password")
 
+	def should_protect_identifier_value(self, value):
+		text = (value or "").strip()
+		if not text:
+			return False
+		if "://" in text or text.startswith("www."):
+			return True
+		if EMAIL_PATTERN.search(text):
+			return True
+		if PHONE_PATTERN.search(text):
+			return True
+		return False
+
 	def get_pdf_download_url(self, language_code=None):
 		params = {"slug": self.slug}
 		language_code = self.normalize_language_code(language_code)
@@ -508,10 +529,15 @@ class PropertyInstruction(WebsiteGenerator):
 			language_code=translation.language_code,
 			language_name=translation.language_name or translation.language_code.upper(),
 			title=translation.title or self.title,
-			address=translation.address or self.address,
-			emergency_contact=translation.emergency_contact or self.emergency_contact,
+			address=self.address,
+			emergency_contact=self.resolve_translated_emergency_contact(translation.emergency_contact),
 			sections=self.build_grouped_blocks(self.instruction_blocks or [], translation_map=translation_map),
 		)
+
+	def resolve_translated_emergency_contact(self, translated_value):
+		if self.should_protect_identifier_value(self.emergency_contact):
+			return self.emergency_contact
+		return translated_value or self.emergency_contact
 
 	def get_translation_source_payload(self):
 		return {
@@ -569,8 +595,10 @@ class PropertyInstruction(WebsiteGenerator):
 		doc.status = "Draft"
 		doc.source_modified = self.modified
 		doc.title = translated.get("title") or self.title
-		doc.address = translated.get("address") or self.address
-		doc.emergency_contact = translated.get("emergency_contact") or self.emergency_contact
+		doc.address = self.address
+		doc.emergency_contact = self.resolve_translated_emergency_contact(
+			translated.get("emergency_contact")
+		)
 		doc.blocks = []
 		for block in translated.get("blocks") or []:
 			doc.append("blocks", block)

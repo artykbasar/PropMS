@@ -1,9 +1,14 @@
 from __future__ import annotations
 
 import importlib
+import re
 
 import frappe
 from frappe import _
+
+PHONE_PATTERN = re.compile(r"(?:\+?\d[\d\s().-]{6,}\d)")
+EMAIL_PATTERN = re.compile(r"\b[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}\b")
+URL_PATTERN = re.compile(r"https?://[^\s<>'\"]+|www\.[^\s<>'\"]+")
 
 
 def translate_property_instruction(payload, target_language, source_language="en"):
@@ -12,9 +17,9 @@ def translate_property_instruction(payload, target_language, source_language="en
 		frappe.throw(_("A target language is required."))
 
 	jobs = []
-	for fieldname in ("title", "address", "emergency_contact"):
+	for fieldname in ("title", "emergency_contact"):
 		value = (payload.get(fieldname) or "").strip()
-		if value:
+		if value and should_translate_plain_value(fieldname, value):
 			jobs.append(
 				{
 					"index": len(jobs),
@@ -37,7 +42,7 @@ def translate_property_instruction(payload, target_language, source_language="en
 		}
 		for fieldname in ("section", "title", "caption", "link_label"):
 			value = (block.get(fieldname) or "").strip()
-			if value:
+			if value and should_translate_plain_value(fieldname, value):
 				jobs.append(
 					{
 						"index": len(jobs),
@@ -47,12 +52,14 @@ def translate_property_instruction(payload, target_language, source_language="en
 					}
 				)
 		if block.get("body"):
+			body_text, body_tokens = protect_inline_identifiers(block.get("body"))
 			jobs.append(
 				{
 					"index": len(jobs),
 					"path": ("block", len(translated_blocks), "body"),
-					"text": block.get("body"),
+					"text": body_text,
 					"mime_type": "text/html",
+					"tokens": body_tokens,
 				}
 			)
 		translated_blocks.append(block_copy)
@@ -66,6 +73,8 @@ def translate_property_instruction(payload, target_language, source_language="en
 	}
 
 	for job, translated_text in zip(jobs, results):
+		if job.get("tokens"):
+			translated_text = restore_inline_identifiers(translated_text, job["tokens"])
 		scope = job["path"][0]
 		if scope == "field":
 			output[job["path"][1]] = translated_text
@@ -74,6 +83,48 @@ def translate_property_instruction(payload, target_language, source_language="en
 			output["blocks"][block_index][fieldname] = translated_text
 
 	return output
+
+
+def should_translate_plain_value(fieldname, value):
+	if not (value or "").strip():
+		return False
+	if fieldname == "address":
+		return False
+	if contains_identifier_like_value(value):
+		return False
+	return True
+
+
+def contains_identifier_like_value(value):
+	text = (value or "").strip()
+	if not text:
+		return False
+	if URL_PATTERN.search(text):
+		return True
+	if EMAIL_PATTERN.search(text):
+		return True
+	if PHONE_PATTERN.search(text):
+		return True
+	return False
+
+
+def protect_inline_identifiers(text):
+	protected = {}
+
+	def replace(match):
+		token = f"[[PROPMS_TOKEN_{len(protected)}]]"
+		protected[token] = match.group(0)
+		return token
+
+	pattern = re.compile(f"{URL_PATTERN.pattern}|{EMAIL_PATTERN.pattern}|{PHONE_PATTERN.pattern}")
+	return pattern.sub(replace, text or ""), protected
+
+
+def restore_inline_identifiers(text, protected):
+	restored = text or ""
+	for token, original in (protected or {}).items():
+		restored = restored.replace(token, original)
+	return restored
 
 
 def translate_jobs(jobs, target_language, source_language="en"):
