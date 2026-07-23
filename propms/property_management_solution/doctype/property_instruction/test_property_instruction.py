@@ -715,6 +715,9 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 		self.assertNotIn("property-instruction-print", html)
 		self.assertIn("Open property in Google Maps", html)
 		self.assertIn('class="pdf-link-anchor"', html)
+		self.assertIn("page-break-inside: avoid;", html)
+		self.assertIn("display: table;", html)
+		self.assertNotIn('class="pdf-link-url"', html)
 
 	def test_pdf_public_images_are_inlined(self):
 		doc = self.make_instruction(
@@ -770,7 +773,9 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 		html = self.render_pdf(doc)
 		self.assertIn("Map preview unavailable in this PDF", html)
 		self.assertIn("Open property in Google Maps", html)
-		self.assertIn("www.google.com/maps/place/99A+Burlington+Road", html)
+		self.assertNotIn('class="pdf-link-url"', html)
+		self.assertEqual(html.count("Open property in Google Maps"), 1)
+		self.assertEqual(html.count("99A Burlington Road"), 2)
 
 	def test_pdf_template_includes_public_password_only_when_enabled(self):
 		doc = self.make_instruction(show_wifi_password_publicly=1)
@@ -805,6 +810,7 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 		self.assertIn("99A Burlington Road", "\n".join(pages))
 		self.assertIn("Estaex Guest WiFi", "\n".join(pages))
 		self.assertNotIn("guest-wifi-only", "\n".join(pages))
+		self.assertNotIn("www.google.com/maps/place/", "\n".join(pages))
 
 	def test_long_translated_pdf_retains_all_content_without_blank_trailing_page(self):
 		doc = self.make_instruction(wifi_name="Estaex Guest WiFi")

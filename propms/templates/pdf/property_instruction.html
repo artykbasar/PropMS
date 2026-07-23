@@ -82,11 +82,13 @@
     }
 
     .pdf-summary {
-      margin: 0 0 6mm;
-      padding: 4mm;
+      margin: 0 0 5mm;
+      padding: 3.5mm;
       border: 1px solid #d4dbe2;
       border-radius: 3mm;
       background: #f8fafb;
+      break-inside: avoid;
+      page-break-inside: avoid;
     }
 
     .pdf-summary-table {
@@ -103,6 +105,7 @@
 
     .pdf-meta-item {
       break-inside: avoid;
+      page-break-inside: avoid;
     }
 
     .pdf-label {
@@ -115,8 +118,7 @@
       font-weight: 700;
     }
 
-    .pdf-value,
-    .pdf-link-url {
+    .pdf-value {
       display: block;
       font-weight: 600;
       overflow-wrap: anywhere;
@@ -129,13 +131,6 @@
       text-decoration: underline;
     }
 
-    .pdf-link-url {
-      margin-top: 1mm;
-      color: #5a6876;
-      font-size: 8.6pt;
-      font-weight: 500;
-    }
-
     .pdf-sections {
       display: block;
       margin: 0;
@@ -143,8 +138,9 @@
     }
 
     .pdf-section {
-      margin: 0 0 6mm;
+      margin: 0 0 4.5mm;
       break-inside: auto;
+      page-break-inside: auto;
     }
 
     .pdf-summary:last-child,
@@ -157,11 +153,14 @@
 
     .pdf-section-title {
       margin: 0 0 3mm;
-      padding-bottom: 1.5mm;
+      padding-bottom: 1.2mm;
       border-bottom: 1px solid #cad5df;
       font-size: 15pt;
       line-height: 1.15;
       break-after: avoid;
+      page-break-after: avoid;
+      orphans: 2;
+      widows: 2;
     }
 
     .pdf-blocks {
@@ -173,12 +172,21 @@
     .pdf-warning,
     .pdf-image-block {
       break-inside: avoid;
+      page-break-inside: avoid;
     }
 
     .pdf-block {
+      display: table;
+      width: 100%;
+      box-sizing: border-box;
+      margin: 0 0 2.5mm;
       border: 1px solid #dce3ea;
       border-radius: 2.4mm;
-      padding: 3mm;
+      padding: 2.6mm;
+    }
+
+    .pdf-block:last-child {
+      margin-bottom: 0;
     }
 
     .pdf-warning {
@@ -191,6 +199,8 @@
       align-items: flex-start;
       gap: 3mm;
       margin: 0 0 2mm;
+      break-inside: avoid;
+      page-break-inside: avoid;
     }
 
     .pdf-step-number {
@@ -210,6 +220,8 @@
       margin: 0;
       font-size: 11.5pt;
       line-height: 1.2;
+      break-after: avoid;
+      page-break-after: avoid;
     }
 
     .pdf-body :first-child {
@@ -254,6 +266,8 @@
 
     .pdf-link {
       margin-top: 2mm;
+      break-inside: avoid;
+      page-break-inside: avoid;
     }
 
     .pdf-machine-note {
@@ -263,15 +277,22 @@
     }
 
     .pdf-map {
-      margin: 0 0 6mm;
-      padding: 4mm;
+      margin: 0 0 5mm;
+      padding: 3.5mm;
       border: 1px solid #d4dbe2;
       border-radius: 3mm;
       background: #fbfcfd;
       break-inside: avoid;
+      page-break-inside: avoid;
     }
 
     .pdf-map-grid {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+    }
+
+    .pdf-map-grid-compact {
       width: 100%;
       border-collapse: collapse;
       table-layout: fixed;
@@ -283,13 +304,13 @@
     }
 
     .pdf-map-visual {
-      width: 72mm;
-      padding-right: 5mm;
+      width: 66mm;
+      padding-right: 4mm;
     }
 
     .pdf-map-image {
       width: 100%;
-      max-height: 48mm;
+      max-height: 42mm;
       display: block;
       object-fit: contain;
       border: 1px solid #d4dbe2;
@@ -298,7 +319,7 @@
     }
 
     .pdf-map-fallback {
-      min-height: 38mm;
+      min-height: 30mm;
       border: 1px dashed #9ab9b5;
       border-radius: 2.4mm;
       background: linear-gradient(180deg, #f2fbfa 0%, #eef6f5 100%);
@@ -319,6 +340,13 @@
       line-height: 1.4;
       color: #38545f;
       font-weight: 500;
+    }
+
+    .pdf-map-note {
+      margin: 0 0 2mm;
+      color: #38545f;
+      font-size: 9pt;
+      line-height: 1.35;
     }
 
     .pdf-footer {
@@ -408,13 +436,6 @@
         {% if address %}
         <div class="pdf-meta-item"><span class="pdf-label">Property Address</span><span class="pdf-value">{{ address }}</span></div>
         {% endif %}
-        {% if pdf_map and pdf_map.external_url %}
-        <div class="pdf-meta-item">
-          <span class="pdf-label">Map</span>
-          <a class="pdf-link-anchor" href="{{ pdf_map.external_url }}">Open property in Google Maps</a>
-          {% if pdf_map.display_url %}<span class="pdf-link-url">{{ pdf_map.display_url }}</span>{% endif %}
-        </div>
-        {% endif %}
           </td>
         </tr>
       </table>
@@ -423,32 +444,35 @@
     {% if pdf_map and pdf_map.external_url %}
     <section class="pdf-map">
       <span class="pdf-label">Property Location</span>
+      {% if pdf_map.image_url %}
       <table class="pdf-map-grid">
         <tr>
           <td class="pdf-map-visual">
-            {% if pdf_map.image_url %}
             <a href="{{ pdf_map.external_url }}">
               <img class="pdf-map-image" src="{{ pdf_map.image_url }}" alt="Map preview for {{ title }}">
             </a>
-            {% else %}
-            <div class="pdf-map-fallback">
-              <span class="pdf-map-fallback-title">Map preview unavailable in this PDF</span>
-              <span class="pdf-map-fallback-copy">Use the Google Maps link to open the full location details.</span>
-            </div>
-            {% endif %}
           </td>
           <td class="pdf-map-content">
-            {% if address %}
-            <div class="pdf-meta-item"><span class="pdf-label">Address</span><span class="pdf-value">{{ address }}</span></div>
-            {% endif %}
             <div class="pdf-meta-item">
-              <span class="pdf-label">Map Link</span>
+              <span class="pdf-label">Map</span>
               <a class="pdf-link-anchor" href="{{ pdf_map.external_url }}">Open property in Google Maps</a>
-              {% if pdf_map.display_url %}<span class="pdf-link-url">{{ pdf_map.display_url }}</span>{% endif %}
             </div>
           </td>
         </tr>
       </table>
+      {% else %}
+      <table class="pdf-map-grid-compact">
+        <tr>
+          <td class="pdf-map-content">
+            <div class="pdf-map-note">Map preview unavailable in this PDF. Use the Google Maps link to open the full location details.</div>
+            <div class="pdf-meta-item">
+              <span class="pdf-label">Map</span>
+              <a class="pdf-link-anchor" href="{{ pdf_map.external_url }}">Open property in Google Maps</a>
+            </div>
+          </td>
+        </tr>
+      </table>
+      {% endif %}
     </section>
     {% endif %}
 
@@ -473,7 +497,6 @@
                   {% if block.link_url %}
                   <div class="pdf-link">
                     <a class="pdf-link-anchor" href="{{ block.link_url }}">{{ block.display_link_label }}</a>
-                    {% if block.pdf_link_display_url %}<span class="pdf-link-url">{{ block.pdf_link_display_url }}</span>{% endif %}
                   </div>
                   {% endif %}
                   </td>
@@ -490,7 +513,6 @@
               {% if block.link_url %}
               <div class="pdf-link">
                 <a class="pdf-link-anchor" href="{{ block.link_url }}">{{ block.display_link_label }}</a>
-                {% if block.pdf_link_display_url %}<span class="pdf-link-url">{{ block.pdf_link_display_url }}</span>{% endif %}
               </div>
               {% endif %}
               {% else %}
@@ -501,7 +523,6 @@
               {% if block.link_url %}
               <div class="pdf-link">
                 <a class="pdf-link-anchor" href="{{ block.link_url }}">{{ block.display_link_label }}</a>
-                {% if block.pdf_link_display_url %}<span class="pdf-link-url">{{ block.pdf_link_display_url }}</span>{% endif %}
               </div>
               {% endif %}
               {% endif %}
