@@ -6,13 +6,19 @@ from __future__ import unicode_literals
 from frappe.utils.nestedset import NestedSet
 from frappe.website.page_renderers.document_page import DocumentPage
 import frappe
+import re
 from urllib.parse import unquote
 from frappe.utils.caching import redis_cache
 from frappe.website.path_resolver import evaluate_dynamic_routes
 from frappe.website.path_resolver import resolve_path as original_resolve_path
-from builder.utils import (
-    ColonRule
-)
+try:
+    from builder.utils import ColonRule
+except ImportError:
+    from werkzeug.routing import Rule as _Rule
+
+    class ColonRule(_Rule):
+        def __init__(self, route, *args, **kwargs):
+            super().__init__(re.sub(r":([A-Za-z_][A-Za-z0-9_]*)", r"<\1>", route), *args, **kwargs)
 
 
 class PropertyPageRenderer(DocumentPage):
@@ -401,4 +407,3 @@ def resolve_path(path):
         pass
 
     return original_resolve_path(path)
-

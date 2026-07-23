@@ -28,7 +28,11 @@
         "section_break_ubgp",
         "default_rent_uom",
         "column_break_pfvd",
-        "default_security_deposit_period"
+        "default_security_deposit_period",
+        "section_break_guest_guides",
+        "enable_guest_guide_google_translate",
+        "guest_guide_source_language",
+        "guest_guide_translate_languages"
     ],
     "fields": [
         {
@@ -148,6 +152,31 @@
         {
             "fieldname": "section_break_ubgp",
             "fieldtype": "Section Break"
+        },
+        {
+            "fieldname": "section_break_guest_guides",
+            "fieldtype": "Section Break",
+            "label": "Guest Guide Website"
+        },
+        {
+            "default": "0",
+            "fieldname": "enable_guest_guide_google_translate",
+            "fieldtype": "Check",
+            "label": "Enable Guest Guide Google Translate"
+        },
+        {
+            "default": "en",
+            "depends_on": "eval: doc.enable_guest_guide_google_translate == 1",
+            "fieldname": "guest_guide_source_language",
+            "fieldtype": "Data",
+            "label": "Guest Guide Source Language"
+        },
+        {
+            "depends_on": "eval: doc.enable_guest_guide_google_translate == 1",
+            "description": "Leave empty to display all languages supported by the Google Translate widget. Enter comma-separated language codes only when you want to restrict the list.",
+            "fieldname": "guest_guide_translate_languages",
+            "fieldtype": "Small Text",
+            "label": "Guest Guide Translate Languages"
         }
     ],
     "index_web_pages_for_search": 1,

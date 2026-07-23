@@ -1,0 +1,1152 @@
+{% extends "templates/web.html" %}
+{% set google_translate = google_translate if google_translate is defined and google_translate else {"enabled": 0} %}
+{% set property_map = property_map if property_map is defined and property_map else {"embed_url": map_embed_url if map_embed_url is defined else None, "external_url": google_maps_url if google_maps_url is defined else None} %}
+{% set screen_map_query = ("place_id:" ~ google_maps_place_id) if google_maps_place_id else (map_search_query or address) %}
+{% set screen_map_zoom = map_zoom or 16 %}
+{% set screen_map_embed_url = property_map.embed_url if property_map and property_map.embed_url else (map_embed_url if map_embed_url is defined and map_embed_url else (("https://www.google.com/maps?q=" ~ (screen_map_query | urlencode) ~ "&z=" ~ screen_map_zoom ~ "&output=embed" ~ ("&t=k" if map_type == "satellite" else "")) if show_embedded_map and screen_map_query else None)) %}
+{% set screen_map_external_url = property_map.external_url if property_map and property_map.external_url else (google_maps_url if google_maps_url is defined and google_maps_url else (("https://www.google.com/maps/search/?api=1&query=" ~ (screen_map_query | urlencode)) if screen_map_query else None)) %}
+
+{% block navbar %}{% endblock %}
+{% block footer %}{% endblock %}
+{% block meta_block %}
+  {{ super() }}
+  <meta name="robots" content="{{ noindex_robots_content or 'noindex, nofollow, noarchive, nosnippet, noimageindex' }}">
+{% endblock %}
+
+{% block style %}
+<style>
+  .pi-page {
+    --pi-bg: #f6f2ea;
+    --pi-card: #ffffff;
+    --pi-ink: #1f2933;
+    --pi-muted: #5b6875;
+    --pi-accent: #115e59;
+    --pi-accent-soft: #dff4f2;
+    --pi-warning: #fff4db;
+    --pi-border: #d7dee5;
+    background: linear-gradient(180deg, #fbfaf7 0%, var(--pi-bg) 100%);
+    color: var(--pi-ink);
+    padding: 1.5rem 0 4rem;
+  }
+  .pi-shell {
+    width: min(1080px, calc(100% - 2rem));
+    margin: 0 auto;
+  }
+  .pi-hero,
+  .pi-card,
+  .pi-nav,
+  .pi-translate-shell {
+    background: var(--pi-card);
+    border: 1px solid var(--pi-border);
+    border-radius: 24px;
+    box-shadow: 0 18px 40px rgba(15, 23, 42, 0.06);
+  }
+  .pi-screen-layout {
+    display: block;
+  }
+  .pi-print-layout {
+    display: none;
+  }
+  .pi-hero {
+    overflow: hidden;
+    margin-bottom: 1.25rem;
+  }
+  .pi-cover {
+    width: 100%;
+    max-height: 360px;
+    object-fit: cover;
+    display: block;
+  }
+  .pi-hero-body {
+    padding: 1.5rem;
+  }
+  .pi-eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: .5rem;
+    font-size: .85rem;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    color: var(--pi-accent);
+    font-weight: 700;
+  }
+  .pi-title {
+    font-size: clamp(2rem, 4vw, 3.2rem);
+    line-height: 1.05;
+    margin: .75rem 0;
+  }
+  .pi-address-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: .75rem;
+    margin-top: .35rem;
+  }
+  .pi-meta {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: .9rem;
+    margin-top: 1.25rem;
+  }
+  .pi-meta-item,
+  .pi-card {
+    padding: 1rem 1.1rem;
+  }
+  .pi-label {
+    display: block;
+    font-size: .82rem;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    color: var(--pi-muted);
+    margin-bottom: .25rem;
+  }
+  .pi-value {
+    font-weight: 600;
+    overflow-wrap: anywhere;
+  }
+  .pi-copy-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: .75rem;
+  }
+  .pi-meta-item .pi-copy-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .pi-meta-item .pi-copy-button {
+    width: auto;
+  }
+  .pi-copy-text {
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+  .pi-copy-value {
+    display: block;
+    font-weight: 600;
+    overflow-wrap: anywhere;
+    user-select: text;
+  }
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+  .pi-copy-button {
+    position: relative;
+    flex: 0 0 auto;
+    width: 2.5rem;
+    height: 2.5rem;
+    min-width: 2.5rem;
+    min-height: 2.5rem;
+    border: 1px solid var(--pi-border);
+    background: #fff;
+    color: var(--pi-accent);
+    border-radius: 999px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: border-color .2s ease, color .2s ease, background-color .2s ease;
+  }
+  .pi-copy-button svg {
+    width: 1.15rem;
+    height: 1.15rem;
+    stroke: currentColor;
+    stroke-width: 2;
+    fill: none;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    pointer-events: none;
+  }
+  .pi-copy-button .pi-copy-icon-check {
+    display: none;
+  }
+  .pi-copy-button.is-copied {
+    color: #0f766e;
+    border-color: #99f6e4;
+    background: #f0fdfa;
+  }
+  .pi-copy-button.is-copied .pi-copy-icon-copy {
+    display: none;
+  }
+  .pi-copy-button.is-copied .pi-copy-icon-check {
+    display: block;
+  }
+  .pi-copy-button:focus-visible,
+  .pi-btn:focus-visible,
+  .pi-nav a:focus-visible,
+  .pi-language-option:focus-visible {
+    outline: 2px solid var(--pi-accent);
+    outline-offset: 2px;
+  }
+  .pi-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .75rem;
+    margin-top: 1rem;
+  }
+  .pi-action-status {
+    flex: 1 0 100%;
+    color: var(--pi-muted);
+    font-size: .92rem;
+    margin: 0;
+  }
+  .pi-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: .5rem;
+    border-radius: 999px;
+    padding: .8rem 1.2rem;
+    font-weight: 700;
+    text-decoration: none;
+    border: 1px solid transparent;
+  }
+  .pi-btn-primary {
+    background: var(--pi-accent);
+    color: #fff;
+  }
+  .pi-btn-secondary {
+    background: transparent;
+    color: var(--pi-accent);
+    border-color: var(--pi-border);
+  }
+  .pi-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 250px) minmax(0, 1fr);
+    gap: 1.25rem;
+    align-items: start;
+  }
+  .pi-nav {
+    position: sticky;
+    top: 1rem;
+    padding: 1rem;
+  }
+  .pi-nav ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: grid;
+    gap: .55rem;
+  }
+  .pi-nav a {
+    color: var(--pi-ink);
+    text-decoration: none;
+    font-weight: 600;
+  }
+  .pi-sections {
+    display: grid;
+    gap: 1rem;
+  }
+  .pi-section-title {
+    margin: 0 0 .9rem;
+    font-size: 1.4rem;
+  }
+  .pi-blocks {
+    display: grid;
+    gap: .9rem;
+  }
+  .pi-block {
+    border: 1px solid var(--pi-border);
+    border-radius: 18px;
+    padding: 1rem;
+    background: #fff;
+  }
+  .pi-block-step {
+    border-color: #cde7e4;
+    background: #f9fffe;
+  }
+  .pi-block-warning {
+    border-color: #f0d48c;
+    background: var(--pi-warning);
+  }
+  .pi-step-head {
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+    margin-bottom: .5rem;
+  }
+  .pi-step-badge {
+    width: 2rem;
+    height: 2rem;
+    border-radius: 999px;
+    background: var(--pi-accent);
+    color: #fff;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    flex: 0 0 auto;
+  }
+  .pi-block h3 {
+    margin: 0;
+    font-size: 1.05rem;
+  }
+  .pi-body :first-child {
+    margin-top: 0;
+  }
+  .pi-body :last-child {
+    margin-bottom: 0;
+  }
+  .pi-image {
+    width: 100%;
+    border-radius: 14px;
+    margin-top: .8rem;
+    max-height: 360px;
+    object-fit: cover;
+  }
+  .pi-caption {
+    margin-top: .45rem;
+    color: var(--pi-muted);
+    font-size: .92rem;
+  }
+  .pi-link {
+    margin-top: .8rem;
+  }
+  .pi-link a {
+    color: var(--pi-accent);
+    font-weight: 700;
+    text-decoration: underline;
+  }
+  .pi-empty {
+    text-align: center;
+    color: var(--pi-muted);
+  }
+  .pi-map-card {
+    margin-bottom: 1.25rem;
+    padding: 1rem;
+  }
+  .pi-map-shell {
+    aspect-ratio: 16 / 9;
+    min-height: 320px;
+    overflow: hidden;
+    border-radius: 20px;
+    border: 1px solid var(--pi-border);
+    background: #e7ecef;
+  }
+  .pi-map {
+    width: 100%;
+    height: 100%;
+    border: 0;
+    display: block;
+  }
+  .pi-language-switcher {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .5rem;
+    margin-bottom: 1rem;
+    align-items: center;
+  }
+  .pi-language-label {
+    margin: 0;
+    color: var(--pi-muted);
+    font-size: .88rem;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+  }
+  .pi-language-option {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: .5rem .85rem;
+    border-radius: 999px;
+    border: 1px solid var(--pi-border);
+    color: var(--pi-ink);
+    text-decoration: none;
+    font-weight: 600;
+    background: rgba(255, 255, 255, 0.75);
+  }
+  .pi-language-option.is-active {
+    background: var(--pi-accent);
+    border-color: var(--pi-accent);
+    color: #fff;
+  }
+  .pi-translate-shell {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: .75rem;
+    margin-bottom: 1rem;
+    padding: .9rem 1rem;
+  }
+  .pi-translate-copy {
+    margin: 0;
+    color: var(--pi-muted);
+    font-size: .95rem;
+  }
+  .pi-translate-widget {
+    min-height: 2.5rem;
+  }
+  .pi-translate-widget .goog-te-gadget {
+    color: var(--pi-ink) !important;
+    font-family: inherit;
+    font-size: .95rem !important;
+  }
+  .pi-translate-widget .goog-te-combo {
+    min-width: 220px;
+    border: 1px solid var(--pi-border);
+    border-radius: 999px;
+    padding: .55rem .9rem;
+    background: #fff;
+    color: var(--pi-ink);
+  }
+  @media (max-width: 768px) {
+    .pi-address-row,
+    .pi-copy-row {
+      flex-direction: column;
+      align-items: stretch;
+    }
+    .pi-copy-button {
+      width: 2.5rem;
+    }
+    .pi-actions .pi-btn {
+      width: 100%;
+    }
+  }
+  .pi-print-kicker {
+    margin: 0 0 2mm;
+    font-size: 9pt;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: #475569;
+    font-weight: 700;
+  }
+  .pi-print-title {
+    margin: 0;
+    font-size: 20pt;
+    line-height: 1.08;
+  }
+  .pi-print-address {
+    margin: 2mm 0 0;
+    font-size: 10.5pt;
+    color: #334155;
+  }
+  .pi-print-meta-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 2.5mm 5mm;
+    margin-top: 2.5mm;
+  }
+  .pi-print-meta-item {
+    break-inside: avoid;
+  }
+  .pi-print-map-url,
+  .pi-print-link-url {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+  .pi-print-section {
+    margin: 0 0 5mm;
+    break-inside: auto;
+  }
+  .pi-print-section + .pi-print-section {
+    margin-top: 5mm;
+  }
+  .pi-print-section-title {
+    margin: 0 0 2mm;
+    padding-bottom: 1.5mm;
+    border-bottom: 1px solid #cbd5e1;
+    font-size: 13pt;
+    break-after: avoid;
+  }
+  .pi-print-blocks {
+    display: grid;
+    gap: 3mm;
+  }
+  .pi-print-block {
+    border: 1px solid #d8dee6;
+    border-radius: 3mm;
+    padding: 3mm;
+    background: #fff;
+    break-inside: avoid;
+    margin-bottom: 2.5mm;
+  }
+  .pi-print-block:last-child {
+    margin-bottom: 0;
+  }
+  .pi-print-block-warning {
+    border-left: 3mm solid #92400e;
+    background: #fffaf0;
+  }
+  .pi-print-step-head {
+    display: flex;
+    gap: 3mm;
+    align-items: flex-start;
+    margin-bottom: 2mm;
+  }
+  .pi-print-step-number {
+    width: 8mm;
+    height: 8mm;
+    border-radius: 999px;
+    background: #0f766e;
+    color: #fff;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 9pt;
+    font-weight: 700;
+    flex: 0 0 auto;
+  }
+  .pi-print-block-title {
+    margin: 0;
+    font-size: 10.5pt;
+    line-height: 1.35;
+  }
+  .pi-print-body :first-child {
+    margin-top: 0;
+  }
+  .pi-print-body :last-child {
+    margin-bottom: 0;
+  }
+  .pi-print-caption {
+    margin-top: 1.5mm;
+    color: #475569;
+    font-size: 9pt;
+  }
+  .pi-print-image {
+    display: block;
+    max-width: 100%;
+    width: auto;
+    max-height: 55mm;
+    margin-top: 2.5mm;
+    object-fit: contain;
+    border-radius: 2mm;
+    break-inside: avoid;
+  }
+  .pi-print-image-block {
+    display: grid;
+    grid-template-columns: 60mm minmax(0, 1fr);
+    gap: 4mm;
+    align-items: start;
+  }
+  .pi-print-image-figure {
+    margin: 0;
+  }
+  .pi-print-image-content {
+    min-width: 0;
+  }
+  .pi-print-link {
+    margin-top: 2mm;
+    font-size: 9pt;
+  }
+  .pi-print-link a {
+    color: inherit;
+    text-decoration: underline;
+  }
+  @media (max-width: 860px) {
+    .pi-grid {
+      grid-template-columns: 1fr;
+    }
+    .pi-nav {
+      position: static;
+    }
+    .pi-map-shell {
+      min-height: 260px;
+    }
+  }
+  @media print {
+    @page {
+      size: A4 portrait;
+      margin: 12mm 13mm;
+    }
+    html,
+    body,
+    .page-content-wrapper,
+    .page_content,
+    .pi-page {
+      min-height: 0 !important;
+      height: auto !important;
+    }
+    .pi-page {
+      background: #fff;
+      color: #111827;
+      padding: 0;
+      font-size: 10pt;
+    }
+    .pi-shell {
+      width: 100%;
+    }
+    .pi-screen-layout {
+      display: none !important;
+    }
+    .pi-print-layout {
+      display: block !important;
+    }
+    .pi-print-layout,
+    .pi-print-section,
+    .pi-print-blocks {
+      width: 100%;
+    }
+    .pi-print-blocks {
+      display: block;
+    }
+    .pi-print-meta-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .pi-print-block,
+    .pi-print-image,
+    .pi-print-step-head {
+      break-inside: avoid;
+    }
+    .pi-print-section-title {
+      break-after: avoid;
+    }
+    .pi-print-block-warning {
+      print-color-adjust: exact;
+      -webkit-print-color-adjust: exact;
+    }
+    .pi-print-layout a {
+      color: inherit;
+    }
+    .pi-print-layout .pi-print-body,
+    .pi-print-layout .pi-print-caption,
+    .pi-print-layout .pi-print-link,
+    .pi-print-layout .pi-value {
+      orphans: 3;
+      widows: 3;
+    }
+    .pi-print-image-block {
+      grid-template-columns: 55mm minmax(0, 1fr);
+    }
+  }
+</style>
+{% endblock %}
+
+{% macro render_copy_row(label, value, button_label, aria_label, target_id, protect_value=False) %}
+  <div class="pi-copy-row">
+    <div class="pi-copy-text">
+      <span class="pi-label">{{ label }}</span>
+      <span
+        id="{{ target_id }}"
+        class="pi-copy-value{% if protect_value %} notranslate{% endif %}"
+        {% if protect_value %}translate="no"{% endif %}>{{ value }}</span>
+    </div>
+    <button
+      type="button"
+      class="pi-copy-button"
+      data-copy-target="{{ target_id }}"
+      data-default-label="{{ aria_label | e }}"
+      aria-label="{{ aria_label }}"
+      title="{{ aria_label }}">
+      <svg class="pi-copy-icon pi-copy-icon-copy" aria-hidden="true" focusable="false" viewBox="0 0 24 24">
+        <rect x="9" y="9" width="13" height="13" rx="2"></rect>
+        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+      </svg>
+      <svg class="pi-copy-icon pi-copy-icon-check" aria-hidden="true" focusable="false" viewBox="0 0 24 24">
+        <path d="M20 6 9 17l-5-5"></path>
+      </svg>
+      <span class="sr-only">{{ aria_label }}</span>
+    </button>
+    <span class="pi-copy-status sr-only" aria-live="polite"></span>
+  </div>
+{% endmacro %}
+
+{% macro render_screen_block(block) %}
+  <div class="pi-block pi-block-{{ block.block_type | lower | replace(' ', '-') }}" data-pdf-block="{{ block.name }}">
+    {% if block.block_type == "Step" %}
+    <div class="pi-step-head">
+      <span class="pi-step-badge">{{ block.display_step_number }}</span>
+      {% if block.title %}<h3 data-pdf-block-field="title"{% if block.title_translation_protected %} class="notranslate" translate="no"{% endif %}>{{ block.title }}</h3>{% endif %}
+    </div>
+    {% elif block.title %}
+    <h3 data-pdf-block-field="title"{% if block.title_translation_protected %} class="notranslate" translate="no"{% endif %}>{{ block.title }}</h3>
+    {% endif %}
+
+    {% if block.safe_body %}
+    <div class="pi-body" data-pdf-block-field="body">{{ block.safe_body }}</div>
+    {% endif %}
+
+    {% if block.image %}
+    <img class="pi-image" src="{{ block.image }}" alt="{{ block.image_alt }}">
+    {% endif %}
+
+    {% if block.caption %}
+    <div class="pi-caption{% if block.caption_translation_protected %} notranslate{% endif %}" data-pdf-block-field="caption"{% if block.caption_translation_protected %} translate="no"{% endif %}>{{ block.caption }}</div>
+    {% endif %}
+
+    {% if block.link_url %}
+    <div class="pi-link">
+      <a href="{{ block.link_url }}" target="_blank" rel="noopener noreferrer nofollow" data-pdf-block-field="link_label"{% if block.display_link_label_translation_protected %} class="notranslate" translate="no"{% endif %}>{{ block.display_link_label }}</a>
+    </div>
+    {% endif %}
+  </div>
+{% endmacro %}
+
+{% macro render_print_block(block) %}
+  {% if block.hide_in_print %}
+  {% else %}
+  <div class="pi-print-block pi-print-block-{{ block.block_type | lower | replace(' ', '-') }}">
+    {% if block.block_type == "Image" %}
+    <div class="pi-print-image-block">
+      <figure class="pi-print-image-figure">
+        <img class="pi-print-image" src="{{ block.image }}" alt="{{ block.image_alt }}">
+      </figure>
+      <div class="pi-print-image-content">
+        {% if block.title %}<h3 class="pi-print-block-title">{{ block.title }}</h3>{% endif %}
+        {% if block.safe_body %}
+        <div class="pi-print-body">{{ block.safe_body }}</div>
+        {% endif %}
+        {% if block.caption %}
+        <div class="pi-print-caption">{{ block.caption }}</div>
+        {% endif %}
+        {% if block.link_url %}
+        <div class="pi-print-link">
+          <strong>{{ block.display_link_label }}</strong>
+          <div class="pi-print-link-url">{{ block.link_url }}</div>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+    {% elif block.block_type == "Step" %}
+    <div class="pi-print-step-head">
+      <span class="pi-print-step-number">{{ block.display_step_number }}</span>
+      {% if block.title %}<h3 class="pi-print-block-title">{{ block.title }}</h3>{% endif %}
+    </div>
+    {% elif block.title %}
+    <h3 class="pi-print-block-title">{{ block.title }}</h3>
+    {% endif %}
+
+    {% if block.safe_body %}
+    <div class="pi-print-body">{{ block.safe_body }}</div>
+    {% endif %}
+
+    {% if block.image and block.block_type != "Image" %}
+    <img class="pi-print-image" src="{{ block.image }}" alt="{{ block.image_alt }}">
+    {% endif %}
+
+    {% if block.caption and block.block_type != "Image" %}
+    <div class="pi-print-caption">{{ block.caption }}</div>
+    {% endif %}
+
+    {% if block.link_url %}
+    <div class="pi-print-link">
+      <strong>{{ block.display_link_label }}</strong>
+      <div class="pi-print-link-url">{{ block.link_url }}</div>
+    </div>
+    {% endif %}
+  </div>
+  {% endif %}
+{% endmacro %}
+
+{% block page_content %}
+<div class="pi-page" lang="{{ selected_language_code or 'en' }}">
+  <div class="pi-shell">
+    <div class="pi-screen-layout">
+      {% if google_translate and google_translate.enabled %}
+      <section class="pi-translate-shell" aria-label="Instant translation">
+        <p class="pi-translate-copy">Translate this guide instantly</p>
+        <div id="{{ google_translate.container_id }}" class="pi-translate-widget"></div>
+      </section>
+      {% endif %}
+
+      {% if reviewed_language_selector_enabled %}
+      <nav class="pi-language-switcher" aria-label="Language selector">
+        <p class="pi-language-label">Language</p>
+        {% for language in available_languages %}
+        <a
+          class="pi-language-option{% if language.language_code == selected_language_code %} is-active{% endif %}"
+          href="{{ language.url }}">
+          {{ language.language_name }}
+        </a>
+        {% endfor %}
+      </nav>
+      {% endif %}
+
+      <article class="pi-hero">
+        {% if cover_image %}
+        <img class="pi-cover" src="{{ cover_image }}" alt="{{ title }} cover image">
+        {% endif %}
+        <div class="pi-hero-body">
+          <div class="pi-eyebrow">Guest Instructions</div>
+          <h1 class="pi-title" data-pdf-field="title">{{ title }}</h1>
+          {% if address %}
+          <div class="pi-address-row">
+            {{ render_copy_row("Address", address, "Copy address", "Copy property address", "property-address", True) }}
+          </div>
+          {% endif %}
+
+          <div class="pi-meta">
+            {% if check_in_time %}
+            <div class="pi-meta-item">
+              <span class="pi-label">Check-In</span>
+              <span class="pi-value">{{ check_in_time }}</span>
+            </div>
+            {% endif %}
+            {% if check_out_time %}
+            <div class="pi-meta-item">
+              <span class="pi-label">Check-Out</span>
+              <span class="pi-value">{{ check_out_time }}</span>
+            </div>
+            {% endif %}
+            {% if wifi_name %}
+            <div class="pi-meta-item">
+              {{ render_copy_row("Wi-Fi Name", wifi_name, "Copy network", "Copy Wi-Fi network name", "wifi-network-name", True) }}
+            </div>
+            {% endif %}
+            {% if wifi_password_public %}
+            <div class="pi-meta-item">
+              {{ render_copy_row("Wi-Fi Password", wifi_password_public, "Copy password", "Copy Wi-Fi password", "wifi-password-public", True) }}
+            </div>
+            {% endif %}
+            {% if emergency_contact %}
+            <div class="pi-meta-item">
+              <span class="pi-label">Emergency Contact</span>
+              <span class="pi-value{% if emergency_contact_translation_protected %} notranslate{% endif %}" data-pdf-field="emergency_contact"{% if emergency_contact_translation_protected %} translate="no"{% endif %}>{{ emergency_contact }}</span>
+            </div>
+            {% endif %}
+            {% if last_reviewed_on %}
+            <div class="pi-meta-item">
+              <span class="pi-label">Last Reviewed</span>
+              <span class="pi-value">{{ last_reviewed_on_display or last_reviewed_on }}</span>
+            </div>
+            {% endif %}
+          </div>
+
+          <div class="pi-actions">
+            {% if screen_map_external_url %}
+            <a class="pi-btn pi-btn-primary" href="{{ screen_map_external_url }}" target="_blank" rel="noopener noreferrer nofollow">Open in Google Maps</a>
+            {% endif %}
+            {% if pdf_download_url %}
+            <a
+              class="pi-btn pi-btn-secondary pi-pdf-download"
+              href="{{ pdf_download_url }}"
+              data-pdf-download-url="{{ pdf_download_url }}"
+              data-pdf-token="{{ pdf_snapshot_token }}"
+              data-pdf-slug="{{ doc.slug }}"
+              data-reviewed-language="{{ selected_language_code or 'en' }}"
+              data-pdf-filename="{{ doc.slug }}-guest-guide.pdf"
+              >Download PDF</a>
+            {% endif %}
+            <button type="button" class="pi-btn pi-btn-secondary property-instruction-print">Print guide</button>
+            <p class="pi-action-status sr-only" aria-live="polite"></p>
+          </div>
+        </div>
+      </article>
+
+      {% if screen_map_embed_url %}
+      <section class="pi-card pi-map-card" aria-label="Property map">
+        <div class="pi-map-shell">
+          <iframe
+            class="pi-map"
+            title="Map showing the property location"
+            loading="lazy"
+            allowfullscreen
+            referrerpolicy="strict-origin-when-cross-origin"
+            src="{{ screen_map_embed_url }}">
+          </iframe>
+        </div>
+        {% if screen_map_external_url %}
+        <div class="pi-actions">
+          <a class="pi-btn pi-btn-secondary" href="{{ screen_map_external_url }}" target="_blank" rel="noopener noreferrer nofollow">Open in Google Maps</a>
+        </div>
+        {% endif %}
+      </section>
+      {% endif %}
+
+      {% if has_sections %}
+      <div class="pi-grid">
+        <nav class="pi-nav" aria-label="Instruction sections">
+          <strong class="pi-label">Jump to Section</strong>
+          <ul>
+            {% for section in sections %}
+            <li><a href="#{{ section.anchor }}">{{ section.section }}</a></li>
+            {% endfor %}
+          </ul>
+        </nav>
+
+        <div class="pi-sections">
+          {% for section in sections %}
+          <section id="{{ section.anchor }}" class="pi-card">
+            <h2 class="pi-section-title" data-pdf-section="{{ section.anchor }}">{{ section.section }}</h2>
+            <div class="pi-blocks">
+              {% for block in section.blocks %}
+              {{ render_screen_block(block) }}
+              {% endfor %}
+            </div>
+          </section>
+          {% endfor %}
+        </div>
+      </div>
+      {% else %}
+      <div class="pi-card pi-empty">
+        <p>No published instruction content is available for this property yet.</p>
+      </div>
+      {% endif %}
+    </div>
+
+    <div class="pi-print-layout" aria-hidden="true">
+      <header class="pi-print-header">
+        <p class="pi-print-kicker">Estaex Guest Guide</p>
+        <h1 class="pi-print-title">{{ title }}</h1>
+        {% if address %}
+        <p class="pi-print-address">{{ address }}</p>
+        {% endif %}
+        <div class="pi-print-meta-grid">
+          {% if check_in_time %}
+          <div class="pi-print-meta-item"><span class="pi-label">Check-In</span><span class="pi-value">{{ check_in_time }}</span></div>
+          {% endif %}
+          {% if check_out_time %}
+          <div class="pi-print-meta-item"><span class="pi-label">Check-Out</span><span class="pi-value">{{ check_out_time }}</span></div>
+          {% endif %}
+          {% if wifi_name %}
+          <div class="pi-print-meta-item"><span class="pi-label">Wi-Fi Name</span><span class="pi-value">{{ wifi_name }}</span></div>
+          {% endif %}
+          {% if emergency_contact %}
+          <div class="pi-print-meta-item"><span class="pi-label">Emergency Contact</span><span class="pi-value">{{ emergency_contact }}</span></div>
+          {% endif %}
+          {% if last_reviewed_on %}
+          <div class="pi-print-meta-item"><span class="pi-label">Last Reviewed</span><span class="pi-value">{{ last_reviewed_on }}</span></div>
+          {% endif %}
+          {% if screen_map_external_url %}
+          <div class="pi-print-meta-item pi-print-map-url"><span class="pi-label">Property Location</span><span class="pi-value">{{ screen_map_external_url }}</span></div>
+          {% endif %}
+        </div>
+      </header>
+
+      {% if has_sections %}
+        {% for section in sections %}
+        <section class="pi-print-section">
+          <h2 class="pi-print-section-title">{{ section.section }}</h2>
+          <div class="pi-print-blocks">
+            {% for block in section.blocks %}
+            {{ render_print_block(block) }}
+            {% endfor %}
+          </div>
+        </section>
+        {% endfor %}
+      {% else %}
+      <section class="pi-print-section">
+        <div class="pi-empty">
+          <p>No published instruction content is available for this property yet.</p>
+        </div>
+      </section>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% if google_translate and google_translate.enabled %}
+<script>
+  window.googleTranslateElementInit = window.googleTranslateElementInit || function () {
+    if (!window.google || !google.translate || !google.translate.TranslateElement) {
+      return;
+    }
+    new google.translate.TranslateElement({{ google_translate.config_json | safe }}, "{{ google_translate.container_id }}");
+  };
+</script>
+<script src="{{ google_translate.script_url }}"></script>
+{% endif %}
+<script>
+  (function () {
+    if (window.__propertyInstructionUiBound) {
+      return;
+    }
+    window.__propertyInstructionUiBound = true;
+
+    async function copyValue(value) {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(value);
+        return;
+      }
+
+      const fallback = document.createElement("textarea");
+      fallback.value = value;
+      fallback.setAttribute("readonly", "readonly");
+      fallback.style.position = "absolute";
+      fallback.style.left = "-9999px";
+      document.body.appendChild(fallback);
+      fallback.select();
+      document.execCommand("copy");
+      document.body.removeChild(fallback);
+    }
+
+    function getWidgetLanguage() {
+      const widgetSelect = document.querySelector(".goog-te-combo");
+      if (!widgetSelect || !widgetSelect.value) {
+        return "";
+      }
+      return String(widgetSelect.value).trim().toLowerCase();
+    }
+
+    function getReviewedLanguage(downloadLink) {
+      return String(downloadLink.getAttribute("data-reviewed-language") || "en").trim().toLowerCase();
+    }
+
+    function getPdfSnapshotPayload(downloadLink) {
+      const fields = {};
+      const sections = {};
+      const blocks = {};
+
+      document.querySelectorAll("[data-pdf-field]").forEach(function (element) {
+        const fieldName = element.getAttribute("data-pdf-field");
+        if (!fieldName) {
+          return;
+        }
+        const value = fieldName === "emergency_contact" ? element.textContent.trim() : element.textContent.trim();
+        if (value) {
+          fields[fieldName] = value;
+        }
+      });
+
+      document.querySelectorAll("[data-pdf-section]").forEach(function (element) {
+        const sectionKey = element.getAttribute("data-pdf-section");
+        const value = element.textContent.trim();
+        if (sectionKey && value) {
+          sections[sectionKey] = value;
+        }
+      });
+
+      document.querySelectorAll("[data-pdf-block]").forEach(function (blockElement) {
+        const blockName = blockElement.getAttribute("data-pdf-block");
+        if (!blockName) {
+          return;
+        }
+        const blockPayload = {};
+        blockElement.querySelectorAll("[data-pdf-block-field]").forEach(function (fieldElement) {
+          const fieldName = fieldElement.getAttribute("data-pdf-block-field");
+          if (!fieldName) {
+            return;
+          }
+          const value = fieldName === "body"
+            ? fieldElement.innerHTML.trim()
+            : fieldElement.textContent.trim();
+          if (value) {
+            blockPayload[fieldName] = value;
+          }
+        });
+        if (Object.keys(blockPayload).length) {
+          blocks[blockName] = blockPayload;
+        }
+      });
+
+      return {
+        slug: downloadLink.getAttribute("data-pdf-slug") || "",
+        token: downloadLink.getAttribute("data-pdf-token") || "",
+        display_language: getReviewedLanguage(downloadLink),
+        reviewed_language: getReviewedLanguage(downloadLink),
+        widget_language: getWidgetLanguage(),
+        fields: fields,
+        sections: sections,
+        blocks: blocks
+      };
+    }
+
+    function getDownloadFilename(response, downloadLink) {
+      const contentDisposition = response.headers.get("Content-Disposition") || "";
+      const match = contentDisposition.match(/filename=\"?([^\";]+)\"?/i);
+      if (match && match[1]) {
+        return match[1];
+      }
+      return downloadLink.getAttribute("data-pdf-filename") || "guest-guide.pdf";
+    }
+
+    async function downloadTranslatedPdf(downloadLink) {
+      const statusElement = document.querySelector(".pi-action-status");
+      const originalLabel = downloadLink.textContent;
+      const payload = getPdfSnapshotPayload(downloadLink);
+
+      downloadLink.classList.add("is-disabled");
+      downloadLink.setAttribute("aria-disabled", "true");
+      downloadLink.textContent = "Preparing PDF";
+      if (statusElement) {
+        statusElement.classList.remove("sr-only");
+        statusElement.textContent = "Preparing PDF";
+      }
+
+      try {
+        const response = await window.fetch(downloadLink.getAttribute("data-pdf-download-url"), {
+          method: "POST",
+          credentials: "same-origin",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify(payload)
+        });
+
+        if (!response.ok) {
+          throw new Error("Unable to generate PDF");
+        }
+
+        const pdfBlob = await response.blob();
+        const objectUrl = window.URL.createObjectURL(pdfBlob);
+        const temporaryLink = document.createElement("a");
+        temporaryLink.href = objectUrl;
+        temporaryLink.download = getDownloadFilename(response, downloadLink);
+        document.body.appendChild(temporaryLink);
+        temporaryLink.click();
+        temporaryLink.remove();
+        window.URL.revokeObjectURL(objectUrl);
+        if (statusElement) {
+          statusElement.textContent = "PDF downloaded";
+        }
+      } catch (error) {
+        if (statusElement) {
+          statusElement.textContent = "Unable to prepare PDF";
+        }
+        window.location.href = downloadLink.getAttribute("href");
+      } finally {
+        downloadLink.classList.remove("is-disabled");
+        downloadLink.removeAttribute("aria-disabled");
+        downloadLink.textContent = originalLabel;
+      }
+    }
+
+    document.addEventListener("click", async function (event) {
+      const copyButton = event.target.closest(".pi-copy-button");
+      if (copyButton) {
+        const copyTarget = copyButton.getAttribute("data-copy-target");
+        const defaultLabel = copyButton.getAttribute("data-default-label") || "Copy";
+        const statusElement = copyButton.parentElement
+          ? copyButton.parentElement.querySelector(".pi-copy-status")
+          : null;
+        const targetElement = copyTarget ? document.getElementById(copyTarget) : null;
+        const value = targetElement ? targetElement.textContent.trim() : "";
+        if (!value) {
+          return;
+        }
+        try {
+          await copyValue(value);
+          copyButton.classList.add("is-copied");
+          copyButton.setAttribute("aria-label", "Copied");
+          copyButton.setAttribute("title", "Copied");
+          if (statusElement) {
+            statusElement.textContent = "Copied";
+          }
+        } catch (error) {
+          if (statusElement) {
+            statusElement.textContent = "Unable to copy";
+          }
+        }
+        window.setTimeout(function () {
+          copyButton.classList.remove("is-copied");
+          copyButton.setAttribute("aria-label", defaultLabel);
+          copyButton.setAttribute("title", defaultLabel);
+          if (statusElement) {
+            statusElement.textContent = "";
+          }
+        }, 2000);
+        return;
+      }
+
+      const downloadLink = event.target.closest(".pi-pdf-download");
+      if (downloadLink && window.fetch && window.URL && window.URL.createObjectURL) {
+        event.preventDefault();
+        await downloadTranslatedPdf(downloadLink);
+        return;
+      }
+
+      const printButton = event.target.closest(".property-instruction-print");
+      if (printButton) {
+        window.print();
+      }
+    });
+  })();
+</script>
+{% endblock %}

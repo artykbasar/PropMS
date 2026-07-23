@@ -1,0 +1,221 @@
+{
+ "actions": [],
+ "allow_guest_to_view": 1,
+ "allow_rename": 1,
+ "autoname": "hash",
+ "creation": "2026-07-22 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "title",
+  "property",
+  "published",
+  "slug",
+  "route",
+  "last_reviewed_on",
+  "section_basic_details",
+  "address",
+  "cover_image",
+  "google_maps_url",
+  "show_embedded_map",
+  "google_maps_place_id",
+  "map_search_query",
+  "map_zoom",
+  "map_type",
+  "column_break_visit_details",
+  "check_in_time",
+  "check_out_time",
+  "emergency_contact",
+  "section_wifi",
+  "wifi_name",
+  "wifi_password",
+  "show_wifi_password_publicly",
+  "section_instruction_blocks",
+  "instruction_blocks"
+ ],
+ "fields": [
+  {
+   "fieldname": "title",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Title",
+   "reqd": 1
+  },
+  {
+   "fieldname": "property",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Property",
+   "options": "Property",
+   "reqd": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "published",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Published"
+  },
+  {
+   "description": "Used in the public URL under /instructions/",
+   "fieldname": "slug",
+   "fieldtype": "Data",
+   "label": "Slug",
+   "unique": 1
+  },
+  {
+   "fieldname": "route",
+   "fieldtype": "Data",
+   "label": "Route",
+   "read_only": 1,
+   "unique": 1
+  },
+  {
+   "fieldname": "last_reviewed_on",
+   "fieldtype": "Date",
+   "label": "Last Reviewed On"
+  },
+  {
+   "fieldname": "section_basic_details",
+   "fieldtype": "Section Break",
+   "label": "Visit Details"
+  },
+  {
+   "fieldname": "address",
+   "fieldtype": "Small Text",
+   "label": "Address"
+  },
+  {
+   "fieldname": "cover_image",
+   "fieldtype": "Attach Image",
+   "label": "Cover Image"
+  },
+  {
+   "fieldname": "google_maps_url",
+   "fieldtype": "Data",
+   "label": "Google Maps URL"
+  },
+  {
+   "default": "1",
+   "fieldname": "show_embedded_map",
+   "fieldtype": "Check",
+   "label": "Show Embedded Map"
+  },
+  {
+   "fieldname": "google_maps_place_id",
+   "fieldtype": "Data",
+   "label": "Google Maps Place ID"
+  },
+  {
+   "fieldname": "map_search_query",
+   "fieldtype": "Data",
+   "label": "Map Search Query"
+  },
+  {
+   "default": "16",
+   "fieldname": "map_zoom",
+   "fieldtype": "Int",
+   "label": "Map Zoom"
+  },
+  {
+   "default": "roadmap",
+   "fieldname": "map_type",
+   "fieldtype": "Select",
+   "label": "Map Type",
+   "options": "roadmap\nsatellite"
+  },
+  {
+   "fieldname": "column_break_visit_details",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "check_in_time",
+   "fieldtype": "Time",
+   "label": "Check-In Time"
+  },
+  {
+   "fieldname": "check_out_time",
+   "fieldtype": "Time",
+   "label": "Check-Out Time"
+  },
+  {
+   "fieldname": "emergency_contact",
+   "fieldtype": "Data",
+   "label": "Emergency Contact"
+  },
+  {
+   "fieldname": "section_wifi",
+   "fieldtype": "Section Break",
+   "label": "Wi-Fi"
+  },
+  {
+   "fieldname": "wifi_name",
+   "fieldtype": "Data",
+   "label": "Wi-Fi Name"
+  },
+  {
+   "fieldname": "wifi_password",
+   "fieldtype": "Password",
+   "label": "Wi-Fi Password"
+  },
+  {
+   "default": "0",
+   "description": "Warning: enabling this exposes the Wi-Fi password to anyone with the public guide URL.",
+   "fieldname": "show_wifi_password_publicly",
+   "fieldtype": "Check",
+   "label": "Show Wi-Fi Password Publicly"
+  },
+  {
+   "fieldname": "section_instruction_blocks",
+   "fieldtype": "Section Break",
+   "label": "Instruction Blocks"
+  },
+  {
+   "fieldname": "instruction_blocks",
+   "fieldtype": "Table",
+   "label": "Instruction Blocks",
+   "options": "Property Instruction Block"
+  }
+ ],
+ "has_web_view": 1,
+ "index_web_pages_for_search": 0,
+ "is_published_field": "published",
+ "links": [],
+ "modified": "2026-07-22 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Property Management Solution",
+ "name": "Property Instruction",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Property Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "title"
+}

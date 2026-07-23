@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="{{ selected_language_code or 'en' }}">
+<head>
+  <meta charset="utf-8">
+  <title>{{ title }}</title>
+  <style>
+    @page {
+      size: A4 portrait;
+      margin: 10mm 12mm 12mm;
+    }
+
+    html,
+    body {
+      margin: 0;
+      padding: 0;
+      min-height: 0 !important;
+      height: auto !important;
+      color: #18212b;
+      font-family: "Helvetica Neue", Arial, sans-serif;
+      font-size: 10pt;
+      line-height: 1.45;
+    }
+
+    body {
+      background: #fff;
+    }
+
+    .pdf-page {
+      margin: 0;
+      min-height: 0;
+      height: auto;
+    }
+
+    .pdf-header {
+      margin: 0 0 6mm;
+      padding-bottom: 4mm;
+      border-bottom: 1px solid #d4dbe2;
+    }
+
+    .pdf-header-table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+    }
+
+    .pdf-header-main,
+    .pdf-header-side {
+      vertical-align: top;
+    }
+
+    .pdf-header-side {
+      width: 38mm;
+      padding-left: 7mm;
+    }
+
+    .pdf-kicker {
+      margin: 0 0 2mm;
+      font-size: 8.5pt;
+      font-weight: 700;
+      letter-spacing: .14em;
+      text-transform: uppercase;
+      color: #0f615a;
+    }
+
+    .pdf-title {
+      margin: 0 0 2mm;
+      font-size: 20pt;
+      line-height: 1.05;
+    }
+
+    .pdf-address {
+      margin: 0;
+      color: #44515e;
+      font-size: 10pt;
+    }
+
+    .pdf-cover {
+      width: 100%;
+      max-height: 34mm;
+      object-fit: cover;
+      border-radius: 3mm;
+    }
+
+    .pdf-summary {
+      margin: 0 0 6mm;
+      padding: 4mm;
+      border: 1px solid #d4dbe2;
+      border-radius: 3mm;
+      background: #f8fafb;
+    }
+
+    .pdf-summary-table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+    }
+
+    .pdf-summary-col {
+      width: 50%;
+      vertical-align: top;
+      padding-right: 6mm;
+    }
+
+    .pdf-meta-item {
+      break-inside: avoid;
+    }
+
+    .pdf-label {
+      display: block;
+      margin: 0 0 1mm;
+      color: #5a6876;
+      font-size: 7.8pt;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      font-weight: 700;
+    }
+
+    .pdf-value,
+    .pdf-link-url {
+      display: block;
+      font-weight: 600;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }
+
+    .pdf-sections {
+      display: block;
+      margin: 0;
+      padding: 0;
+    }
+
+    .pdf-section {
+      margin: 0 0 6mm;
+      break-inside: auto;
+    }
+
+    .pdf-summary:last-child,
+    .pdf-section:last-child,
+    .pdf-block:last-child,
+    .pdf-link:last-child,
+    .pdf-machine-note:last-child {
+      margin-bottom: 0;
+    }
+
+    .pdf-section-title {
+      margin: 0 0 3mm;
+      padding-bottom: 1.5mm;
+      border-bottom: 1px solid #cad5df;
+      font-size: 15pt;
+      line-height: 1.15;
+      break-after: avoid;
+    }
+
+    .pdf-blocks {
+      display: block;
+    }
+
+    .pdf-block,
+    .pdf-step,
+    .pdf-warning,
+    .pdf-image-block {
+      break-inside: avoid;
+    }
+
+    .pdf-block {
+      border: 1px solid #dce3ea;
+      border-radius: 2.4mm;
+      padding: 3mm;
+    }
+
+    .pdf-warning {
+      border-left: 2mm solid #c98322;
+      background: #fff7e7;
+    }
+
+    .pdf-step-head {
+      display: flex;
+      align-items: flex-start;
+      gap: 3mm;
+      margin: 0 0 2mm;
+    }
+
+    .pdf-step-number {
+      width: 7mm;
+      height: 7mm;
+      border-radius: 999px;
+      background: #0f615a;
+      color: #fff;
+      text-align: center;
+      font-size: 8.5pt;
+      line-height: 7mm;
+      font-weight: 700;
+      flex: 0 0 auto;
+    }
+
+    .pdf-block-title {
+      margin: 0;
+      font-size: 11.5pt;
+      line-height: 1.2;
+    }
+
+    .pdf-body :first-child {
+      margin-top: 0;
+    }
+
+    .pdf-body :last-child {
+      margin-bottom: 0;
+    }
+
+    .pdf-image-block {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+    }
+
+    .pdf-image-cell,
+    .pdf-image-content {
+      vertical-align: top;
+    }
+
+    .pdf-image-cell {
+      width: 52mm;
+      padding-right: 4mm;
+    }
+
+    .pdf-image {
+      width: 100%;
+      max-height: 45mm;
+      object-fit: cover;
+      border-radius: 2mm;
+      display: block;
+    }
+
+    .pdf-caption {
+      margin-top: 1.5mm;
+      color: #5a6876;
+      font-size: 9pt;
+    }
+
+    .pdf-link {
+      margin-top: 2mm;
+    }
+
+    .pdf-machine-note {
+      margin: 0 0 4mm;
+      color: #5a6876;
+      font-size: 8.5pt;
+    }
+
+    .pdf-footer {
+      width: 100%;
+      margin: 0;
+      padding: 0;
+      color: #5a6876;
+      font-size: 8pt;
+      line-height: 1.2;
+    }
+
+    .pdf-footer-table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+    }
+
+    .pdf-footer-left,
+    .pdf-footer-right {
+      padding: 0;
+      vertical-align: bottom;
+    }
+
+    .pdf-footer-right {
+      text-align: right;
+      white-space: nowrap;
+    }
+
+    @media print {
+      html,
+      body,
+      .pdf-page {
+        min-height: 0 !important;
+        height: auto !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="pdf-page">
+    <header class="pdf-header">
+      <table class="pdf-header-table">
+        <tr>
+          <td class="pdf-header-main">
+        <p class="pdf-kicker">Estaex Guest Guide</p>
+        <h1 class="pdf-title">{{ title }}</h1>
+        {% if address %}
+        <p class="pdf-address">{{ address }}</p>
+        {% endif %}
+          </td>
+          {% if pdf_cover_image %}
+          <td class="pdf-header-side">
+        <img class="pdf-cover" src="{{ pdf_cover_image }}" alt="{{ title }} cover image">
+          </td>
+          {% endif %}
+        </tr>
+      </table>
+    </header>
+
+    <section class="pdf-summary">
+      {% if machine_translation_note %}
+      <p class="pdf-machine-note">{{ machine_translation_note }}</p>
+      {% endif %}
+      <table class="pdf-summary-table">
+        <tr>
+          <td class="pdf-summary-col">
+        {% if check_in_time %}
+        <div class="pdf-meta-item"><span class="pdf-label">Check-In</span><span class="pdf-value">{{ check_in_time }}</span></div>
+        {% endif %}
+        {% if check_out_time %}
+        <div class="pdf-meta-item"><span class="pdf-label">Check-Out</span><span class="pdf-value">{{ check_out_time }}</span></div>
+        {% endif %}
+        {% if wifi_name %}
+        <div class="pdf-meta-item"><span class="pdf-label">Wi-Fi Name</span><span class="pdf-value">{{ wifi_name }}</span></div>
+        {% endif %}
+        {% if wifi_password_public %}
+        <div class="pdf-meta-item"><span class="pdf-label">Wi-Fi Password</span><span class="pdf-value">{{ wifi_password_public }}</span></div>
+        {% endif %}
+          </td>
+          <td class="pdf-summary-col">
+        {% if emergency_contact %}
+        <div class="pdf-meta-item"><span class="pdf-label">Emergency Contact</span><span class="pdf-value">{{ emergency_contact }}</span></div>
+        {% endif %}
+        {% if last_reviewed_on_display %}
+        <div class="pdf-meta-item"><span class="pdf-label">Last Reviewed</span><span class="pdf-value">{{ last_reviewed_on_display }}</span></div>
+        {% endif %}
+        {% if address %}
+        <div class="pdf-meta-item"><span class="pdf-label">Property Address</span><span class="pdf-value">{{ address }}</span></div>
+        {% endif %}
+        {% if google_maps_url %}
+        <div class="pdf-meta-item"><span class="pdf-label">Map URL</span><span class="pdf-link-url">{{ google_maps_url }}</span></div>
+        {% endif %}
+          </td>
+        </tr>
+      </table>
+    </section>
+
+    <div class="pdf-sections">
+      {% for section in pdf_sections %}
+      <section class="pdf-section">
+        <h2 class="pdf-section-title">{{ section.section }}</h2>
+        <div class="pdf-blocks">
+          {% for block in section.blocks %}
+            {% if not block.hide_in_print %}
+            <div class="pdf-block{% if block.block_type == 'Warning' %} pdf-warning{% endif %}">
+              {% if block.block_type == "Image" %}
+              <table class="pdf-image-block">
+                <tr>
+                  <td class="pdf-image-cell">
+                  <img class="pdf-image" src="{{ block.pdf_image or block.image }}" alt="{{ block.image_alt }}">
+                  </td>
+                  <td class="pdf-image-content">
+                  {% if block.title %}<h3 class="pdf-block-title">{{ block.title }}</h3>{% endif %}
+                  {% if block.safe_body %}<div class="pdf-body">{{ block.safe_body }}</div>{% endif %}
+                  {% if block.caption %}<div class="pdf-caption">{{ block.caption }}</div>{% endif %}
+                  {% if block.link_url %}
+                  <div class="pdf-link">
+                    <span class="pdf-label">{{ block.display_link_label }}</span>
+                    <span class="pdf-link-url">{{ block.link_url }}</span>
+                  </div>
+                  {% endif %}
+                  </td>
+                </tr>
+              </table>
+              {% elif block.block_type == "Step" %}
+              <div class="pdf-step-head">
+                <span class="pdf-step-number">{{ block.display_step_number }}</span>
+                {% if block.title %}<h3 class="pdf-block-title">{{ block.title }}</h3>{% endif %}
+              </div>
+              {% if block.safe_body %}<div class="pdf-body">{{ block.safe_body }}</div>{% endif %}
+              {% if block.pdf_image or block.image %}<img class="pdf-image" src="{{ block.pdf_image or block.image }}" alt="{{ block.image_alt }}">{% endif %}
+              {% if block.caption %}<div class="pdf-caption">{{ block.caption }}</div>{% endif %}
+              {% if block.link_url %}
+              <div class="pdf-link">
+                <span class="pdf-label">{{ block.display_link_label }}</span>
+                <span class="pdf-link-url">{{ block.link_url }}</span>
+              </div>
+              {% endif %}
+              {% else %}
+              {% if block.title %}<h3 class="pdf-block-title">{{ block.title }}</h3>{% endif %}
+              {% if block.safe_body %}<div class="pdf-body">{{ block.safe_body }}</div>{% endif %}
+              {% if block.pdf_image or block.image %}<img class="pdf-image" src="{{ block.pdf_image or block.image }}" alt="{{ block.image_alt }}">{% endif %}
+              {% if block.caption %}<div class="pdf-caption">{{ block.caption }}</div>{% endif %}
+              {% if block.link_url %}
+              <div class="pdf-link">
+                <span class="pdf-label">{{ block.display_link_label }}</span>
+                <span class="pdf-link-url">{{ block.link_url }}</span>
+              </div>
+              {% endif %}
+              {% endif %}
+            </div>
+            {% endif %}
+          {% endfor %}
+        </div>
+      </section>
+      {% endfor %}
+    </div>
+
+  </div>
+  <div id="footer-html">
+    <div class="pdf-footer">
+      <table class="pdf-footer-table">
+        <tr>
+          <td class="pdf-footer-left">Estaex Guest Guide {{ generated_on_display }}</td>
+          <td class="pdf-footer-right">Page <span class="page"></span> of <span class="topage"></span></td>
+        </tr>
+      </table>
+    </div>
+  </div>
+</body>
+</html>

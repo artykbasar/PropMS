@@ -13,6 +13,12 @@ app_color = "grey"
 app_email = "info@aakvatech.com"
 app_license = "MIT"
 
+jinja = {
+    "methods": [
+        "propms.utils.optional_dependencies.get_value_if_field_exists",
+    ]
+}
+
 # Includes in <head>
 # ------------------
 
@@ -76,7 +82,11 @@ doctype_js = {
 # ----------
 
 # automatically create page for each record of this doctype
-# website_generators = ["Web Page"]
+website_generators = ["Property Instruction"]
+
+after_request = [
+    "propms.property_management_solution.doctype.property_instruction.property_instruction.apply_guest_guide_noindex_headers"
+]
 
 # Installation
 # ------------

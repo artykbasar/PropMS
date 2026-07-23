@@ -8,6 +8,32 @@ import frappe.share
 import json
 import traceback
 from frappe import _
+from propms.utils.optional_dependencies import field_exists
+
+
+OPTIONAL_ITEM_FIELDS = ("withholding_tax_rate",)
+
+
+def get_item_doctype(doctype):
+    return "Sales Order Item" if doctype == "Sales Order" else "Sales Invoice Item"
+
+
+def remove_missing_optional_item_fields(items, doctype):
+    item_doctype = get_item_doctype(doctype)
+    missing_fields = [
+        fieldname
+        for fieldname in OPTIONAL_ITEM_FIELDS
+        if not field_exists(item_doctype, fieldname)
+    ]
+
+    if not missing_fields:
+        return items
+
+    for item in items:
+        for fieldname in missing_fields:
+            item.pop(fieldname, None)
+
+    return items
 
 
 @frappe.whitelist()
@@ -45,6 +71,7 @@ def makeInvoice(
         default_tax_template = frappe.get_value(
             "Company", company, "default_tax_template"
         )
+        invoice_items = remove_missing_optional_item_fields(json.loads(items), doctype)
         if qty != int(qty):
             # it means the last invoice for the lease that may have fraction of months
             subs_end_date = frappe.get_value("Lease", lease, "end_date")
@@ -56,7 +83,7 @@ def makeInvoice(
                 doctype=doctype,
                 company=company,
                 posting_date=today(),
-                items=json.loads(items),
+                items=invoice_items,
                 customer=str(customer),
                 due_date=getDueDate(today(), str(customer)),
                 currency=currency,
@@ -128,7 +155,6 @@ def leaseInvoiceAutoCreate():
                 "invoice_number",
                 "sales_order_number",
                 "parent",
-                "parent",
                 "invoice_item_group",
                 "lease_item",
                 "paid_by",
@@ -136,6 +162,9 @@ def leaseInvoiceAutoCreate():
             ],
             order_by="parent, paid_by, invoice_item_group, date_to_invoice, currency, lease_item",
         )
+        if not lease_invoice:
+            return None
+
         # frappe.msgprint("Lease being generated for " + str(lease_invoice))
         row_num = 1  # to identify the 1st line of the list
         prev_parent = ""
@@ -206,7 +235,10 @@ def leaseInvoiceAutoCreate():
             item_json["qty"] = invoice_item.qty
             item_json["rate"] = invoice_item.rate
             item_json["cost_center"] = getCostCenter(invoice_item.parent)
-            item_json["withholding_tax_rate"] = invoice_item.tax
+            if field_exists(
+                get_item_doctype(invoice_item.document_type), "withholding_tax_rate"
+            ):
+                item_json["withholding_tax_rate"] = invoice_item.tax
             # item_json["enable_deferred_revenue"] = 1 # Set it to true
             item_json["service_start_date"] = str(invoice_item.schedule_start_date)
             if invoice_item.qty != int(invoice_item.qty):
@@ -230,6 +262,9 @@ def leaseInvoiceAutoCreate():
             prev_currency = invoice_item.currency
             row_num += 1  # increment by 1
         # Create the last invoice
+        if not item_dict:
+            return None
+
         res = makeInvoice(
             invoice_item.date_to_invoice,
             invoice_item.paid_by,
