@@ -173,7 +173,7 @@
         },
         {
             "depends_on": "eval: doc.enable_guest_guide_google_translate == 1",
-            "description": "Optional comma-separated ISO language codes, for example es,fr,de.",
+            "description": "Leave empty to display all languages supported by the Google Translate widget. Enter comma-separated language codes only when you want to restrict the list.",
             "fieldname": "guest_guide_translate_languages",
             "fieldtype": "Small Text",
             "label": "Guest Guide Translate Languages"

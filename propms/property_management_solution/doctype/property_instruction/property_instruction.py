@@ -2,14 +2,16 @@
 
 from __future__ import annotations
 
+import json
 import os
+import re
 from datetime import timedelta
 from urllib.parse import urlencode, urlparse, urlunparse
 
 import frappe
 from frappe import _
 from frappe.model.naming import make_autoname
-from frappe.utils import cint, sanitize_html, validate_url
+from frappe.utils import cint, formatdate, sanitize_html, validate_url
 from frappe.website.website_generator import WebsiteGenerator
 from markupsafe import Markup
 
@@ -36,6 +38,7 @@ TRANSLATION_READY = "Ready"
 TRANSLATION_STALE = "Stale"
 GOOGLE_TRANSLATE_SCRIPT_URL = "https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"
 TRUSTED_GOOGLE_MAP_HOSTS = {"www.google.com", "google.com", "maps.google.com"}
+LANGUAGE_CODE_PATTERN = re.compile(r"^[a-z]{2,3}(?:-[a-z]{2,8})*$")
 
 
 class PropertyInstruction(WebsiteGenerator):
@@ -143,41 +146,54 @@ class PropertyInstruction(WebsiteGenerator):
 		return page_info
 
 	def get_context(self, context):
-		language_code = self.get_requested_language()
-		translation = self.get_ready_translation(language_code)
-		display_content = self.get_display_content(translation)
-		property_map = self.get_property_map()
-		google_translate = self.get_google_translate_settings()
+		page_context = self.get_public_render_context(self.get_requested_language())
 
 		context.no_cache = 1
 		context.no_breadcrumbs = 1
-		context.title = display_content.title
-		context.page_title = display_content.title
-		context.sections = display_content.sections
-		context.has_sections = bool(context.sections)
-		context.address = display_content.address
-		context.cover_image = self.cover_image
-		context.google_maps_url = property_map.external_url
-		context.map_embed_url = property_map.embed_url
-		context.map_embed_enabled = bool(property_map.embed_url)
-		context.map_display_query = self.get_map_display_query()
-		context.property_map = property_map
-		context.check_in_time = self.format_display_time(self.check_in_time)
-		context.check_out_time = self.format_display_time(self.check_out_time)
-		context.wifi_name = self.wifi_name
-		context.emergency_contact = display_content.emergency_contact
-		context.last_reviewed_on = self.last_reviewed_on
-		context.available_languages = self.get_available_languages()
-		context.selected_language_code = display_content.language_code
-		context.selected_language_name = display_content.language_name
-		context.translation_enabled = len(context.available_languages) > 1
+		context.update(page_context)
 		if not getattr(context, "boot", None):
 			context.boot = frappe._dict()
 		elif isinstance(context.boot, dict) and not isinstance(context.boot, frappe._dict):
 			context.boot = frappe._dict(context.boot)
-		context.boot.lang = display_content.language_code
-		context.google_translate = google_translate
+		context.boot.lang = page_context.selected_language_code
 		return context
+
+	def get_public_render_context(self, language_code=None):
+		language_code = self.normalize_language_code(language_code or "en") or "en"
+		translation = self.get_ready_translation(language_code)
+		display_content = self.get_display_content(translation)
+		property_map = self.get_property_map()
+		google_translate = self.get_google_translate_settings()
+		available_languages = self.get_available_languages()
+		wifi_password_public = self.get_public_wifi_password()
+		return frappe._dict(
+			title=display_content.title,
+			page_title=display_content.title,
+			sections=display_content.sections,
+			has_sections=bool(display_content.sections),
+			address=display_content.address,
+			address_copy_value=display_content.address,
+			cover_image=self.cover_image,
+			google_maps_url=property_map.external_url,
+			map_embed_url=property_map.embed_url,
+			map_embed_enabled=bool(property_map.embed_url),
+			map_display_query=self.get_map_display_query(),
+			property_map=property_map,
+			check_in_time=self.format_display_time(self.check_in_time),
+			check_out_time=self.format_display_time(self.check_out_time),
+			wifi_name=self.wifi_name,
+			wifi_password_public=wifi_password_public,
+			show_wifi_password_publicly=bool(cint(self.show_wifi_password_publicly or 0)),
+			emergency_contact=display_content.emergency_contact,
+			last_reviewed_on=self.last_reviewed_on,
+			last_reviewed_on_display=formatdate(self.last_reviewed_on) if self.last_reviewed_on else None,
+			available_languages=available_languages,
+			selected_language_code=display_content.language_code,
+			selected_language_name=display_content.language_name,
+			translation_enabled=len(available_languages) > 1,
+			reviewed_language_selector_enabled=len(available_languages) > 1 and not google_translate.enabled,
+			google_translate=google_translate,
+		)
 
 	def get_grouped_blocks(self):
 		return self.build_grouped_blocks(self.instruction_blocks or [])
@@ -317,12 +333,15 @@ class PropertyInstruction(WebsiteGenerator):
 
 	def get_google_translate_settings(self):
 		enabled = cint(self.get_property_management_setting("enable_guest_guide_google_translate") or 0)
-		source_language = (
+		source_language = self.normalize_language_code(
 			self.get_property_management_setting("guest_guide_source_language") or "en"
-		).strip().lower() or "en"
+		) or "en"
 		language_codes = self.parse_google_translate_languages(
 			self.get_property_management_setting("guest_guide_translate_languages")
 		)
+		config = {"pageLanguage": source_language}
+		if language_codes:
+			config["includedLanguages"] = ",".join(language_codes)
 		return frappe._dict(
 			enabled=bool(enabled),
 			container_id="google_translate_element" if enabled else None,
@@ -330,6 +349,7 @@ class PropertyInstruction(WebsiteGenerator):
 			source_language=source_language,
 			included_languages=language_codes,
 			included_languages_csv=",".join(language_codes) if language_codes else "",
+			config_json=json.dumps(config),
 		)
 
 	def get_property_management_setting(self, fieldname):
@@ -341,10 +361,16 @@ class PropertyInstruction(WebsiteGenerator):
 	def parse_google_translate_languages(self, raw_value):
 		languages = []
 		for value in (raw_value or "").split(","):
-			code = (value or "").strip().lower()
+			code = self.normalize_language_code(value)
 			if code and code not in languages:
 				languages.append(code)
 		return languages
+
+	def normalize_language_code(self, value):
+		code = (value or "").strip().lower()
+		if not code or not LANGUAGE_CODE_PATTERN.match(code):
+			return None
+		return code
 
 	def format_display_time(self, value):
 		if not value:
@@ -440,6 +466,13 @@ class PropertyInstruction(WebsiteGenerator):
 			)
 
 		return options
+
+	def get_public_wifi_password(self):
+		if not cint(self.show_wifi_password_publicly or 0):
+			return None
+		if not self.wifi_password:
+			return None
+		return self.get_password("wifi_password")
 
 	def get_display_content(self, translation=None):
 		if not translation:

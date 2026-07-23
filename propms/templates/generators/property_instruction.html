@@ -71,9 +71,17 @@
     line-height: 1.05;
     margin: .75rem 0;
   }
+  .pi-address-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: .75rem;
+    margin-top: .35rem;
+  }
   .pi-meta {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
     gap: .9rem;
     margin-top: 1.25rem;
   }
@@ -92,6 +100,46 @@
   .pi-value {
     font-weight: 600;
     overflow-wrap: anywhere;
+  }
+  .pi-copy-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: .75rem;
+  }
+  .pi-meta-item .pi-copy-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .pi-meta-item .pi-copy-button {
+    width: auto;
+  }
+  .pi-copy-text {
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+  .pi-copy-value {
+    display: block;
+    font-weight: 600;
+    overflow-wrap: anywhere;
+    user-select: text;
+  }
+  .pi-copy-button {
+    flex: 0 0 auto;
+    border: 1px solid var(--pi-border);
+    background: #fff;
+    color: var(--pi-accent);
+    border-radius: 999px;
+    padding: .55rem .9rem;
+    font-weight: 700;
+    line-height: 1;
+  }
+  .pi-copy-button:focus-visible,
+  .pi-btn:focus-visible,
+  .pi-nav a:focus-visible,
+  .pi-language-option:focus-visible {
+    outline: 2px solid var(--pi-accent);
+    outline-offset: 2px;
   }
   .pi-actions {
     display: flex;
@@ -297,6 +345,20 @@
     padding: .55rem .9rem;
     background: #fff;
     color: var(--pi-ink);
+  }
+  @media (max-width: 768px) {
+    .pi-address-row,
+    .pi-copy-row {
+      flex-direction: column;
+      align-items: stretch;
+    }
+    .pi-copy-button {
+      width: 100%;
+      justify-content: center;
+    }
+    .pi-actions .pi-btn {
+      width: 100%;
+    }
   }
   .pi-print-kicker {
     margin: 0 0 2mm;
@@ -507,6 +569,23 @@
 </style>
 {% endblock %}
 
+{% macro render_copy_row(label, value, button_label, aria_label) %}
+  <div class="pi-copy-row">
+    <div class="pi-copy-text">
+      <span class="pi-label">{{ label }}</span>
+      <span class="pi-copy-value">{{ value }}</span>
+    </div>
+    <button
+      type="button"
+      class="pi-copy-button"
+      data-copy-value="{{ value | e }}"
+      data-default-label="{{ button_label | e }}"
+      aria-label="{{ aria_label }}">
+      {{ button_label }}
+    </button>
+  </div>
+{% endmacro %}
+
 {% macro render_screen_block(block) %}
   <div class="pi-block pi-block-{{ block.block_type | lower | replace(' ', '-') }}">
     {% if block.block_type == "Step" %}
@@ -605,7 +684,7 @@
       </section>
       {% endif %}
 
-      {% if translation_enabled %}
+      {% if reviewed_language_selector_enabled %}
       <nav class="pi-language-switcher" aria-label="Language selector">
         <p class="pi-language-label">Language</p>
         {% for language in available_languages %}
@@ -626,7 +705,9 @@
           <div class="pi-eyebrow">Guest Instructions</div>
           <h1 class="pi-title">{{ title }}</h1>
           {% if address %}
-          <p class="pi-value">{{ address }}</p>
+          <div class="pi-address-row">
+            {{ render_copy_row("Address", address_copy_value, "Copy address", "Copy property address") }}
+          </div>
           {% endif %}
 
           <div class="pi-meta">
@@ -644,8 +725,12 @@
             {% endif %}
             {% if wifi_name %}
             <div class="pi-meta-item">
-              <span class="pi-label">Wi-Fi Name</span>
-              <span class="pi-value">{{ wifi_name }}</span>
+              {{ render_copy_row("Wi-Fi Name", wifi_name, "Copy network", "Copy Wi-Fi network name") }}
+            </div>
+            {% endif %}
+            {% if wifi_password_public %}
+            <div class="pi-meta-item">
+              {{ render_copy_row("Wi-Fi Password", wifi_password_public, "Copy password", "Copy Wi-Fi password") }}
             </div>
             {% endif %}
             {% if emergency_contact %}
@@ -657,7 +742,7 @@
             {% if last_reviewed_on %}
             <div class="pi-meta-item">
               <span class="pi-label">Last Reviewed</span>
-              <span class="pi-value">{{ last_reviewed_on }}</span>
+              <span class="pi-value">{{ last_reviewed_on_display or last_reviewed_on }}</span>
             </div>
             {% endif %}
           </div>
@@ -666,7 +751,7 @@
             {% if screen_map_external_url %}
             <a class="pi-btn pi-btn-primary" href="{{ screen_map_external_url }}" target="_blank" rel="noopener noreferrer nofollow">Open in Google Maps</a>
             {% endif %}
-            <button type="button" class="pi-btn pi-btn-secondary property-instruction-print" onclick="window.print()">Print or save guide</button>
+            <button type="button" class="pi-btn pi-btn-secondary property-instruction-print">Print guide</button>
           </div>
         </div>
       </article>
@@ -778,17 +863,60 @@
     if (!window.google || !google.translate || !google.translate.TranslateElement) {
       return;
     }
-
-    const config = {
-      pageLanguage: "{{ google_translate.source_language }}"
-    };
-    {% if google_translate.included_languages_csv %}
-    config.includedLanguages = "{{ google_translate.included_languages_csv }}";
-    {% endif %}
-
-    new google.translate.TranslateElement(config, "{{ google_translate.container_id }}");
+    new google.translate.TranslateElement({{ google_translate.config_json | safe }}, "{{ google_translate.container_id }}");
   };
 </script>
 <script src="{{ google_translate.script_url }}"></script>
 {% endif %}
+<script>
+  (function () {
+    if (window.__propertyInstructionUiBound) {
+      return;
+    }
+    window.__propertyInstructionUiBound = true;
+
+    async function copyValue(value) {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(value);
+        return;
+      }
+
+      const fallback = document.createElement("textarea");
+      fallback.value = value;
+      fallback.setAttribute("readonly", "readonly");
+      fallback.style.position = "absolute";
+      fallback.style.left = "-9999px";
+      document.body.appendChild(fallback);
+      fallback.select();
+      document.execCommand("copy");
+      document.body.removeChild(fallback);
+    }
+
+    document.addEventListener("click", async function (event) {
+      const copyButton = event.target.closest(".pi-copy-button");
+      if (copyButton) {
+        const value = copyButton.getAttribute("data-copy-value");
+        const defaultLabel = copyButton.getAttribute("data-default-label") || "Copy";
+        if (!value) {
+          return;
+        }
+        try {
+          await copyValue(value);
+          copyButton.textContent = "Copied";
+        } catch (error) {
+          copyButton.textContent = "Failed";
+        }
+        window.setTimeout(function () {
+          copyButton.textContent = defaultLabel;
+        }, 2000);
+        return;
+      }
+
+      const printButton = event.target.closest(".property-instruction-print");
+      if (printButton) {
+        window.print();
+      }
+    });
+  })();
+</script>
 {% endblock %}

@@ -10,9 +10,7 @@ from frappe.tests.utils import FrappeTestCase
 from frappe.website.page_renderers.document_page import _find_matching_document_webview
 from frappe.website.router import clear_routing_cache, get_base_template
 
-from propms.property_management_solution.doctype.property_instruction.property_instruction import (
-	generate_translation,
-)
+from propms.property_management_solution.doctype.property_instruction.property_instruction import generate_translation
 from propms.property_management_solution.doctype.property_instruction import translation_service
 
 
@@ -346,7 +344,9 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 		self.assertIn("referrerpolicy=\"strict-origin-when-cross-origin\"", html)
 		self.assertIn("allowfullscreen", html)
 		self.assertIn("property-instruction-print", html)
-		self.assertIn("Print or save guide", html)
+		self.assertIn("Print guide", html)
+		self.assertIn("Copy address", html)
+		self.assertIn("Copy network", html)
 		self.assertNotIn('href="javascript:', html)
 		self.assertNotIn("guest-wifi-only", html)
 		self.assertNotIn("15:00:00", html)
@@ -359,6 +359,8 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 		print_slice = html.split('class="pi-print-layout"', 1)[1]
 		self.assertNotIn("<iframe", print_slice)
 		self.assertEqual(print_slice.count("https://www.google.com/maps/place/99A+Burlington+Road"), 1)
+		self.assertIn('data-copy-value="99A Burlington Road"', html)
+		self.assertIn('data-copy-value="TestWifi"', html)
 
 	def test_print_layout_has_dedicated_wrappers(self):
 		doc = self.make_instruction()
@@ -409,22 +411,60 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 	def test_google_translate_widget_disabled_by_default(self):
 		self.set_property_management_setting("enable_guest_guide_google_translate", 0)
 		doc = self.make_instruction()
+		self.make_translation(doc, language_code="es", status="Ready", title="Guia lista")
 		html = self.render_instruction(doc)
 		self.assertNotIn("translate.google.com/translate_a/element.js", html)
 		self.assertNotIn("google_translate_element", html)
+		self.assertIn("Language selector", html)
+		self.assertIn("English", html)
+		self.assertIn("Spanish", html)
 
 	def test_google_translate_widget_renders_when_enabled(self):
 		self.set_property_management_setting("enable_guest_guide_google_translate", 1)
 		self.set_property_management_setting("guest_guide_source_language", "en")
 		self.set_property_management_setting("guest_guide_translate_languages", "es,fr,de")
 		doc = self.make_instruction()
+		self.make_translation(doc, language_code="es", status="Ready", title="Guia lista")
 		context = self.get_context(doc)
 		html = self.render_instruction(doc)
 		self.assertTrue(context.google_translate.enabled)
 		self.assertEqual(context.google_translate.included_languages, ["es", "fr", "de"])
 		self.assertEqual(html.count("translate.google.com/translate_a/element.js"), 1)
 		self.assertIn("id=\"google_translate_element\"", html)
-		self.assertIn('config.includedLanguages = "es,fr,de";', html)
+		self.assertIn('"includedLanguages": "es,fr,de"', html)
+		self.assertNotIn("Language selector", html)
+		self.assertNotIn('class="pi-language-option', html)
+
+	def test_google_translate_uses_full_language_list_when_restriction_empty(self):
+		self.set_property_management_setting("enable_guest_guide_google_translate", 1)
+		self.set_property_management_setting("guest_guide_source_language", "en")
+		self.set_property_management_setting("guest_guide_translate_languages", "")
+		doc = self.make_instruction()
+		context = self.get_context(doc)
+		html = self.render_instruction(doc)
+		self.assertEqual(context.google_translate.included_languages, [])
+		self.assertNotIn("includedLanguages", html)
+
+	def test_google_translate_restriction_is_sanitized(self):
+		self.set_property_management_setting("enable_guest_guide_google_translate", 1)
+		self.set_property_management_setting("guest_guide_translate_languages", 'es, FR ,<script>alert(1)</script>,pt-br,xx";alert(1)//')
+		doc = self.make_instruction()
+		context = self.get_context(doc)
+		html = self.render_instruction(doc)
+		self.assertEqual(context.google_translate.included_languages, ["es", "fr", "pt-br"])
+		self.assertIn('"includedLanguages": "es,fr,pt-br"', html)
+		self.assertNotIn("alert(1)", html)
+
+	def test_wifi_password_rendered_only_with_public_opt_in(self):
+		doc = self.make_instruction(show_wifi_password_publicly=1)
+		html = self.render_instruction(doc)
+		self.assertIn("guest-wifi-only", html)
+		self.assertIn("Copy password", html)
+
+	def test_copy_script_is_included_once(self):
+		doc = self.make_instruction()
+		html = self.render_instruction(doc)
+		self.assertEqual(html.count("document.addEventListener(\"click\""), 1)
 
 	def test_no_key_map_embed_uses_trusted_google_host(self):
 		self.set_conf("google_maps_embed_api_key", None)
@@ -450,8 +490,6 @@ class TestPropertyInstructionTranslations(PropertyInstructionTestMixin, FrappeTe
 		self.assertEqual(context.boot.lang, "es")
 		self.assertEqual(context.title, "Guia de huespedes")
 		self.assertIn("Guia de huespedes", html)
-		self.assertIn("Language", html)
-		self.assertIn("Spanish", html)
 
 	def test_ready_translation_reads_language_from_request_args(self):
 		doc = self.make_instruction()

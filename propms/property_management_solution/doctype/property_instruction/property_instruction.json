@@ -29,6 +29,7 @@
   "section_wifi",
   "wifi_name",
   "wifi_password",
+  "show_wifi_password_publicly",
   "section_instruction_blocks",
   "instruction_blocks"
  ],
@@ -158,6 +159,13 @@
    "fieldname": "wifi_password",
    "fieldtype": "Password",
    "label": "Wi-Fi Password"
+  },
+  {
+   "default": "0",
+   "description": "Warning: enabling this exposes the Wi-Fi password to anyone with the public guide URL.",
+   "fieldname": "show_wifi_password_publicly",
+   "fieldtype": "Check",
+   "label": "Show Wi-Fi Password Publicly"
   },
   {
    "fieldname": "section_instruction_blocks",
