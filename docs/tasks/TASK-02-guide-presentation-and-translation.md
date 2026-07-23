@@ -66,3 +66,13 @@ The guest-facing Property Instruction guide needs to evolve from a basic publish
 - Draft or Stale translations fall back cleanly to English
 - translated output remains sanitized and ordered
 - all intended changes stay isolated to `feature/property-instructions`
+
+## Search Engine Behaviour
+
+- guest guides return `noindex, nofollow, noarchive, nosnippet, noimageindex` in both HTML metadata and `X-Robots-Tag` response headers
+- guide PDFs return the same `X-Robots-Tag` directive because PDF responses cannot carry HTML robots metadata
+- guest-guide routes are excluded from sitemap generation to reduce discovery without blocking direct guest access
+- `noindex` is not authentication; anyone with the published URL can still open the guide
+- compliant search engines usually remove indexed URLs only after they revisit the route and observe the new directive
+- already indexed production URLs may take time to disappear after deployment
+- urgent removal from an existing search index may still require the relevant search-engine removal tool after production deployment

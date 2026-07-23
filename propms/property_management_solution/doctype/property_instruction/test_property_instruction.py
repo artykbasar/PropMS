@@ -13,13 +13,17 @@ from pypdf import PdfReader, PdfWriter
 from frappe.website.page_renderers.document_page import _find_matching_document_webview
 from frappe.website.router import clear_routing_cache, get_base_template
 from frappe.utils.pdf import get_pdf
+from werkzeug.datastructures import Headers
 
 from propms.property_management_solution.doctype.property_instruction.property_instruction import (
+	NOINDEX_ROBOTS_CONTENT,
 	PDF_WIDGET_TRANSLATION_NOTE,
+	apply_guest_guide_noindex_headers,
 	download_pdf,
 	generate_translation,
 )
 from propms.property_management_solution.doctype.property_instruction import translation_service
+from propms.www.sitemap import get_filtered_public_pages_from_doctypes
 
 
 class PropertyInstructionTestMixin:
@@ -210,6 +214,7 @@ class PropertyInstructionTestMixin:
 		context.web_include_icons = []
 		context.show_language_picker = "false"
 		context._context_dict = context
+		frappe.local.response_headers = Headers()
 		out = doc.get_context(context)
 		if out:
 			context.update(out)
@@ -547,6 +552,8 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 		self.assertIn("Unable to prepare PDF", html)
 		self.assertIn("window.fetch", html)
 		self.assertIn("data-pdf-download-url", html)
+		self.assertIn(f'<meta name="robots" content="{NOINDEX_ROBOTS_CONTENT}">', html)
+		self.assertNotIn(f">{NOINDEX_ROBOTS_CONTENT}<", html)
 
 	def test_print_layout_has_dedicated_wrappers(self):
 		doc = self.make_instruction()
@@ -713,6 +720,7 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 	def test_pdf_endpoint_returns_download_response(self):
 		doc = self.make_instruction()
 		frappe.local.response = frappe._dict(headers={})
+		frappe.local.response_headers = Headers()
 		with patch(
 			"propms.property_management_solution.doctype.property_instruction.property_instruction.get_pdf",
 			return_value=b"%PDF-1.4 test",
@@ -721,6 +729,7 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 		self.assertEqual(frappe.local.response.filename, "test-guest-guide-property.pdf")
 		self.assertEqual(frappe.local.response.type, "download")
 		self.assertEqual(frappe.local.response.content_type, "application/pdf")
+		self.assertEqual(frappe.local.response_headers.get("X-Robots-Tag"), NOINDEX_ROBOTS_CONTENT)
 
 	def test_widget_translated_pdf_has_no_footer_only_third_page(self):
 		doc = self.make_instruction(wifi_name="Estaex Guest WiFi")
@@ -941,6 +950,7 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 		)
 		self.set_request_payload(payload)
 		frappe.local.response = frappe._dict(headers={})
+		frappe.local.response_headers = Headers()
 		with patch(
 			"propms.property_management_solution.doctype.property_instruction.property_instruction.get_pdf",
 			return_value=b"%PDF-1.4 translated",
@@ -951,10 +961,12 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 		self.assertIn("Arrivee", rendered_html)
 		self.assertEqual(frappe.local.response.content_type, "application/pdf")
 		self.assertEqual(frappe.local.response.filename, "test-guest-guide-property.pdf")
+		self.assertEqual(frappe.local.response_headers.get("X-Robots-Tag"), NOINDEX_ROBOTS_CONTENT)
 
 	def test_unpublished_pdf_request_is_rejected(self):
 		doc = self.make_instruction(published=0, slug="hidden-guide")
 		frappe.local.response = frappe._dict(headers={})
+		frappe.local.response_headers = Headers()
 		with self.assertRaises(frappe.DoesNotExistError):
 			download_pdf(slug=doc.slug)
 
@@ -962,6 +974,34 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 		self.set_conf("google_maps_embed_api_key", None)
 		doc = self.make_instruction(address="99A Burlington Road, New Malden")
 		self.assertTrue(doc.get_map_embed_url().startswith("https://www.google.com/maps?"))
+
+	def test_guide_context_sets_noindex_header(self):
+		doc = self.make_instruction()
+		self.get_context(doc)
+		self.assertEqual(frappe.local.response_headers.get("X-Robots-Tag"), NOINDEX_ROBOTS_CONTENT)
+
+	def test_sitemap_filter_excludes_property_instruction_only(self):
+		doc = self.make_instruction(slug="sitemap-hidden-guide")
+		routes = {
+			doc.route: {"doctype": "Property Instruction", "name": doc.name, "modified": doc.modified},
+			"contact": {"doctype": "Web Page", "name": "contact", "modified": doc.modified},
+		}
+		with patch("frappe.www.sitemap.get_public_pages_from_doctypes", return_value=routes):
+			filtered = get_filtered_public_pages_from_doctypes()
+		self.assertNotIn(doc.route, filtered)
+		self.assertIn("contact", filtered)
+
+	def test_after_request_hook_adds_noindex_header_for_guest_guide_route(self):
+		response = frappe._dict(headers={})
+		request = frappe._dict(path="/instructions/test-guide")
+		apply_guest_guide_noindex_headers(response=response, request=request)
+		self.assertEqual(response.headers.get("X-Robots-Tag"), NOINDEX_ROBOTS_CONTENT)
+
+	def test_after_request_hook_does_not_touch_unrelated_route(self):
+		response = frappe._dict(headers={})
+		request = frappe._dict(path="/contact")
+		apply_guest_guide_noindex_headers(response=response, request=request)
+		self.assertIsNone(response.headers.get("X-Robots-Tag"))
 
 
 class TestPropertyInstructionTranslations(PropertyInstructionTestMixin, FrappeTestCase):
@@ -983,6 +1023,8 @@ class TestPropertyInstructionTranslations(PropertyInstructionTestMixin, FrappeTe
 		self.assertEqual(context.title, "Guia de huespedes")
 		self.assertIn("Guia de huespedes", html)
 		self.assertIn("Guia de huespedes", self.render_pdf(doc, lang="es"))
+		self.assertIn(f'<meta name="robots" content="{NOINDEX_ROBOTS_CONTENT}">', html)
+		self.assertEqual(frappe.local.response_headers.get("X-Robots-Tag"), NOINDEX_ROBOTS_CONTENT)
 
 	def test_ready_translation_reads_language_from_request_args(self):
 		doc = self.make_instruction()
@@ -1345,6 +1387,7 @@ class TestPropertyInstructionTranslations(PropertyInstructionTestMixin, FrappeTe
 		html = self.render_instruction(doc, lang="es")
 		self.assertIn("English Guide", html)
 		self.assertNotIn("Guia caducada", html)
+		self.assertIn(f'<meta name="robots" content="{NOINDEX_ROBOTS_CONTENT}">', html)
 
 	def test_pdf_falls_back_to_english_for_stale_translation(self):
 		doc = self.make_instruction(title="English Guide")
@@ -1352,6 +1395,28 @@ class TestPropertyInstructionTranslations(PropertyInstructionTestMixin, FrappeTe
 		html = self.render_pdf(doc, lang="es")
 		self.assertIn("English Guide", html)
 		self.assertNotIn("Guia caducada", html)
+
+	def test_unsupported_language_fallback_keeps_noindex(self):
+		doc = self.make_instruction(title="English Guide")
+		html = self.render_instruction(doc, lang="it")
+		self.assertIn("English Guide", html)
+		self.assertIn(f'<meta name="robots" content="{NOINDEX_ROBOTS_CONTENT}">', html)
+		self.assertEqual(frappe.local.response_headers.get("X-Robots-Tag"), NOINDEX_ROBOTS_CONTENT)
+
+	def test_noindex_present_when_google_translate_disabled(self):
+		self.set_property_management_setting("enable_guest_guide_google_translate", 0)
+		doc = self.make_instruction()
+		html = self.render_instruction(doc)
+		self.assertIn(f'<meta name="robots" content="{NOINDEX_ROBOTS_CONTENT}">', html)
+		self.assertEqual(frappe.local.response_headers.get("X-Robots-Tag"), NOINDEX_ROBOTS_CONTENT)
+
+	def test_noindex_present_when_google_translate_enabled(self):
+		self.set_property_management_setting("enable_guest_guide_google_translate", 1)
+		doc = self.make_instruction()
+		html = self.render_instruction(doc)
+		self.assertIn("translate.google.com/translate_a/element.js", html)
+		self.assertIn(f'<meta name="robots" content="{NOINDEX_ROBOTS_CONTENT}">', html)
+		self.assertEqual(frappe.local.response_headers.get("X-Robots-Tag"), NOINDEX_ROBOTS_CONTENT)
 
 
 @frappe.whitelist()

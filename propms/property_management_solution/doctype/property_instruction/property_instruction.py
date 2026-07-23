@@ -23,6 +23,7 @@ from frappe.utils.verified_command import get_secret
 from frappe.website.website_generator import WebsiteGenerator
 from pypdf import PdfReader, PdfWriter
 from markupsafe import Markup
+from werkzeug.datastructures import Headers
 
 from propms.property_management_solution.doctype.property_instruction import translation_service
 
@@ -82,6 +83,7 @@ PDF_SNAPSHOT_ALLOWED_BODY_TAGS = {
 }
 PDF_WIDGET_TRANSLATION_NOTE = "Machine translated using the language selected on the guest guide."
 PDF_FOOTER_LINE_PATTERN = re.compile(r"^Page\s+\d+\s+of\s+\d+$")
+NOINDEX_ROBOTS_CONTENT = "noindex, nofollow, noarchive, nosnippet, noimageindex"
 
 
 class PropertyInstruction(WebsiteGenerator):
@@ -193,12 +195,16 @@ class PropertyInstruction(WebsiteGenerator):
 
 		context.no_cache = 1
 		context.no_breadcrumbs = 1
+		context.sitemap = 0
 		context.update(page_context)
+		context.metatags = frappe._dict(context.get("metatags") or {})
+		context.metatags["robots"] = NOINDEX_ROBOTS_CONTENT
 		if not getattr(context, "boot", None):
 			context.boot = frappe._dict()
 		elif isinstance(context.boot, dict) and not isinstance(context.boot, frappe._dict):
 			context.boot = frappe._dict(context.boot)
 		context.boot.lang = page_context.selected_language_code
+		self.set_noindex_response_header()
 		return context
 
 	def get_public_render_context(self, language_code=None):
@@ -212,6 +218,7 @@ class PropertyInstruction(WebsiteGenerator):
 		return frappe._dict(
 			title=display_content.title,
 			page_title=display_content.title,
+			noindex_robots_content=NOINDEX_ROBOTS_CONTENT,
 			sections=display_content.sections,
 			has_sections=bool(display_content.sections),
 			address=display_content.address,
@@ -1021,6 +1028,11 @@ class PropertyInstruction(WebsiteGenerator):
 		writer.write(stream)
 		return stream.getvalue()
 
+	def set_noindex_response_header(self):
+		if not hasattr(frappe.local, "response_headers") or frappe.local.response_headers is None:
+			frappe.local.response_headers = Headers()
+		frappe.local.response_headers.set("X-Robots-Tag", NOINDEX_ROBOTS_CONTENT)
+
 
 @frappe.whitelist()
 def generate_translation(property_instruction, language_code, language_name=None):
@@ -1109,6 +1121,7 @@ def download_pdf(slug=None, name=None, lang=None):
 		doc = get_published_instruction(slug=slug, name=name)
 		pdf_html = doc.render_pdf_html(language_code=lang)
 
+	doc.set_noindex_response_header()
 	pdf_bytes = get_pdf(pdf_html, options=doc.get_pdf_options())
 	pdf_bytes, _removed_footer_only_page = doc.cleanup_trailing_footer_only_page(pdf_bytes)
 	filename = doc.get_public_pdf_filename()
@@ -1117,3 +1130,15 @@ def download_pdf(slug=None, name=None, lang=None):
 	frappe.local.response.type = "download"
 	frappe.local.response.display_content_as = "attachment"
 	frappe.local.response.content_type = "application/pdf"
+
+
+def apply_guest_guide_noindex_headers(response=None, request=None):
+	request = request or getattr(frappe.local, "request", None)
+	if not response or not request:
+		return
+
+	path = (getattr(request, "path", "") or "").strip()
+	if path.startswith("/instructions/") or path.startswith(
+		"/api/method/propms.property_management_solution.doctype.property_instruction.property_instruction.download_pdf"
+	):
+		response.headers["X-Robots-Tag"] = NOINDEX_ROBOTS_CONTENT

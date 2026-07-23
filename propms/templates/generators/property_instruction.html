@@ -8,6 +8,10 @@
 
 {% block navbar %}{% endblock %}
 {% block footer %}{% endblock %}
+{% block meta_block %}
+  {{ super() }}
+  <meta name="robots" content="{{ noindex_robots_content or 'noindex, nofollow, noarchive, nosnippet, noimageindex' }}">
+{% endblock %}
 
 {% block style %}
 <style>

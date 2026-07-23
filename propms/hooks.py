@@ -84,6 +84,10 @@ doctype_js = {
 # automatically create page for each record of this doctype
 website_generators = ["Property Instruction"]
 
+after_request = [
+    "propms.property_management_solution.doctype.property_instruction.property_instruction.apply_guest_guide_noindex_headers"
+]
+
 # Installation
 # ------------
 
