@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import sys
 import uuid
 import unittest
@@ -217,6 +218,15 @@ class PropertyInstructionTestMixin:
 	def render_pdf(self, doc, lang=None):
 		return doc.render_pdf_html(language_code=lang)
 
+	def set_request_payload(self, payload, method="POST", args=None):
+		body = json.dumps(payload)
+		request = frappe._dict(method=method, args=frappe._dict(args or {}))
+		request.get_data = lambda as_text=False: body if as_text else body.encode()
+		frappe.local.request = request
+		frappe.local.request_ip = "127.0.0.1"
+		frappe.local.form_dict = frappe._dict(args or {})
+		return request
+
 
 class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 	def test_slug_generation_from_title(self):
@@ -372,6 +382,17 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 		self.assertIn('class="pi-copy-status sr-only"', html)
 		self.assertNotIn(">Copy address<", html)
 		self.assertNotIn(">Copy network<", html)
+		self.assertIn('data-pdf-field="title"', html)
+		self.assertIn('data-pdf-field="emergency_contact"', html)
+		self.assertIn('data-pdf-section="check-in"', html)
+		self.assertIn('data-pdf-block-field="body"', html)
+		self.assertIn('class="pi-btn pi-btn-secondary pi-pdf-download"', html)
+		self.assertIn('data-pdf-token="', html)
+		self.assertIn("Preparing PDF", html)
+		self.assertIn("PDF downloaded", html)
+		self.assertIn("Unable to prepare PDF", html)
+		self.assertIn("window.fetch", html)
+		self.assertIn("data-pdf-download-url", html)
 
 	def test_print_layout_has_dedicated_wrappers(self):
 		doc = self.make_instruction()
@@ -546,6 +567,143 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 		self.assertEqual(frappe.local.response.filename, "test-guest-guide-property.pdf")
 		self.assertEqual(frappe.local.response.type, "download")
 		self.assertEqual(frappe.local.response.content_type, "application/pdf")
+
+	def test_page_context_contains_pdf_snapshot_token(self):
+		doc = self.make_instruction()
+		context = self.get_context(doc)
+		self.assertTrue(context.pdf_snapshot_token)
+		self.assertIn(".", context.pdf_snapshot_token)
+
+	def test_expired_pdf_snapshot_token_is_rejected(self):
+		doc = self.make_instruction()
+		payload = {
+			"slug": doc.slug,
+			"token": doc.get_pdf_snapshot_token(expires_at=1),
+			"display_language": "fr",
+			"reviewed_language": "en",
+			"fields": {"title": "Guide en francais"},
+			"sections": {},
+			"blocks": {},
+		}
+		self.set_request_payload(payload)
+		with self.assertRaises(frappe.ValidationError):
+			download_pdf()
+
+	def test_pdf_snapshot_token_for_other_instruction_is_rejected(self):
+		doc = self.make_instruction()
+		other = self.make_instruction(property_name=self.make_property().name, slug="other-guide")
+		payload = {
+			"slug": doc.slug,
+			"token": other.get_pdf_snapshot_token(),
+			"display_language": "fr",
+			"reviewed_language": "en",
+			"fields": {"title": "Guide en francais"},
+			"sections": {},
+			"blocks": {},
+		}
+		self.set_request_payload(payload)
+		with self.assertRaises(frappe.ValidationError):
+			download_pdf()
+
+	def test_malformed_pdf_snapshot_payload_is_rejected(self):
+		doc = self.make_instruction()
+		payload = {
+			"slug": doc.slug,
+			"token": doc.get_pdf_snapshot_token(),
+			"display_language": "fr",
+			"reviewed_language": "en",
+			"fields": {"title": "Guide"},
+			"sections": [],
+			"blocks": {},
+		}
+		self.set_request_payload(payload)
+		with self.assertRaises(frappe.ValidationError):
+			download_pdf()
+
+	def test_translated_snapshot_overlays_only_permitted_fields(self):
+		doc = self.make_instruction(emergency_contact="For immediate danger, contact emergency services.")
+		source_block = doc.get_translation_source_payload()["blocks"][1]
+		payload = {
+			"slug": doc.slug,
+			"token": doc.get_pdf_snapshot_token(),
+			"display_language": "fr",
+			"reviewed_language": "en",
+			"widget_language": "fr",
+			"fields": {
+				"title": "Guide d'arrivee",
+				"emergency_contact": "Appelez les services d'urgence",
+			},
+			"sections": {"check-in": "Arrivee"},
+			"blocks": {
+				source_block["source_block_name"]: {
+					"title": "Entrez",
+					"body": "<p onclick='alert(1)'>Entrez par la porte laterale.</p><script>alert(1)</script>",
+					"caption": "Legende",
+					"link_label": "Ignored label",
+				},
+				"UNKNOWN-BLOCK": {"title": "Ignored"},
+			},
+		}
+		snapshot = doc.parse_translated_pdf_snapshot(payload)
+		html = doc.render_pdf_html(translated_snapshot=snapshot)
+		self.assertIn("Guide d'arrivee", html)
+		self.assertIn("Arrivee", html)
+		self.assertIn("Entrez", html)
+		self.assertIn("Entrez par la porte laterale.", html)
+		self.assertNotIn("onclick", html)
+		self.assertNotIn("alert(1)", html)
+		self.assertIn("99A Burlington Road", html)
+		self.assertIn("TestWifi", html)
+		self.assertIn("Machine translated using the language selected on the guest guide.", html)
+
+	def test_translated_snapshot_cannot_expose_password_or_reorder_blocks(self):
+		doc = self.make_instruction(show_wifi_password_publicly=0)
+		source_blocks = doc.get_translation_source_payload()["blocks"]
+		payload = {
+			"slug": doc.slug,
+			"token": doc.get_pdf_snapshot_token(),
+			"display_language": "de",
+			"reviewed_language": "en",
+			"fields": {"title": "Gastanleitung"},
+			"sections": {"parking": "Parken", "check-in": "Ankunft"},
+			"blocks": {
+				source_blocks[-1]["source_block_name"]: {"title": "Muell"},
+				source_blocks[0]["source_block_name"]: {"title": "Karte"},
+			},
+		}
+		snapshot = doc.parse_translated_pdf_snapshot(payload)
+		html = doc.render_pdf_html(translated_snapshot=snapshot)
+		self.assertNotIn("guest-wifi-only", html)
+		self.assertLess(html.find("Ankunft"), html.find("Parken"))
+		self.assertNotIn("UNKNOWN-BLOCK", html)
+
+	def test_post_pdf_endpoint_returns_pdf_for_translated_snapshot(self):
+		doc = self.make_instruction(emergency_contact="For immediate danger, contact emergency services.")
+		payload = doc.get_snapshot_request_payload(
+			{
+				"display_language": "fr",
+				"reviewed_language": "en",
+				"widget_language": "fr",
+				"fields": {
+					"title": "Guide traduit",
+					"emergency_contact": "Appelez les services d'urgence",
+				},
+				"sections": {"check-in": "Arrivee"},
+				"blocks": {},
+			}
+		)
+		self.set_request_payload(payload)
+		frappe.local.response = frappe._dict(headers={})
+		with patch(
+			"propms.property_management_solution.doctype.property_instruction.property_instruction.get_pdf",
+			return_value=b"%PDF-1.4 translated",
+		) as get_pdf_mock:
+			download_pdf()
+		rendered_html = get_pdf_mock.call_args.args[0]
+		self.assertIn("Guide traduit", rendered_html)
+		self.assertIn("Arrivee", rendered_html)
+		self.assertEqual(frappe.local.response.content_type, "application/pdf")
+		self.assertEqual(frappe.local.response.filename, "test-guest-guide-property.pdf")
 
 	def test_unpublished_pdf_request_is_rejected(self):
 		doc = self.make_instruction(published=0, slug="hidden-guide")

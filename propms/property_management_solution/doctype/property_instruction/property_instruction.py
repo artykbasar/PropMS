@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import base64
+import hashlib
+import hmac
 import json
 import mimetypes
 import os
@@ -13,8 +15,10 @@ from urllib.parse import urlencode, urlparse, urlunparse
 import frappe
 from frappe import _
 from frappe.model.naming import make_autoname
-from frappe.utils import cint, formatdate, nowdate, sanitize_html, validate_url
+from frappe.rate_limiter import rate_limit
+from frappe.utils import cint, formatdate, now_datetime, nowdate, sanitize_html, validate_url
 from frappe.utils.pdf import get_pdf
+from frappe.utils.verified_command import get_secret
 from frappe.website.website_generator import WebsiteGenerator
 from markupsafe import Markup
 
@@ -44,6 +48,37 @@ TRUSTED_GOOGLE_MAP_HOSTS = {"www.google.com", "google.com", "maps.google.com"}
 LANGUAGE_CODE_PATTERN = re.compile(r"^[a-z]{2,3}(?:-[a-z]{2,8})*$")
 PHONE_PATTERN = re.compile(r"(?:\+?\d[\d\s().-]{6,}\d)")
 EMAIL_PATTERN = re.compile(r"\b[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}\b")
+CONTROL_CHAR_PATTERN = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
+PDF_TOKEN_TTL_SECONDS = 30 * 60
+PDF_SNAPSHOT_MAX_PAYLOAD_BYTES = 250 * 1024
+PDF_SNAPSHOT_MAX_TEXT_LENGTH = 500
+PDF_SNAPSHOT_MAX_BODY_LENGTH = 20 * 1024
+PDF_SNAPSHOT_ALLOWED_FIELDS = {"title", "emergency_contact"}
+PDF_SNAPSHOT_ALLOWED_BLOCK_FIELDS = {"title", "body", "caption", "link_label"}
+PDF_SNAPSHOT_ALLOWED_KEYS = {
+	"slug",
+	"token",
+	"display_language",
+	"reviewed_language",
+	"widget_language",
+	"fields",
+	"sections",
+	"blocks",
+}
+PDF_SNAPSHOT_ALLOWED_BODY_TAGS = {
+	"p",
+	"br",
+	"ul",
+	"ol",
+	"li",
+	"strong",
+	"em",
+	"b",
+	"i",
+	"u",
+	"span",
+}
+PDF_WIDGET_TRANSLATION_NOTE = "Machine translated using the language selected on the guest guide."
 
 
 class PropertyInstruction(WebsiteGenerator):
@@ -201,6 +236,8 @@ class PropertyInstruction(WebsiteGenerator):
 			reviewed_language_selector_enabled=len(available_languages) > 1 and not google_translate.enabled,
 			google_translate=google_translate,
 			pdf_download_url=self.get_pdf_download_url(display_content.language_code),
+			pdf_snapshot_token=self.get_pdf_snapshot_token(),
+			pdf_download_method="propms.property_management_solution.doctype.property_instruction.property_instruction.download_pdf",
 		)
 
 	def get_grouped_blocks(self):
@@ -511,6 +548,17 @@ class PropertyInstruction(WebsiteGenerator):
 			"/api/method/propms.property_management_solution.doctype.property_instruction.property_instruction.download_pdf?"
 			f"{urlencode(params)}"
 		)
+
+	def get_pdf_snapshot_token(self, expires_at=None):
+		expires_at = expires_at or int((now_datetime() + timedelta(seconds=PDF_TOKEN_TTL_SECONDS)).timestamp())
+		payload = {
+			"name": self.name,
+			"slug": self.slug,
+			"published": 1,
+			"expires_at": expires_at,
+		}
+		return sign_pdf_snapshot_token(payload)
+
 	def get_display_content(self, translation=None):
 		if not translation:
 			return frappe._dict(
@@ -676,16 +724,54 @@ class PropertyInstruction(WebsiteGenerator):
 
 	def get_pdf_render_context(self, language_code=None):
 		context = self.get_public_render_context(language_code)
+		context.machine_translation_note = None
+		context.pdf_display_language = language_code or "en"
 		context.pdf_cover_image = self.get_pdf_asset_url(self.cover_image)
+		context.pdf_machine_translated = False
 		context.pdf_sections = self.get_pdf_sections(context.sections)
 		context.generated_on_display = self.get_local_generated_date_display()
 		context.pdf_filename = self.get_public_pdf_filename()
 		return context
 
-	def render_pdf_html(self, language_code=None):
+	def render_pdf_html(self, language_code=None, translated_snapshot=None):
 		context = frappe._dict(doc=self)
 		context.update(self.get_pdf_render_context(language_code))
+		if translated_snapshot:
+			self.apply_translated_snapshot_to_context(context, translated_snapshot)
 		return frappe.render_template("templates/pdf/property_instruction.html", context)
+
+	def apply_translated_snapshot_to_context(self, context, translated_snapshot):
+		fields = translated_snapshot.get("fields") or {}
+		sections = translated_snapshot.get("sections") or {}
+		blocks = translated_snapshot.get("blocks") or {}
+
+		if fields.get("title"):
+			context.title = fields["title"]
+			context.page_title = fields["title"]
+
+		if fields.get("emergency_contact") and not self.should_protect_identifier_value(context.emergency_contact):
+			context.emergency_contact = fields["emergency_contact"]
+
+		for section in context.sections or []:
+			if sections.get(section.anchor):
+				section.section = sections[section.anchor]
+			for block in section.blocks or []:
+				override = blocks.get(block.name) or {}
+				if override.get("title") and not block.title_translation_protected:
+					block.title = override["title"]
+				if override.get("body"):
+					block.body = override["body"]
+					block.safe_body = self.get_safe_body(override["body"])
+				if override.get("caption") and not block.caption_translation_protected:
+					block.caption = override["caption"]
+				if override.get("link_label") and not block.display_link_label_translation_protected:
+					block.display_link_label = override["link_label"]
+				block.image_alt = block.caption or block.title or block.image_alt
+
+		context.pdf_machine_translated = True
+		context.pdf_display_language = translated_snapshot.get("display_language") or context.pdf_display_language
+		context.machine_translation_note = PDF_WIDGET_TRANSLATION_NOTE
+		context.pdf_sections = self.get_pdf_sections(context.sections)
 
 	def get_public_pdf_filename(self):
 		filename_stem = (
@@ -751,6 +837,133 @@ class PropertyInstruction(WebsiteGenerator):
 			encoded = base64.b64encode(asset_file.read()).decode("ascii")
 		return f"data:{mime_type};base64,{encoded}"
 
+	def get_snapshot_section_map(self):
+		return {self.scrub(section): section for section in SECTION_OPTIONS}
+
+	def get_snapshot_block_name_set(self):
+		return {row.name for row in self.instruction_blocks or [] if row.name}
+
+	def parse_translated_pdf_snapshot(self, payload):
+		if not isinstance(payload, dict):
+			frappe.throw(_("Invalid PDF snapshot payload."))
+
+		unknown_keys = set(payload) - PDF_SNAPSHOT_ALLOWED_KEYS
+		if unknown_keys:
+			frappe.throw(_("Invalid PDF snapshot payload."))
+
+		if payload.get("slug") and payload.get("slug") != self.slug:
+			frappe.throw(_("Invalid PDF snapshot payload."))
+
+		fields = payload.get("fields")
+		sections = payload.get("sections")
+		blocks = payload.get("blocks")
+
+		if fields is None:
+			fields = {}
+		if sections is None:
+			sections = {}
+		if blocks is None:
+			blocks = {}
+
+		if not isinstance(fields, dict) or not isinstance(sections, dict) or not isinstance(blocks, dict):
+			frappe.throw(_("Invalid PDF snapshot payload."))
+
+		if len(blocks) > len(self.instruction_blocks or []):
+			frappe.throw(_("Invalid PDF snapshot payload."))
+
+		sanitized = {
+			"display_language": self.normalize_language_code(payload.get("display_language")) or "en",
+			"reviewed_language": self.normalize_language_code(payload.get("reviewed_language")) or "en",
+			"widget_language": self.normalize_language_code(payload.get("widget_language")),
+			"fields": {},
+			"sections": {},
+			"blocks": {},
+		}
+
+		for fieldname, value in fields.items():
+			if fieldname not in PDF_SNAPSHOT_ALLOWED_FIELDS:
+				frappe.throw(_("Invalid PDF snapshot payload."))
+			sanitized_value = self.sanitize_snapshot_text(value, max_length=PDF_SNAPSHOT_MAX_TEXT_LENGTH)
+			if sanitized_value:
+				if fieldname == "emergency_contact" and self.should_protect_identifier_value(self.emergency_contact):
+					continue
+				sanitized["fields"][fieldname] = sanitized_value
+
+		valid_sections = self.get_snapshot_section_map()
+		for section_key, value in sections.items():
+			if section_key not in valid_sections:
+				continue
+			sanitized_value = self.sanitize_snapshot_text(value, max_length=PDF_SNAPSHOT_MAX_TEXT_LENGTH)
+			if sanitized_value:
+				sanitized["sections"][section_key] = sanitized_value
+
+		valid_block_names = self.get_snapshot_block_name_set()
+		for block_name, block_payload in blocks.items():
+			if block_name not in valid_block_names:
+				continue
+			if not isinstance(block_payload, dict):
+				frappe.throw(_("Invalid PDF snapshot payload."))
+			unknown_block_fields = set(block_payload) - PDF_SNAPSHOT_ALLOWED_BLOCK_FIELDS
+			if unknown_block_fields:
+				frappe.throw(_("Invalid PDF snapshot payload."))
+
+			sanitized_block = {}
+			for fieldname, value in block_payload.items():
+				if fieldname == "body":
+					sanitized_value = self.sanitize_snapshot_body(value)
+				else:
+					sanitized_value = self.sanitize_snapshot_text(value, max_length=PDF_SNAPSHOT_MAX_TEXT_LENGTH)
+				if sanitized_value:
+					sanitized_block[fieldname] = sanitized_value
+
+			if sanitized_block:
+				sanitized["blocks"][block_name] = sanitized_block
+
+		return sanitized
+
+	def sanitize_snapshot_text(self, value, max_length=PDF_SNAPSHOT_MAX_TEXT_LENGTH):
+		text = frappe.safe_decode(value or "").strip()
+		text = CONTROL_CHAR_PATTERN.sub("", text)
+		text = re.sub(r"\s+", " ", text).strip()
+		if len(text) > max_length:
+			frappe.throw(_("Invalid PDF snapshot payload."))
+		return text or None
+
+	def sanitize_snapshot_body(self, value):
+		text = frappe.safe_decode(value or "")
+		text = CONTROL_CHAR_PATTERN.sub("", text)
+		if len(text) > PDF_SNAPSHOT_MAX_BODY_LENGTH:
+			frappe.throw(_("Invalid PDF snapshot payload."))
+		sanitized = sanitize_html(
+			text,
+			always_sanitize=True,
+			disallowed_tags={"script", "style", "iframe", "form", "object", "embed", "button", "img", "svg"},
+		)
+		sanitized = self.strip_disallowed_snapshot_tags(sanitized)
+		return sanitized.strip() or None
+
+	def get_snapshot_request_payload(self, translated_snapshot):
+		payload = {
+			"slug": self.slug,
+			"token": self.get_pdf_snapshot_token(),
+			"display_language": translated_snapshot.get("display_language") or "en",
+			"reviewed_language": translated_snapshot.get("reviewed_language") or "en",
+			"widget_language": translated_snapshot.get("widget_language"),
+			"fields": translated_snapshot.get("fields") or {},
+			"sections": translated_snapshot.get("sections") or {},
+			"blocks": translated_snapshot.get("blocks") or {},
+		}
+		return payload
+
+	def strip_disallowed_snapshot_tags(self, html):
+		tag_pattern = re.compile(r"</?([a-zA-Z0-9]+)(?:\s[^>]*)?>")
+
+		def replace_tag(match):
+			tag_name = match.group(1).lower()
+			return match.group(0) if tag_name in PDF_SNAPSHOT_ALLOWED_BODY_TAGS else ""
+
+		return tag_pattern.sub(replace_tag, html or "")
+
 	def block_has_content(self, row):
 		return any(
 			[
@@ -785,10 +998,72 @@ def get_published_instruction(slug=None, name=None):
 	return frappe.get_doc("Property Instruction", instruction_name)
 
 
+def sign_pdf_snapshot_token(payload):
+	serialized = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+	encoded = base64.urlsafe_b64encode(serialized.encode()).decode().rstrip("=")
+	signature = hmac.new(get_secret().encode(), serialized.encode(), hashlib.sha256).hexdigest()
+	return f"{encoded}.{signature}"
+
+
+def verify_pdf_snapshot_token(token):
+	if not token or "." not in token:
+		frappe.throw(_("Invalid PDF token."))
+
+	encoded_payload, provided_signature = token.rsplit(".", 1)
+	padding = "=" * (-len(encoded_payload) % 4)
+	try:
+		serialized = base64.urlsafe_b64decode(encoded_payload + padding).decode()
+		payload = json.loads(serialized)
+	except Exception:
+		frappe.throw(_("Invalid PDF token."))
+
+	expected_signature = hmac.new(get_secret().encode(), serialized.encode(), hashlib.sha256).hexdigest()
+	if not hmac.compare_digest(provided_signature, expected_signature):
+		frappe.throw(_("Invalid PDF token."))
+
+	if int(payload.get("expires_at") or 0) < int(now_datetime().timestamp()):
+		frappe.throw(_("This PDF link has expired."))
+
+	return payload
+
+
+def get_pdf_request_payload():
+	if not frappe.request or frappe.request.method != "POST":
+		return None
+
+	raw_body = frappe.request.get_data(as_text=True) or ""
+	if len(raw_body.encode()) > PDF_SNAPSHOT_MAX_PAYLOAD_BYTES:
+		frappe.throw(_("PDF request is too large."))
+
+	try:
+		payload = json.loads(raw_body)
+	except Exception:
+		frappe.throw(_("Invalid PDF snapshot payload."))
+
+	if not isinstance(payload, dict):
+		frappe.throw(_("Invalid PDF snapshot payload."))
+
+	return payload
+
+
 @frappe.whitelist(allow_guest=True)
+@rate_limit(limit=30, seconds=60 * 60, methods="POST")
 def download_pdf(slug=None, name=None, lang=None):
-	doc = get_published_instruction(slug=slug, name=name)
-	pdf_bytes = get_pdf(doc.render_pdf_html(language_code=lang), options=doc.get_pdf_options())
+	if frappe.request and frappe.request.method == "POST":
+		payload = get_pdf_request_payload()
+		token_payload = verify_pdf_snapshot_token(payload.get("token"))
+		doc = get_published_instruction(name=token_payload.get("name"))
+		if token_payload.get("slug") != doc.slug or not cint(token_payload.get("published")):
+			frappe.throw(_("Invalid PDF token."))
+
+		reviewed_language = doc.normalize_language_code(payload.get("reviewed_language") or lang) or "en"
+		snapshot = doc.parse_translated_pdf_snapshot(payload)
+		pdf_html = doc.render_pdf_html(language_code=reviewed_language, translated_snapshot=snapshot)
+	else:
+		doc = get_published_instruction(slug=slug, name=name)
+		pdf_html = doc.render_pdf_html(language_code=lang)
+
+	pdf_bytes = get_pdf(pdf_html, options=doc.get_pdf_options())
 	filename = doc.get_public_pdf_filename()
 	frappe.local.response.filename = filename
 	frappe.local.response.filecontent = pdf_bytes

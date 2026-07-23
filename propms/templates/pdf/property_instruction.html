@@ -227,6 +227,12 @@
       margin-top: 2mm;
     }
 
+    .pdf-machine-note {
+      margin: 0 0 4mm;
+      color: #5a6876;
+      font-size: 8.5pt;
+    }
+
     @media print {
       html,
       body,
@@ -259,6 +265,9 @@
     </header>
 
     <section class="pdf-summary">
+      {% if machine_translation_note %}
+      <p class="pdf-machine-note">{{ machine_translation_note }}</p>
+      {% endif %}
       <table class="pdf-summary-table">
         <tr>
           <td class="pdf-summary-col">

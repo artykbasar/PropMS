@@ -35,6 +35,9 @@ The guest-facing Property Instruction guide needs to evolve from a basic publish
 - source edits mark existing translations `Stale`
 - public language selection uses `?lang=<code>` and falls back to English unless a translation is `Ready`
 - print output is driven by template-scoped CSS only, with no builder dependency
+- Google Translate changes only the rendered browser DOM, so translated PDF downloads cannot rely on the existing GET endpoint alone
+- the guide now emits stable `data-pdf-*` markers for permitted translatable fields and posts a signed, size-limited snapshot back to the server for PDF generation
+- the PDF endpoint reconstructs the document from the published source record, overlays only permitted translated text, and preserves protected operational values such as address, Wi-Fi identifiers, URLs, and block order
 
 ## Migration Plan
 
@@ -63,4 +66,3 @@ The guest-facing Property Instruction guide needs to evolve from a basic publish
 - Draft or Stale translations fall back cleanly to English
 - translated output remains sanitized and ordered
 - all intended changes stay isolated to `feature/property-instructions`
-

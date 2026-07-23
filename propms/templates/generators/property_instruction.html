@@ -189,6 +189,12 @@
     gap: .75rem;
     margin-top: 1rem;
   }
+  .pi-action-status {
+    flex: 1 0 100%;
+    color: var(--pi-muted);
+    font-size: .92rem;
+    margin: 0;
+  }
   .pi-btn {
     display: inline-flex;
     align-items: center;
@@ -640,18 +646,18 @@
 {% endmacro %}
 
 {% macro render_screen_block(block) %}
-  <div class="pi-block pi-block-{{ block.block_type | lower | replace(' ', '-') }}">
+  <div class="pi-block pi-block-{{ block.block_type | lower | replace(' ', '-') }}" data-pdf-block="{{ block.name }}">
     {% if block.block_type == "Step" %}
     <div class="pi-step-head">
       <span class="pi-step-badge">{{ block.display_step_number }}</span>
-      {% if block.title %}<h3{% if block.title_translation_protected %} class="notranslate" translate="no"{% endif %}>{{ block.title }}</h3>{% endif %}
+      {% if block.title %}<h3 data-pdf-block-field="title"{% if block.title_translation_protected %} class="notranslate" translate="no"{% endif %}>{{ block.title }}</h3>{% endif %}
     </div>
     {% elif block.title %}
-    <h3{% if block.title_translation_protected %} class="notranslate" translate="no"{% endif %}>{{ block.title }}</h3>
+    <h3 data-pdf-block-field="title"{% if block.title_translation_protected %} class="notranslate" translate="no"{% endif %}>{{ block.title }}</h3>
     {% endif %}
 
     {% if block.safe_body %}
-    <div class="pi-body">{{ block.safe_body }}</div>
+    <div class="pi-body" data-pdf-block-field="body">{{ block.safe_body }}</div>
     {% endif %}
 
     {% if block.image %}
@@ -659,12 +665,12 @@
     {% endif %}
 
     {% if block.caption %}
-    <div class="pi-caption{% if block.caption_translation_protected %} notranslate{% endif %}"{% if block.caption_translation_protected %} translate="no"{% endif %}>{{ block.caption }}</div>
+    <div class="pi-caption{% if block.caption_translation_protected %} notranslate{% endif %}" data-pdf-block-field="caption"{% if block.caption_translation_protected %} translate="no"{% endif %}>{{ block.caption }}</div>
     {% endif %}
 
     {% if block.link_url %}
     <div class="pi-link">
-      <a href="{{ block.link_url }}" target="_blank" rel="noopener noreferrer nofollow"{% if block.display_link_label_translation_protected %} class="notranslate" translate="no"{% endif %}>{{ block.display_link_label }}</a>
+      <a href="{{ block.link_url }}" target="_blank" rel="noopener noreferrer nofollow" data-pdf-block-field="link_label"{% if block.display_link_label_translation_protected %} class="notranslate" translate="no"{% endif %}>{{ block.display_link_label }}</a>
     </div>
     {% endif %}
   </div>
@@ -756,7 +762,7 @@
         {% endif %}
         <div class="pi-hero-body">
           <div class="pi-eyebrow">Guest Instructions</div>
-          <h1 class="pi-title">{{ title }}</h1>
+          <h1 class="pi-title" data-pdf-field="title">{{ title }}</h1>
           {% if address %}
           <div class="pi-address-row">
             {{ render_copy_row("Address", address, "Copy address", "Copy property address", "property-address", True) }}
@@ -789,7 +795,7 @@
             {% if emergency_contact %}
             <div class="pi-meta-item">
               <span class="pi-label">Emergency Contact</span>
-              <span class="pi-value{% if emergency_contact_translation_protected %} notranslate{% endif %}"{% if emergency_contact_translation_protected %} translate="no"{% endif %}>{{ emergency_contact }}</span>
+              <span class="pi-value{% if emergency_contact_translation_protected %} notranslate{% endif %}" data-pdf-field="emergency_contact"{% if emergency_contact_translation_protected %} translate="no"{% endif %}>{{ emergency_contact }}</span>
             </div>
             {% endif %}
             {% if last_reviewed_on %}
@@ -805,9 +811,18 @@
             <a class="pi-btn pi-btn-primary" href="{{ screen_map_external_url }}" target="_blank" rel="noopener noreferrer nofollow">Open in Google Maps</a>
             {% endif %}
             {% if pdf_download_url %}
-            <a class="pi-btn pi-btn-secondary" href="{{ pdf_download_url }}">Download PDF</a>
+            <a
+              class="pi-btn pi-btn-secondary pi-pdf-download"
+              href="{{ pdf_download_url }}"
+              data-pdf-download-url="{{ pdf_download_url }}"
+              data-pdf-token="{{ pdf_snapshot_token }}"
+              data-pdf-slug="{{ doc.slug }}"
+              data-reviewed-language="{{ selected_language_code or 'en' }}"
+              data-pdf-filename="{{ doc.slug }}-guest-guide.pdf"
+              >Download PDF</a>
             {% endif %}
             <button type="button" class="pi-btn pi-btn-secondary property-instruction-print">Print guide</button>
+            <p class="pi-action-status sr-only" aria-live="polite"></p>
           </div>
         </div>
       </article>
@@ -846,7 +861,7 @@
         <div class="pi-sections">
           {% for section in sections %}
           <section id="{{ section.anchor }}" class="pi-card">
-            <h2 class="pi-section-title">{{ section.section }}</h2>
+            <h2 class="pi-section-title" data-pdf-section="{{ section.anchor }}">{{ section.section }}</h2>
             <div class="pi-blocks">
               {% for block in section.blocks %}
               {{ render_screen_block(block) }}
@@ -948,6 +963,137 @@
       document.body.removeChild(fallback);
     }
 
+    function getWidgetLanguage() {
+      const widgetSelect = document.querySelector(".goog-te-combo");
+      if (!widgetSelect || !widgetSelect.value) {
+        return "";
+      }
+      return String(widgetSelect.value).trim().toLowerCase();
+    }
+
+    function getReviewedLanguage(downloadLink) {
+      return String(downloadLink.getAttribute("data-reviewed-language") || "en").trim().toLowerCase();
+    }
+
+    function getPdfSnapshotPayload(downloadLink) {
+      const fields = {};
+      const sections = {};
+      const blocks = {};
+
+      document.querySelectorAll("[data-pdf-field]").forEach(function (element) {
+        const fieldName = element.getAttribute("data-pdf-field");
+        if (!fieldName) {
+          return;
+        }
+        const value = fieldName === "emergency_contact" ? element.textContent.trim() : element.textContent.trim();
+        if (value) {
+          fields[fieldName] = value;
+        }
+      });
+
+      document.querySelectorAll("[data-pdf-section]").forEach(function (element) {
+        const sectionKey = element.getAttribute("data-pdf-section");
+        const value = element.textContent.trim();
+        if (sectionKey && value) {
+          sections[sectionKey] = value;
+        }
+      });
+
+      document.querySelectorAll("[data-pdf-block]").forEach(function (blockElement) {
+        const blockName = blockElement.getAttribute("data-pdf-block");
+        if (!blockName) {
+          return;
+        }
+        const blockPayload = {};
+        blockElement.querySelectorAll("[data-pdf-block-field]").forEach(function (fieldElement) {
+          const fieldName = fieldElement.getAttribute("data-pdf-block-field");
+          if (!fieldName) {
+            return;
+          }
+          const value = fieldName === "body"
+            ? fieldElement.innerHTML.trim()
+            : fieldElement.textContent.trim();
+          if (value) {
+            blockPayload[fieldName] = value;
+          }
+        });
+        if (Object.keys(blockPayload).length) {
+          blocks[blockName] = blockPayload;
+        }
+      });
+
+      return {
+        slug: downloadLink.getAttribute("data-pdf-slug") || "",
+        token: downloadLink.getAttribute("data-pdf-token") || "",
+        display_language: getReviewedLanguage(downloadLink),
+        reviewed_language: getReviewedLanguage(downloadLink),
+        widget_language: getWidgetLanguage(),
+        fields: fields,
+        sections: sections,
+        blocks: blocks
+      };
+    }
+
+    function getDownloadFilename(response, downloadLink) {
+      const contentDisposition = response.headers.get("Content-Disposition") || "";
+      const match = contentDisposition.match(/filename=\"?([^\";]+)\"?/i);
+      if (match && match[1]) {
+        return match[1];
+      }
+      return downloadLink.getAttribute("data-pdf-filename") || "guest-guide.pdf";
+    }
+
+    async function downloadTranslatedPdf(downloadLink) {
+      const statusElement = document.querySelector(".pi-action-status");
+      const originalLabel = downloadLink.textContent;
+      const payload = getPdfSnapshotPayload(downloadLink);
+
+      downloadLink.classList.add("is-disabled");
+      downloadLink.setAttribute("aria-disabled", "true");
+      downloadLink.textContent = "Preparing PDF";
+      if (statusElement) {
+        statusElement.classList.remove("sr-only");
+        statusElement.textContent = "Preparing PDF";
+      }
+
+      try {
+        const response = await window.fetch(downloadLink.getAttribute("data-pdf-download-url"), {
+          method: "POST",
+          credentials: "same-origin",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify(payload)
+        });
+
+        if (!response.ok) {
+          throw new Error("Unable to generate PDF");
+        }
+
+        const pdfBlob = await response.blob();
+        const objectUrl = window.URL.createObjectURL(pdfBlob);
+        const temporaryLink = document.createElement("a");
+        temporaryLink.href = objectUrl;
+        temporaryLink.download = getDownloadFilename(response, downloadLink);
+        document.body.appendChild(temporaryLink);
+        temporaryLink.click();
+        temporaryLink.remove();
+        window.URL.revokeObjectURL(objectUrl);
+        if (statusElement) {
+          statusElement.textContent = "PDF downloaded";
+        }
+      } catch (error) {
+        if (statusElement) {
+          statusElement.textContent = "Unable to prepare PDF";
+        }
+        window.location.href = downloadLink.getAttribute("href");
+      } finally {
+        downloadLink.classList.remove("is-disabled");
+        downloadLink.removeAttribute("aria-disabled");
+        downloadLink.textContent = originalLabel;
+      }
+    }
+
     document.addEventListener("click", async function (event) {
       const copyButton = event.target.closest(".pi-copy-button");
       if (copyButton) {
@@ -982,6 +1128,13 @@
             statusElement.textContent = "";
           }
         }, 2000);
+        return;
+      }
+
+      const downloadLink = event.target.closest(".pi-pdf-download");
+      if (downloadLink && window.fetch && window.URL && window.URL.createObjectURL) {
+        event.preventDefault();
+        await downloadTranslatedPdf(downloadLink);
         return;
       }
 
