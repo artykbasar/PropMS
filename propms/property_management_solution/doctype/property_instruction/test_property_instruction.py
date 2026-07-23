@@ -1047,20 +1047,22 @@ class TestPropertyInstructionTranslations(PropertyInstructionTestMixin, FrappeTe
 
 	def test_translated_html_is_sanitized(self):
 		doc = self.make_instruction()
-		source_block = doc.get_translation_source_payload()["blocks"][1]
+		source_blocks = doc.get_translation_source_payload()["blocks"]
 		self.make_translation(
 			doc,
+			status="Ready",
 			blocks=[
 				{
-					"source_block_name": source_block["source_block_name"],
-					"section": "Registro",
-					"title": "Paso seguro",
-					"body": "<p>Texto</p><script>alert(1)</script>",
-					"caption": None,
-					"link_label": None,
-					"sort_order": source_block["sort_order"],
+					"source_block_name": row["source_block_name"],
+					"section": "Registro" if row["section"] == "Check-In" else f"{row['section']} ES",
+					"title": "Paso seguro" if row["source_block_name"] == source_blocks[1]["source_block_name"] else f"{(row.get('title') or row['section'])} ES",
+					"body": "<p>Texto</p><script>alert(1)</script>" if row["source_block_name"] == source_blocks[1]["source_block_name"] else row.get("body"),
+					"caption": row.get("caption"),
+					"link_label": row.get("link_label"),
+					"sort_order": row["sort_order"],
 				}
-			],
+				for row in source_blocks
+			]
 		)
 		html = self.render_instruction(doc, lang="es")
 		self.assertIn("Texto", html)
@@ -1144,6 +1146,114 @@ class TestPropertyInstructionTranslations(PropertyInstructionTestMixin, FrappeTe
 		self.assertEqual(translation.language_code, "es")
 		self.assertEqual(translation.title, "Guia de huespedes")
 		self.assertEqual(translation.address, doc.address)
+
+	def test_reviewed_translation_cannot_be_ready_with_missing_title(self):
+		doc = self.make_instruction()
+		translation = self.make_translation(doc, status="Draft", title="")
+		translation.status = "Ready"
+		with self.assertRaises(frappe.ValidationError):
+			translation.save(ignore_permissions=True)
+
+	def test_reviewed_translation_cannot_be_ready_with_missing_source_block(self):
+		doc = self.make_instruction()
+		translation = self.make_translation(doc, status="Draft")
+		translation.blocks = translation.blocks[:-1]
+		translation.status = "Ready"
+		with self.assertRaises(frappe.ValidationError):
+			translation.save(ignore_permissions=True)
+
+	def test_reviewed_translation_cannot_be_ready_with_missing_block_body_or_title(self):
+		doc = self.make_instruction()
+		translation = self.make_translation(doc, status="Draft")
+		translation.blocks[1].title = ""
+		translation.blocks[1].body = ""
+		translation.status = "Ready"
+		with self.assertRaises(frappe.ValidationError):
+			translation.save(ignore_permissions=True)
+
+	def test_protected_address_and_ssid_are_not_required_for_ready_translation(self):
+		doc = self.make_instruction(wifi_name="Estaex Guest WiFi")
+		translation = self.make_translation(doc, status="Draft", address="")
+		translation.status = "Ready"
+		translation.save(ignore_permissions=True)
+		translation.reload()
+		self.assertEqual(translation.status, "Ready")
+
+	def test_completed_spanish_translation_can_be_ready(self):
+		doc = self.make_instruction()
+		translation = self.make_translation(
+			doc,
+			status="Draft",
+			title="Guia de huespedes de prueba",
+			emergency_contact="En caso de peligro inmediato, contacte con los servicios de emergencia.",
+			blocks=[
+				{
+					"source_block_name": row["source_block_name"],
+					"section": f"{row['section']} ES",
+					"title": f"{(row.get('title') or row['section'])} ES",
+					"body": "<p>Contenido traducido.</p>" if row.get("body") else None,
+					"caption": "Subtitulo ES" if row.get("caption") else None,
+					"link_label": "Abrir mapa" if row.get("link_label") else None,
+					"sort_order": row.get("sort_order"),
+				}
+				for row in doc.get_translation_source_payload()["blocks"]
+			],
+		)
+		translation.status = "Ready"
+		translation.save(ignore_permissions=True)
+		translation.reload()
+		self.assertEqual(translation.status, "Ready")
+
+	def test_spanish_pdf_no_longer_contains_known_untranslated_english_fixture_phrases(self):
+		doc = self.make_instruction(wifi_name="Estaex Guest WiFi")
+		self.make_translation(
+			doc,
+			language_code="es",
+			status="Ready",
+			title="Guia de huespedes de 99A Burlington Road",
+			emergency_contact="En caso de peligro inmediato, contacte con los servicios de emergencia.",
+			blocks=[
+				{
+					"source_block_name": row["source_block_name"],
+					"section": {
+						"Finding the Property": "Encontrar la propiedad",
+						"Check-In": "Registro",
+						"Parking": "Aparcamiento",
+						"WiFi": "WiFi",
+						"Rubbish": "Residuos",
+						"Check-Out": "Salida",
+					}.get(row["section"], row["section"]),
+					"title": {
+						"Map": "Mapa",
+						"Entrance reference": "Referencia de entrada",
+						"Arrive at the main entrance": "Llegue a la entrada principal",
+						"Follow separately supplied arrival instructions": "Siga las instrucciones de llegada facilitadas por separado",
+						"Confirm the door is locked after entry": "Confirme que la puerta queda cerrada despues de entrar",
+						"Guest parking": "Aparcamiento para invitados",
+						"Parking restrictions": "Restricciones de aparcamiento",
+						"Waste and recycling": "Residuos y reciclaje",
+						"Turn off lights and appliances": "Apague las luces y los electrodomesticos",
+						"Close windows": "Cierre las ventanas",
+						"Lock the property": "Cierre la propiedad",
+						"Follow separate key-return instructions": "Siga las instrucciones separadas para devolver las llaves",
+					}.get(row.get("title"), row.get("title")),
+					"body": (
+						"<p>Contenido traducido al espanol.</p>" if row.get("body") else None
+					),
+					"caption": "Imagen de referencia de desarrollo." if row.get("caption") else None,
+					"link_label": "Abrir mapa" if row.get("link_label") else None,
+					"sort_order": row.get("sort_order"),
+				}
+				for row in doc.get_translation_source_payload()["blocks"]
+			],
+		)
+		pdf_text = self.render_pdf(doc, lang="es")
+		self.assertIn("Guia de huespedes de 99A Burlington Road", pdf_text)
+		self.assertNotIn("Arrive at the main entrance", pdf_text)
+		self.assertNotIn("Follow separately supplied arrival instructions", pdf_text)
+		self.assertIn("99A Burlington Road", pdf_text)
+		self.assertIn("Estaex Guest WiFi", pdf_text)
+		self.assertNotIn("guest-wifi-only", pdf_text)
 
 	def test_reviewed_translation_keeps_original_address_and_wifi_name(self):
 		doc = self.make_instruction()
