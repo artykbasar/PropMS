@@ -751,6 +751,9 @@
             {% if screen_map_external_url %}
             <a class="pi-btn pi-btn-primary" href="{{ screen_map_external_url }}" target="_blank" rel="noopener noreferrer nofollow">Open in Google Maps</a>
             {% endif %}
+            {% if pdf_download_url %}
+            <a class="pi-btn pi-btn-secondary" href="{{ pdf_download_url }}">Download PDF</a>
+            {% endif %}
             <button type="button" class="pi-btn pi-btn-secondary property-instruction-print">Print guide</button>
           </div>
         </div>

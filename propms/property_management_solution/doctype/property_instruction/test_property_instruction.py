@@ -10,7 +10,10 @@ from frappe.tests.utils import FrappeTestCase
 from frappe.website.page_renderers.document_page import _find_matching_document_webview
 from frappe.website.router import clear_routing_cache, get_base_template
 
-from propms.property_management_solution.doctype.property_instruction.property_instruction import generate_translation
+from propms.property_management_solution.doctype.property_instruction.property_instruction import (
+	download_pdf,
+	generate_translation,
+)
 from propms.property_management_solution.doctype.property_instruction import translation_service
 
 
@@ -211,6 +214,9 @@ class PropertyInstructionTestMixin:
 		context = self.get_context(doc, lang=lang)
 		return frappe.get_template("templates/generators/property_instruction.html").render(context)
 
+	def render_pdf(self, doc, lang=None):
+		return doc.render_pdf_html(language_code=lang)
+
 
 class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 	def test_slug_generation_from_title(self):
@@ -344,7 +350,7 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 		self.assertIn("referrerpolicy=\"strict-origin-when-cross-origin\"", html)
 		self.assertIn("allowfullscreen", html)
 		self.assertIn("property-instruction-print", html)
-		self.assertIn("Print guide", html)
+		self.assertIn("Download PDF", html)
 		self.assertIn("Copy address", html)
 		self.assertIn("Copy network", html)
 		self.assertNotIn('href="javascript:', html)
@@ -466,6 +472,41 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 		html = self.render_instruction(doc)
 		self.assertEqual(html.count("document.addEventListener(\"click\""), 1)
 
+	def test_pdf_template_contains_text_without_screen_controls(self):
+		doc = self.make_instruction()
+		html = self.render_pdf(doc)
+		self.assertIn("Estaex Guest Guide", html)
+		self.assertIn("TestWifi", html)
+		self.assertIn("99A Burlington Road", html)
+		self.assertNotIn("<iframe", html)
+		self.assertNotIn("translate.google.com/translate_a/element.js", html)
+		self.assertNotIn("pi-copy-button", html)
+		self.assertNotIn("property-instruction-print", html)
+
+	def test_pdf_template_includes_public_password_only_when_enabled(self):
+		doc = self.make_instruction(show_wifi_password_publicly=1)
+		html = self.render_pdf(doc)
+		self.assertIn("guest-wifi-only", html)
+		self.assertIn("Wi-Fi Password", html)
+
+	def test_pdf_endpoint_returns_download_response(self):
+		doc = self.make_instruction()
+		frappe.local.response = frappe._dict(headers={})
+		with patch(
+			"propms.property_management_solution.doctype.property_instruction.property_instruction.get_pdf",
+			return_value=b"%PDF-1.4 test",
+		):
+			download_pdf(slug=doc.slug)
+		self.assertEqual(frappe.local.response.filename, "test-guest-guide-property.pdf")
+		self.assertEqual(frappe.local.response.type, "download")
+		self.assertEqual(frappe.local.response.content_type, "application/pdf")
+
+	def test_unpublished_pdf_request_is_rejected(self):
+		doc = self.make_instruction(published=0, slug="hidden-guide")
+		frappe.local.response = frappe._dict(headers={})
+		with self.assertRaises(frappe.DoesNotExistError):
+			download_pdf(slug=doc.slug)
+
 	def test_no_key_map_embed_uses_trusted_google_host(self):
 		self.set_conf("google_maps_embed_api_key", None)
 		doc = self.make_instruction(address="99A Burlington Road, New Malden")
@@ -490,6 +531,7 @@ class TestPropertyInstructionTranslations(PropertyInstructionTestMixin, FrappeTe
 		self.assertEqual(context.boot.lang, "es")
 		self.assertEqual(context.title, "Guia de huespedes")
 		self.assertIn("Guia de huespedes", html)
+		self.assertIn("Guia de huespedes", self.render_pdf(doc, lang="es"))
 
 	def test_ready_translation_reads_language_from_request_args(self):
 		doc = self.make_instruction()
@@ -676,11 +718,19 @@ class TestPropertyInstructionTranslations(PropertyInstructionTestMixin, FrappeTe
 		self.assertIn("Guia para imprimir", html)
 		self.assertIn("@page {", html)
 		self.assertIn(".pi-language-switcher", html)
+		self.assertIn("Guia para imprimir", self.render_pdf(doc, lang="es"))
 
 	def test_translation_fallback_excludes_unready_content(self):
 		doc = self.make_instruction(title="English Guide")
 		self.make_translation(doc, language_code="es", status="Stale", title="Guia caducada")
 		html = self.render_instruction(doc, lang="es")
+		self.assertIn("English Guide", html)
+		self.assertNotIn("Guia caducada", html)
+
+	def test_pdf_falls_back_to_english_for_stale_translation(self):
+		doc = self.make_instruction(title="English Guide")
+		self.make_translation(doc, language_code="es", status="Stale", title="Guia caducada")
+		html = self.render_pdf(doc, lang="es")
 		self.assertIn("English Guide", html)
 		self.assertNotIn("Guia caducada", html)
 

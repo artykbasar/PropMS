@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import base64
 import json
+import mimetypes
 import os
 import re
 from datetime import timedelta
@@ -11,7 +13,8 @@ from urllib.parse import urlencode, urlparse, urlunparse
 import frappe
 from frappe import _
 from frappe.model.naming import make_autoname
-from frappe.utils import cint, formatdate, sanitize_html, validate_url
+from frappe.utils import cint, formatdate, nowdate, sanitize_html, validate_url
+from frappe.utils.pdf import get_pdf
 from frappe.website.website_generator import WebsiteGenerator
 from markupsafe import Markup
 
@@ -193,6 +196,7 @@ class PropertyInstruction(WebsiteGenerator):
 			translation_enabled=len(available_languages) > 1,
 			reviewed_language_selector_enabled=len(available_languages) > 1 and not google_translate.enabled,
 			google_translate=google_translate,
+			pdf_download_url=self.get_pdf_download_url(display_content.language_code),
 		)
 
 	def get_grouped_blocks(self):
@@ -396,6 +400,9 @@ class PropertyInstruction(WebsiteGenerator):
 	def should_hide_block_in_print(self, row, print_map_url=None):
 		if row.block_type != "Link" or row.section != "Finding the Property" or not row.link_url or not print_map_url:
 			return False
+		hostname = (urlparse((row.link_url or "").strip()).hostname or "").lower()
+		if hostname in TRUSTED_GOOGLE_MAP_HOSTS:
+			return True
 		return self.urls_match_for_print(row.link_url, print_map_url)
 
 	def urls_match_for_print(self, left, right):
@@ -474,6 +481,15 @@ class PropertyInstruction(WebsiteGenerator):
 			return None
 		return self.get_password("wifi_password")
 
+	def get_pdf_download_url(self, language_code=None):
+		params = {"slug": self.slug}
+		language_code = self.normalize_language_code(language_code)
+		if language_code and language_code != "en":
+			params["lang"] = language_code
+		return (
+			"/api/method/propms.property_management_solution.doctype.property_instruction.property_instruction.download_pdf?"
+			f"{urlencode(params)}"
+		)
 	def get_display_content(self, translation=None):
 		if not translation:
 			return frappe._dict(
@@ -630,6 +646,83 @@ class PropertyInstruction(WebsiteGenerator):
 			return ""
 		return Markup(sanitize_html(body, always_sanitize=True, disallowed_tags={"script", "style"}))
 
+	def get_pdf_render_context(self, language_code=None):
+		context = self.get_public_render_context(language_code)
+		context.pdf_cover_image = self.get_pdf_asset_url(self.cover_image)
+		context.pdf_sections = self.get_pdf_sections(context.sections)
+		context.generated_on_display = self.get_local_generated_date_display()
+		context.pdf_filename = self.get_public_pdf_filename()
+		return context
+
+	def render_pdf_html(self, language_code=None):
+		context = frappe._dict(doc=self)
+		context.update(self.get_pdf_render_context(language_code))
+		return frappe.render_template("templates/pdf/property_instruction.html", context)
+
+	def get_public_pdf_filename(self):
+		filename_stem = (
+			self.slug
+			if self.slug.endswith("-guide") or "guest-guide" in self.slug
+			else f"{self.slug}-guest-guide"
+		)
+		return f"{filename_stem}.pdf"
+
+	def get_pdf_options(self):
+		return {
+			"page-size": "A4",
+			"margin-top": "11mm",
+			"margin-right": "12mm",
+			"margin-bottom": "16mm",
+			"margin-left": "12mm",
+			"footer-left": "Estaex Guest Guide",
+			"footer-right": "[page]/[toPage]",
+			"footer-font-size": "8",
+			"footer-spacing": "4",
+			"load-error-handling": "ignore",
+			"load-media-error-handling": "ignore",
+		}
+
+	def get_local_generated_date_display(self):
+		return formatdate(nowdate())
+
+	def get_pdf_sections(self, sections):
+		pdf_sections = []
+		for section in sections or []:
+			pdf_blocks = []
+			for block in section.blocks or []:
+				pdf_block = frappe._dict(block)
+				pdf_block.pdf_image = self.get_pdf_asset_url(block.image)
+				pdf_blocks.append(pdf_block)
+			pdf_sections.append(frappe._dict(section=section.section, anchor=section.anchor, blocks=pdf_blocks))
+		return pdf_sections
+
+	def get_pdf_asset_url(self, asset_url):
+		if not asset_url:
+			return None
+		if asset_url.startswith(("http://", "https://", "data:")):
+			return asset_url
+		if asset_url.startswith(("/files/", "/private/files/")):
+			inline_asset = self.get_inline_asset_data_uri(asset_url)
+			if inline_asset:
+				return inline_asset
+		return asset_url
+
+	def get_inline_asset_data_uri(self, asset_url):
+		if not asset_url or not asset_url.startswith("/"):
+			return None
+		if asset_url.startswith("/private/files/"):
+			file_path = frappe.get_site_path("private", "files", asset_url.split("/private/files/", 1)[1])
+		elif asset_url.startswith("/files/"):
+			file_path = frappe.get_site_path("public", "files", asset_url.split("/files/", 1)[1])
+		else:
+			return None
+		if not os.path.exists(file_path):
+			return None
+		mime_type = mimetypes.guess_type(file_path)[0] or "application/octet-stream"
+		with open(file_path, "rb") as asset_file:
+			encoded = base64.b64encode(asset_file.read()).decode("ascii")
+		return f"data:{mime_type};base64,{encoded}"
+
 	def block_has_content(self, row):
 		return any(
 			[
@@ -647,3 +740,30 @@ def generate_translation(property_instruction, language_code, language_name=None
 	doc = frappe.get_doc("Property Instruction", property_instruction)
 	doc.check_permission("write")
 	return doc.generate_translation(language_code=language_code, language_name=language_name)
+
+
+def get_published_instruction(slug=None, name=None):
+	filters = {"published": 1}
+	if slug:
+		filters["slug"] = slug
+	elif name:
+		filters["name"] = name
+	else:
+		frappe.throw(_("A published Property Instruction could not be found."), frappe.DoesNotExistError)
+
+	instruction_name = frappe.db.get_value("Property Instruction", filters, "name")
+	if not instruction_name:
+		frappe.throw(_("A published Property Instruction could not be found."), frappe.DoesNotExistError)
+	return frappe.get_doc("Property Instruction", instruction_name)
+
+
+@frappe.whitelist(allow_guest=True)
+def download_pdf(slug=None, name=None, lang=None):
+	doc = get_published_instruction(slug=slug, name=name)
+	pdf_bytes = get_pdf(doc.render_pdf_html(language_code=lang), options=doc.get_pdf_options())
+	filename = doc.get_public_pdf_filename()
+	frappe.local.response.filename = filename
+	frappe.local.response.filecontent = pdf_bytes
+	frappe.local.response.type = "download"
+	frappe.local.response.display_content_as = "attachment"
+	frappe.local.response.content_type = "application/pdf"
