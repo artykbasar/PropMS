@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import io
 import json
 import sys
 import uuid
@@ -8,10 +9,13 @@ from unittest.mock import patch
 
 import frappe
 from frappe.tests.utils import FrappeTestCase
+from pypdf import PdfReader, PdfWriter
 from frappe.website.page_renderers.document_page import _find_matching_document_webview
 from frappe.website.router import clear_routing_cache, get_base_template
+from frappe.utils.pdf import get_pdf
 
 from propms.property_management_solution.doctype.property_instruction.property_instruction import (
+	PDF_WIDGET_TRANSLATION_NOTE,
 	download_pdf,
 	generate_translation,
 )
@@ -217,6 +221,156 @@ class PropertyInstructionTestMixin:
 
 	def render_pdf(self, doc, lang=None):
 		return doc.render_pdf_html(language_code=lang)
+
+	def generate_pdf_bytes(self, doc, lang=None, translated_snapshot=None):
+		pdf_html = doc.render_pdf_html(language_code=lang, translated_snapshot=translated_snapshot)
+		pdf_bytes = get_pdf(pdf_html, options=doc.get_pdf_options())
+		pdf_bytes, _removed = doc.cleanup_trailing_footer_only_page(pdf_bytes)
+		return pdf_bytes
+
+	def extract_pdf_text(self, pdf_bytes):
+		reader = PdfReader(io.BytesIO(pdf_bytes))
+		return "\n".join((page.extract_text() or "") for page in reader.pages)
+
+	def extract_pdf_pages(self, pdf_bytes):
+		reader = PdfReader(io.BytesIO(pdf_bytes))
+		return [(page.extract_text() or "") for page in reader.pages]
+
+	def make_widget_snapshot(self, doc, language="fr", expanded=False):
+		section_map = {
+			"fr": {
+				"Finding the Property": "Trouver le bien immobilier",
+				"Check-In": "Enregistrement",
+				"Parking": "Parking",
+				"WiFi": "Wi-Fi",
+				"Rubbish": "Déchets",
+				"Check-Out": "Vérifier",
+			},
+			"de": {
+				"Finding the Property": "Die Unterkunft finden",
+				"Check-In": "Anreise",
+				"Parking": "Parken",
+				"WiFi": "WLAN",
+				"Rubbish": "Abfall",
+				"Check-Out": "Abreise",
+			},
+		}
+		block_map = {
+			"fr": {
+				"Map": {"title": "Carte", "link_label": "Ouvrir la carte"},
+				"Entrance reference": {"title": "Référence d'entrée", "caption": "Image de remplacement pour l'entrée."},
+				"Arrive at the main entrance": {
+					"title": "Arrivez à l'entrée principale",
+					"body": "<p>Empruntez le chemin principal et attendez dans la zone d'entrée couverte.</p>",
+				},
+				"Follow separately supplied arrival instructions": {
+					"title": "Suivez les instructions d'arrivée fournies séparément.",
+					"body": "<p>Veuillez utiliser le message d'arrivée qui vous a été envoyé séparément. Aucun code d'accès n'est indiqué dans ce guide public.</p>",
+				},
+				"Confirm the door is locked after entry": {
+					"title": "Vérifiez que la porte est verrouillée après l'entrée.",
+					"body": "<p>Une fois à l'intérieur, vérifiez que la porte est bien fermée et verrouillée.</p>",
+				},
+				"Guest parking": {
+					"title": "Parking visiteurs",
+					"body": "<p>Les visiteurs peuvent utiliser les places de stationnement réservées aux visiteurs sur Burlington Road lorsqu'elles sont disponibles.</p>",
+				},
+				"Parking restrictions": {
+					"title": "Restrictions de stationnement",
+					"body": "<p>Veuillez respecter les restrictions de stationnement locales et éviter de bloquer les allées des voisins.</p>",
+				},
+				"Waste and recycling": {
+					"title": "Déchets et recyclage",
+					"body": "<p>Veuillez déposer les ordures ménagères dans le bac noir et les déchets recyclables dans le bac vert situé près du portail latéral. Les détails concernant les jours de collecte ne sont pas indiqués ici, sauf confirmation ultérieure.</p>",
+				},
+				"Turn off lights and appliances": {
+					"title": "Éteignez les lumières et les appareils électroménagers",
+					"body": "<p>Veuillez éteindre les lumières, le chauffage d'appoint et les petits appareils électroménagers avant de partir.</p>",
+				},
+				"Close windows": {
+					"title": "Fermer les fenêtres",
+					"body": "<p>Assurez-vous que toutes les fenêtres accessibles sont complètement fermées.</p>",
+				},
+				"Lock the property": {
+					"title": "Verrouillez la propriété",
+					"body": "<p>Vérifiez que l'entrée principale est bien sécurisée avant de quitter les lieux.</p>",
+				},
+				"Follow separate key-return instructions": {
+					"title": "Suivez les instructions séparées pour le retour des clés",
+					"body": "<p>Veuillez utiliser les instructions de restitution des clés fournies séparément après votre départ.</p>",
+				},
+			},
+			"de": {
+				"Map": {"title": "Karte", "link_label": "Karte öffnen"},
+				"Entrance reference": {"title": "Eingangsreferenz", "caption": "Entwicklungsplatzhalterbild für den Eingangsbereich."},
+				"Arrive at the main entrance": {
+					"title": "Kommen Sie am Haupteingang an",
+					"body": "<p>Benutzen Sie den vorderen Weg und warten Sie im überdachten Eingangsbereich, bis Ihre separat gesendeten Anreisehinweise vollständig befolgt werden können.</p>",
+				},
+				"Follow separately supplied arrival instructions": {
+					"title": "Folgen Sie den separat bereitgestellten Anreisehinweisen",
+					"body": "<p>Bitte verwenden Sie die separat zugesandte Anreisenachricht. In diesem öffentlichen Leitfaden werden keine Zugangscodes angezeigt, und zusätzliche sicherheitsrelevante Informationen werden bewusst nicht aufgenommen.</p>",
+				},
+				"Confirm the door is locked after entry": {
+					"title": "Bestätigen Sie nach dem Betreten, dass die Tür verriegelt ist",
+					"body": "<p>Überprüfen Sie nach dem Betreten sorgfältig, dass die Tür vollständig geschlossen, korrekt eingerastet und weiterhin sicher verriegelt ist.</p>",
+				},
+				"Guest parking": {
+					"title": "Gästeparkplätze",
+					"body": "<p>Gäste können die markierten Besucherparkplätze an der Burlington Road nutzen, sofern sie verfügbar sind und keine lokalen Einschränkungen vorliegen.</p>",
+				},
+				"Parking restrictions": {
+					"title": "Parkbeschränkungen",
+					"body": "<p>Bitte beachten Sie die örtlichen Parkbeschränkungen und vermeiden Sie es, benachbarte Einfahrten, Tore oder Rettungswege auch nur kurzzeitig zu blockieren.</p>",
+				},
+				"Waste and recycling": {
+					"title": "Müll und Recycling",
+					"body": "<p>Bitte legen Sie den Restmüll in die schwarze Tonne und gemischtes Recycling in die grüne Tonne am Seitentor. Angaben zu den Abholtagen werden hier nur angezeigt, wenn sie gesondert bestätigt wurden.</p>",
+				},
+				"Turn off lights and appliances": {
+					"title": "Schalten Sie Lichter und Geräte aus",
+					"body": "<p>Bitte schalten Sie vor Ihrer Abreise alle Lichter, zusätzliche Heizfunktionen und kleinen Elektrogeräte vollständig aus.</p>",
+				},
+				"Close windows": {
+					"title": "Schließen Sie die Fenster",
+					"body": "<p>Stellen Sie sicher, dass alle zugänglichen Fenster vollständig geschlossen und ordnungsgemäß gesichert sind.</p>",
+				},
+				"Lock the property": {
+					"title": "Verriegeln Sie die Unterkunft",
+					"body": "<p>Vergewissern Sie sich vor dem Verlassen der Unterkunft, dass der Haupteingang vollständig gesichert und korrekt verriegelt ist.</p>",
+				},
+				"Follow separate key-return instructions": {
+					"title": "Befolgen Sie die separat mitgeteilten Hinweise zur Schlüsselrückgabe",
+					"body": "<p>Verwenden Sie nach Ihrer Abreise die separat übermittelten Hinweise zur Schlüsselrückgabe und beachten Sie dabei alle bestätigten Zeitfenster.</p>",
+				},
+			},
+		}
+		fields = {
+			"title": "Guide des visiteurs du 99A Burlington Road" if language == "fr" else "Gästeleitfaden für 99A Burlington Road",
+			"emergency_contact": "En cas de danger immédiat, contactez les services d'urgence."
+			if language == "fr"
+			else "Wenden Sie sich bei unmittelbarer Gefahr an den Rettungsdienst.",
+		}
+		snapshot = {
+			"display_language": "en",
+			"reviewed_language": "en",
+			"widget_language": language,
+			"fields": fields,
+			"sections": {},
+			"blocks": {},
+		}
+		for section in doc.get_public_render_context().sections:
+			snapshot["sections"][section.anchor] = section_map[language].get(section.section, section.section)
+			for block in section.blocks:
+				override = block_map[language].get(block.title)
+				if override:
+					snapshot["blocks"][block.name] = dict(override)
+				elif expanded and block.safe_body:
+					snapshot["blocks"][block.name] = {
+						"title": block.title,
+						"body": "<p>" + ("Zusätzlicher übersetzter Fließtext. " * 18) + "</p>",
+					}
+		return snapshot
 
 	def set_request_payload(self, payload, method="POST", args=None):
 		body = json.dumps(payload)
@@ -568,6 +722,99 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 		self.assertEqual(frappe.local.response.type, "download")
 		self.assertEqual(frappe.local.response.content_type, "application/pdf")
 
+	def test_widget_translated_pdf_has_no_footer_only_third_page(self):
+		doc = self.make_instruction(wifi_name="Estaex Guest WiFi")
+		pdf_bytes = self.generate_pdf_bytes(doc, translated_snapshot=self.make_widget_snapshot(doc, language="fr"))
+		pages = self.extract_pdf_pages(pdf_bytes)
+		self.assertEqual(len(pages), 2)
+		self.assertIn("Guide des visiteurs du 99A", pages[0])
+		self.assertRegex(pages[0], r"Page\s+1\s+of\s+2")
+		self.assertRegex(pages[1], r"Page\s+2\s+of\s+2")
+		self.assertNotRegex("\n".join(pages), r"Page\s+3\s+of\s+3")
+		self.assertIn(PDF_WIDGET_TRANSLATION_NOTE, "\n".join(pages))
+		self.assertIn("99A Burlington Road", "\n".join(pages))
+		self.assertIn("Estaex Guest WiFi", "\n".join(pages))
+		self.assertNotIn("guest-wifi-only", "\n".join(pages))
+
+	def test_long_translated_pdf_retains_all_content_without_blank_trailing_page(self):
+		doc = self.make_instruction(wifi_name="Estaex Guest WiFi")
+		pdf_bytes = self.generate_pdf_bytes(doc, translated_snapshot=self.make_widget_snapshot(doc, language="de", expanded=True))
+		pages = self.extract_pdf_pages(pdf_bytes)
+		self.assertGreaterEqual(len(pages), 2)
+		self.assertTrue(all(page.strip() for page in pages))
+		self.assertIn("Gästeleitfaden für 99A Burlington Road", "\n".join(pages))
+		self.assertIn("Zusätzlicher übersetzter Fließtext.", "\n".join(pages))
+		self.assertEqual("\n".join(pages).count("Diese"), 0)
+		self.assertIn("99A Burlington Road", "\n".join(pages))
+		self.assertIn("Estaex Guest WiFi", "\n".join(pages))
+		self.assertNotIn("guest-wifi-only", "\n".join(pages))
+
+	def test_cleanup_removes_only_footer_only_trailing_page(self):
+		doc = self.make_instruction()
+		class FakePage:
+			def __init__(self, text):
+				self._text = text
+
+			def extract_text(self):
+				return self._text
+
+		class FakeReader:
+			def __init__(self, pages):
+				self.pages = pages
+
+		class FakeWriter:
+			def __init__(self):
+				self.pages = []
+
+			def add_page(self, page):
+				self.pages.append(page)
+
+		fake_pages = [
+			FakePage("Content page one"),
+			FakePage("Content page two"),
+			FakePage("Estaex Guest Guide\n23-07-2026\nPage 3 of 3"),
+		]
+		with patch(
+			"propms.property_management_solution.doctype.property_instruction.property_instruction.PdfReader",
+			return_value=FakeReader(fake_pages),
+		), patch(
+			"propms.property_management_solution.doctype.property_instruction.property_instruction.PdfWriter",
+			FakeWriter,
+		), patch.object(
+			doc,
+			"get_pdf_bytes_from_writer",
+			side_effect=lambda writer: str(len(writer.pages)).encode(),
+		):
+			cleaned_bytes, removed = doc.cleanup_trailing_footer_only_page(b"pdf")
+		self.assertTrue(removed)
+		self.assertEqual(cleaned_bytes, b"2")
+
+	def test_cleanup_does_not_remove_legitimate_content_page(self):
+		doc = self.make_instruction()
+		class FakePage:
+			def __init__(self, text):
+				self._text = text
+
+			def extract_text(self):
+				return self._text
+
+		class FakeReader:
+			def __init__(self, pages):
+				self.pages = pages
+
+		fake_pages = [
+			FakePage("Content page one"),
+			FakePage("Content page two"),
+			FakePage("Estaex Guest Guide\nParking details\nPage 3 of 3"),
+		]
+		with patch(
+			"propms.property_management_solution.doctype.property_instruction.property_instruction.PdfReader",
+			return_value=FakeReader(fake_pages),
+		):
+			cleaned_bytes, removed = doc.cleanup_trailing_footer_only_page(b"pdf")
+		self.assertFalse(removed)
+		self.assertEqual(cleaned_bytes, b"pdf")
+
 	def test_page_context_contains_pdf_snapshot_token(self):
 		doc = self.make_instruction()
 		context = self.get_context(doc)
@@ -763,6 +1010,7 @@ class TestPropertyInstructionTranslations(PropertyInstructionTestMixin, FrappeTe
 		source_blocks = doc.get_translation_source_payload()["blocks"]
 		self.make_translation(
 			doc,
+			status="Ready",
 			blocks=[
 				{
 					"source_block_name": source_blocks[0]["source_block_name"],

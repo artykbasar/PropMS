@@ -5,6 +5,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import hmac
+import io
 import json
 import mimetypes
 import os
@@ -20,6 +21,7 @@ from frappe.utils import cint, formatdate, now_datetime, nowdate, sanitize_html,
 from frappe.utils.pdf import get_pdf
 from frappe.utils.verified_command import get_secret
 from frappe.website.website_generator import WebsiteGenerator
+from pypdf import PdfReader, PdfWriter
 from markupsafe import Markup
 
 from propms.property_management_solution.doctype.property_instruction import translation_service
@@ -79,6 +81,7 @@ PDF_SNAPSHOT_ALLOWED_BODY_TAGS = {
 	"span",
 }
 PDF_WIDGET_TRANSLATION_NOTE = "Machine translated using the language selected on the guest guide."
+PDF_FOOTER_LINE_PATTERN = re.compile(r"^Page\s+\d+\s+of\s+\d+$")
 
 
 class PropertyInstruction(WebsiteGenerator):
@@ -784,14 +787,10 @@ class PropertyInstruction(WebsiteGenerator):
 	def get_pdf_options(self):
 		return {
 			"page-size": "A4",
-			"margin-top": "11mm",
+			"margin-top": "10mm",
 			"margin-right": "12mm",
-			"margin-bottom": "16mm",
+			"margin-bottom": "12mm",
 			"margin-left": "12mm",
-			"footer-left": "Estaex Guest Guide",
-			"footer-right": "[page]/[toPage]",
-			"footer-font-size": "8",
-			"footer-spacing": "4",
 			"load-error-handling": "ignore",
 			"load-media-error-handling": "ignore",
 		}
@@ -975,6 +974,53 @@ class PropertyInstruction(WebsiteGenerator):
 			]
 		)
 
+	def cleanup_trailing_footer_only_page(self, pdf_bytes):
+		try:
+			reader = PdfReader(io.BytesIO(pdf_bytes))
+		except Exception:
+			return pdf_bytes, False
+		if len(reader.pages) < 2:
+			return pdf_bytes, False
+
+		last_page_text = self.extract_pdf_page_text(reader.pages[-1])
+		if not self.is_footer_only_page_text(last_page_text):
+			return pdf_bytes, False
+
+		writer = PdfWriter()
+		for page in reader.pages[:-1]:
+			writer.add_page(page)
+
+		cleaned = self.get_pdf_bytes_from_writer(writer)
+		frappe.logger("propms").info("Removed footer-only trailing guest guide PDF page")
+		return cleaned, True
+
+	def extract_pdf_page_text(self, page):
+		try:
+			return (page.extract_text() or "").strip()
+		except Exception:
+			return ""
+
+	def is_footer_only_page_text(self, text):
+		lines = [line.strip() for line in (text or "").splitlines() if line.strip()]
+		if not lines:
+			return False
+
+		for line in lines:
+			if line == "Estaex Guest Guide":
+				continue
+			if PDF_FOOTER_LINE_PATTERN.match(line):
+				continue
+			if re.match(r"^\d{2}-\d{2}-\d{4}$", line):
+				continue
+			return False
+
+		return True
+
+	def get_pdf_bytes_from_writer(self, writer):
+		stream = io.BytesIO()
+		writer.write(stream)
+		return stream.getvalue()
+
 
 @frappe.whitelist()
 def generate_translation(property_instruction, language_code, language_name=None):
@@ -1064,6 +1110,7 @@ def download_pdf(slug=None, name=None, lang=None):
 		pdf_html = doc.render_pdf_html(language_code=lang)
 
 	pdf_bytes = get_pdf(pdf_html, options=doc.get_pdf_options())
+	pdf_bytes, _removed_footer_only_page = doc.cleanup_trailing_footer_only_page(pdf_bytes)
 	filename = doc.get_public_pdf_filename()
 	frappe.local.response.filename = filename
 	frappe.local.response.filecontent = pdf_bytes

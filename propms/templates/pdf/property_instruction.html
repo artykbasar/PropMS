@@ -6,13 +6,15 @@
   <style>
     @page {
       size: A4 portrait;
-      margin: 11mm 12mm 12mm;
+      margin: 10mm 12mm 12mm;
     }
 
     html,
     body {
       margin: 0;
       padding: 0;
+      min-height: 0 !important;
+      height: auto !important;
       color: #18212b;
       font-family: "Helvetica Neue", Arial, sans-serif;
       font-size: 10pt;
@@ -24,7 +26,9 @@
     }
 
     .pdf-page {
+      margin: 0;
       min-height: 0;
+      height: auto;
     }
 
     .pdf-header {
@@ -121,11 +125,21 @@
 
     .pdf-sections {
       display: block;
+      margin: 0;
+      padding: 0;
     }
 
     .pdf-section {
       margin: 0 0 6mm;
       break-inside: auto;
+    }
+
+    .pdf-summary:last-child,
+    .pdf-section:last-child,
+    .pdf-block:last-child,
+    .pdf-link:last-child,
+    .pdf-machine-note:last-child {
+      margin-bottom: 0;
     }
 
     .pdf-section-title {
@@ -231,6 +245,32 @@
       margin: 0 0 4mm;
       color: #5a6876;
       font-size: 8.5pt;
+    }
+
+    .pdf-footer {
+      width: 100%;
+      margin: 0;
+      padding: 0;
+      color: #5a6876;
+      font-size: 8pt;
+      line-height: 1.2;
+    }
+
+    .pdf-footer-table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+    }
+
+    .pdf-footer-left,
+    .pdf-footer-right {
+      padding: 0;
+      vertical-align: bottom;
+    }
+
+    .pdf-footer-right {
+      text-align: right;
+      white-space: nowrap;
     }
 
     @media print {
@@ -363,6 +403,16 @@
       {% endfor %}
     </div>
 
+  </div>
+  <div id="footer-html">
+    <div class="pdf-footer">
+      <table class="pdf-footer-table">
+        <tr>
+          <td class="pdf-footer-left">Estaex Guest Guide {{ generated_on_display }}</td>
+          <td class="pdf-footer-right">Page <span class="page"></span> of <span class="topage"></span></td>
+        </tr>
+      </table>
+    </div>
   </div>
 </body>
 </html>
