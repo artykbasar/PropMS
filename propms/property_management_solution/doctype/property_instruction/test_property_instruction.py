@@ -523,7 +523,8 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 		self.assertIn("property-instruction-print", html)
 		self.assertIn("Download PDF", html)
 		self.assertNotIn('href="javascript:', html)
-		self.assertNotIn("guest-wifi-only", html)
+		self.assertIn("guest-wifi-only", html)
+		self.assertIn("Wi-Fi Password", html)
 		self.assertNotIn("15:00:00", html)
 		self.assertIn("@page {", html)
 		self.assertIn("pi-screen-layout", html)
@@ -651,8 +652,8 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 		self.assertIn('"includedLanguages": "es,fr,pt-br"', html)
 		self.assertNotIn("alert(1)", html)
 
-	def test_wifi_password_rendered_only_with_public_opt_in(self):
-		doc = self.make_instruction(show_wifi_password_publicly=1)
+	def test_wifi_password_renders_when_populated(self):
+		doc = self.make_instruction(wifi_password="guest-wifi-only")
 		html = self.render_instruction(doc)
 		self.assertIn("guest-wifi-only", html)
 		self.assertIn('id="wifi-password-public"', html)
@@ -689,12 +690,21 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 		self.assertIn('statusElement.textContent = "Copied"', html)
 		self.assertIn('statusElement.textContent = "Unable to copy"', html)
 
-	def test_password_remains_hidden_without_public_opt_in(self):
-		doc = self.make_instruction(show_wifi_password_publicly=0)
+	def test_password_is_omitted_when_empty(self):
+		doc = self.make_instruction(wifi_password=None)
 		html = self.render_instruction(doc)
 		self.assertNotIn("guest-wifi-only", html)
 		self.assertNotIn("Copy password", html)
 		self.assertNotIn("wifi-password-public", html)
+		self.assertNotIn("Wi-Fi Password", html)
+
+	def test_password_special_characters_render_exactly(self):
+		doc = self.make_instruction(wifi_password="Gu3st! Pass: #%&[]")
+		html = self.render_instruction(doc)
+		self.assertIn("Gu3st! Pass:", html)
+		self.assertIn("%", html)
+		self.assertIn("[]", html)
+		self.assertIn('id="wifi-password-public"', html)
 
 	def test_copy_script_is_included_once(self):
 		doc = self.make_instruction()
@@ -777,11 +787,19 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 		self.assertEqual(html.count("Open property in Google Maps"), 1)
 		self.assertEqual(html.count("99A Burlington Road"), 2)
 
-	def test_pdf_template_includes_public_password_only_when_enabled(self):
-		doc = self.make_instruction(show_wifi_password_publicly=1)
+	def test_pdf_template_includes_password_when_populated(self):
+		doc = self.make_instruction(wifi_password="guest-wifi-only")
 		html = self.render_pdf(doc)
 		self.assertIn("guest-wifi-only", html)
 		self.assertIn("Wi-Fi Password", html)
+		self.assertNotIn("shared separately", html)
+		self.assertNotIn("not shown on this public page", html)
+
+	def test_pdf_template_omits_password_when_empty(self):
+		doc = self.make_instruction(wifi_password=None)
+		html = self.render_pdf(doc)
+		self.assertNotIn("Wi-Fi Password", html)
+		self.assertNotIn("guest-wifi-only", html)
 
 	def test_pdf_endpoint_returns_download_response(self):
 		doc = self.make_instruction()
@@ -809,7 +827,7 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 		self.assertIn(PDF_WIDGET_TRANSLATION_NOTE, "\n".join(pages))
 		self.assertIn("99A Burlington Road", "\n".join(pages))
 		self.assertIn("Estaex Guest WiFi", "\n".join(pages))
-		self.assertNotIn("guest-wifi-only", "\n".join(pages))
+		self.assertIn("guest-wifi-only", "\n".join(pages))
 		self.assertNotIn("www.google.com/maps/place/", "\n".join(pages))
 
 	def test_long_translated_pdf_retains_all_content_without_blank_trailing_page(self):
@@ -823,7 +841,7 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 		self.assertEqual("\n".join(pages).count("Diese"), 0)
 		self.assertIn("99A Burlington Road", "\n".join(pages))
 		self.assertIn("Estaex Guest WiFi", "\n".join(pages))
-		self.assertNotIn("guest-wifi-only", "\n".join(pages))
+		self.assertIn("guest-wifi-only", "\n".join(pages))
 
 	def test_cleanup_removes_only_footer_only_trailing_page(self):
 		doc = self.make_instruction()
@@ -977,10 +995,11 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 		self.assertNotIn("alert(1)", html)
 		self.assertIn("99A Burlington Road", html)
 		self.assertIn("TestWifi", html)
+		self.assertIn("guest-wifi-only", html)
 		self.assertIn("Machine translated using the language selected on the guest guide.", html)
 
-	def test_translated_snapshot_cannot_expose_password_or_reorder_blocks(self):
-		doc = self.make_instruction(show_wifi_password_publicly=0)
+	def test_translated_snapshot_preserves_password_and_block_order(self):
+		doc = self.make_instruction(wifi_password="guest-wifi-only")
 		source_blocks = doc.get_translation_source_payload()["blocks"]
 		payload = {
 			"slug": doc.slug,
@@ -996,7 +1015,7 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 		}
 		snapshot = doc.parse_translated_pdf_snapshot(payload)
 		html = doc.render_pdf_html(translated_snapshot=snapshot)
-		self.assertNotIn("guest-wifi-only", html)
+		self.assertIn("guest-wifi-only", html)
 		self.assertLess(html.find("Ankunft"), html.find("Parken"))
 		self.assertNotIn("UNKNOWN-BLOCK", html)
 
@@ -1362,7 +1381,7 @@ class TestPropertyInstructionTranslations(PropertyInstructionTestMixin, FrappeTe
 		self.assertNotIn("Follow separately supplied arrival instructions", pdf_text)
 		self.assertIn("99A Burlington Road", pdf_text)
 		self.assertIn("Estaex Guest WiFi", pdf_text)
-		self.assertNotIn("guest-wifi-only", pdf_text)
+		self.assertIn("guest-wifi-only", pdf_text)
 
 	def test_reviewed_translation_keeps_original_address_and_wifi_name(self):
 		doc = self.make_instruction()

@@ -549,8 +549,6 @@ class PropertyInstruction(WebsiteGenerator):
 		return options
 
 	def get_public_wifi_password(self):
-		if not cint(self.show_wifi_password_publicly or 0):
-			return None
 		if not self.wifi_password:
 			return None
 		return self.get_password("wifi_password")
