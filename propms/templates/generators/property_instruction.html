@@ -124,15 +124,57 @@
     overflow-wrap: anywhere;
     user-select: text;
   }
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
   .pi-copy-button {
+    position: relative;
     flex: 0 0 auto;
+    width: 2.5rem;
+    height: 2.5rem;
+    min-width: 2.5rem;
+    min-height: 2.5rem;
     border: 1px solid var(--pi-border);
     background: #fff;
     color: var(--pi-accent);
     border-radius: 999px;
-    padding: .55rem .9rem;
-    font-weight: 700;
-    line-height: 1;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: border-color .2s ease, color .2s ease, background-color .2s ease;
+  }
+  .pi-copy-button svg {
+    width: 1.15rem;
+    height: 1.15rem;
+    stroke: currentColor;
+    stroke-width: 2;
+    fill: none;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    pointer-events: none;
+  }
+  .pi-copy-button .pi-copy-icon-check {
+    display: none;
+  }
+  .pi-copy-button.is-copied {
+    color: #0f766e;
+    border-color: #99f6e4;
+    background: #f0fdfa;
+  }
+  .pi-copy-button.is-copied .pi-copy-icon-copy {
+    display: none;
+  }
+  .pi-copy-button.is-copied .pi-copy-icon-check {
+    display: block;
   }
   .pi-copy-button:focus-visible,
   .pi-btn:focus-visible,
@@ -353,8 +395,7 @@
       align-items: stretch;
     }
     .pi-copy-button {
-      width: 100%;
-      justify-content: center;
+      width: 2.5rem;
     }
     .pi-actions .pi-btn {
       width: 100%;
@@ -582,10 +623,19 @@
       type="button"
       class="pi-copy-button"
       data-copy-target="{{ target_id }}"
-      data-default-label="{{ button_label | e }}"
-      aria-label="{{ aria_label }}">
-      {{ button_label }}
+      data-default-label="{{ aria_label | e }}"
+      aria-label="{{ aria_label }}"
+      title="{{ aria_label }}">
+      <svg class="pi-copy-icon pi-copy-icon-copy" aria-hidden="true" focusable="false" viewBox="0 0 24 24">
+        <rect x="9" y="9" width="13" height="13" rx="2"></rect>
+        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+      </svg>
+      <svg class="pi-copy-icon pi-copy-icon-check" aria-hidden="true" focusable="false" viewBox="0 0 24 24">
+        <path d="M20 6 9 17l-5-5"></path>
+      </svg>
+      <span class="sr-only">{{ aria_label }}</span>
     </button>
+    <span class="pi-copy-status sr-only" aria-live="polite"></span>
   </div>
 {% endmacro %}
 
@@ -903,6 +953,9 @@
       if (copyButton) {
         const copyTarget = copyButton.getAttribute("data-copy-target");
         const defaultLabel = copyButton.getAttribute("data-default-label") || "Copy";
+        const statusElement = copyButton.parentElement
+          ? copyButton.parentElement.querySelector(".pi-copy-status")
+          : null;
         const targetElement = copyTarget ? document.getElementById(copyTarget) : null;
         const value = targetElement ? targetElement.textContent.trim() : "";
         if (!value) {
@@ -910,12 +963,24 @@
         }
         try {
           await copyValue(value);
-          copyButton.textContent = "Copied";
+          copyButton.classList.add("is-copied");
+          copyButton.setAttribute("aria-label", "Copied");
+          copyButton.setAttribute("title", "Copied");
+          if (statusElement) {
+            statusElement.textContent = "Copied";
+          }
         } catch (error) {
-          copyButton.textContent = "Failed";
+          if (statusElement) {
+            statusElement.textContent = "Unable to copy";
+          }
         }
         window.setTimeout(function () {
-          copyButton.textContent = defaultLabel;
+          copyButton.classList.remove("is-copied");
+          copyButton.setAttribute("aria-label", defaultLabel);
+          copyButton.setAttribute("title", defaultLabel);
+          if (statusElement) {
+            statusElement.textContent = "";
+          }
         }, 2000);
         return;
       }

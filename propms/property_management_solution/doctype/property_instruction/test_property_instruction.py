@@ -351,8 +351,6 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 		self.assertIn("allowfullscreen", html)
 		self.assertIn("property-instruction-print", html)
 		self.assertIn("Download PDF", html)
-		self.assertIn("Copy address", html)
-		self.assertIn("Copy network", html)
 		self.assertNotIn('href="javascript:', html)
 		self.assertNotIn("guest-wifi-only", html)
 		self.assertNotIn("15:00:00", html)
@@ -369,6 +367,11 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 		self.assertIn('data-copy-target="wifi-network-name"', html)
 		self.assertIn('id="property-address"', html)
 		self.assertIn('id="wifi-network-name"', html)
+		self.assertIn('class="pi-copy-icon pi-copy-icon-copy"', html)
+		self.assertIn('class="pi-copy-icon pi-copy-icon-check"', html)
+		self.assertIn('class="pi-copy-status sr-only"', html)
+		self.assertNotIn(">Copy address<", html)
+		self.assertNotIn(">Copy network<", html)
 
 	def test_print_layout_has_dedicated_wrappers(self):
 		doc = self.make_instruction()
@@ -467,11 +470,11 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 		doc = self.make_instruction(show_wifi_password_publicly=1)
 		html = self.render_instruction(doc)
 		self.assertIn("guest-wifi-only", html)
-		self.assertIn("Copy password", html)
 		self.assertIn('id="wifi-password-public"', html)
 		self.assertIn('data-copy-target="wifi-password-public"', html)
 		self.assertIn('class="pi-copy-value notranslate"', html)
 		self.assertIn('translate="no">guest-wifi-only</span>', html)
+		self.assertNotIn(">Copy password<", html)
 
 	def test_protected_identifier_values_are_marked_notranslate(self):
 		doc = self.make_instruction(emergency_contact="+44 20 7946 0958")
@@ -493,6 +496,13 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 		self.assertNotIn("data-copy-value=", html)
 		self.assertIn('document.getElementById(copyTarget)', html)
 		self.assertIn("targetElement.textContent.trim()", html)
+		self.assertIn('aria-label="Copy property address"', html)
+		self.assertIn('title="Copy property address"', html)
+		self.assertIn('aria-label="Copy Wi-Fi network name"', html)
+		self.assertIn('title="Copy Wi-Fi network name"', html)
+		self.assertIn('copyButton.classList.add("is-copied")', html)
+		self.assertIn('statusElement.textContent = "Copied"', html)
+		self.assertIn('statusElement.textContent = "Unable to copy"', html)
 
 	def test_password_remains_hidden_without_public_opt_in(self):
 		doc = self.make_instruction(show_wifi_password_publicly=0)
@@ -505,6 +515,8 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 		doc = self.make_instruction()
 		html = self.render_instruction(doc)
 		self.assertEqual(html.count("document.addEventListener(\"click\""), 1)
+		self.assertIn('copyButton.setAttribute("aria-label", "Copied")', html)
+		self.assertIn('copyButton.setAttribute("title", "Copied")', html)
 
 	def test_pdf_template_contains_text_without_screen_controls(self):
 		doc = self.make_instruction()
