@@ -1,4 +1,4 @@
-{% extends "templates/web.html" %}
+{% extends "propms/templates/guest_guide_base.html" %}
 {% set google_translate = google_translate if google_translate is defined and google_translate else {"enabled": 0} %}
 {% set property_map = property_map if property_map is defined and property_map else {"embed_url": map_embed_url if map_embed_url is defined else None, "external_url": google_maps_url if google_maps_url is defined else None} %}
 {% set screen_map_query = ("place_id:" ~ google_maps_place_id) if google_maps_place_id else (map_search_query or address) %}
@@ -300,8 +300,11 @@
     width: 100%;
     border-radius: 14px;
     margin-top: .8rem;
-    max-height: 360px;
-    object-fit: cover;
+    height: auto;
+    max-height: min(70vh, 420px);
+    object-fit: contain;
+    background: #f8fafb;
+    display: block;
   }
   .pi-caption {
     margin-top: .45rem;
@@ -934,14 +937,31 @@
 </div>
 {% if google_translate and google_translate.enabled %}
 <script>
-  window.googleTranslateElementInit = window.googleTranslateElementInit || function () {
-    if (!window.google || !google.translate || !google.translate.TranslateElement) {
-      return;
+  (function () {
+    var callbackName = {{ google_translate.callback_name | tojson }};
+    var containerId = {{ google_translate.container_id | tojson }};
+    var initializedFlag = "__" + callbackName + "_initialized";
+
+    window[callbackName] = function () {
+      if (window[initializedFlag]) {
+        return;
+      }
+      if (!window.google || !google.translate || !google.translate.TranslateElement) {
+        return;
+      }
+      if (!document.getElementById(containerId)) {
+        return;
+      }
+      window[initializedFlag] = true;
+      new google.translate.TranslateElement({{ google_translate.config_json | safe }}, containerId);
+    };
+
+    if (window.google && google.translate && google.translate.TranslateElement) {
+      window[callbackName]();
     }
-    new google.translate.TranslateElement({{ google_translate.config_json | safe }}, "{{ google_translate.container_id }}");
-  };
+  })();
 </script>
-<script src="{{ google_translate.script_url }}"></script>
+<script id="{{ google_translate.script_id }}" async src="{{ google_translate.script_url }}"></script>
 {% endif %}
 <script>
   (function () {

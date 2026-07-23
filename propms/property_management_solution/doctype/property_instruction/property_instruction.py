@@ -46,8 +46,9 @@ MIN_MAP_ZOOM = 0
 MAX_MAP_ZOOM = 21
 TRANSLATION_READY = "Ready"
 TRANSLATION_STALE = "Stale"
-GOOGLE_TRANSLATE_SCRIPT_URL = "https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"
+GOOGLE_TRANSLATE_SCRIPT_BASE_URL = "https://translate.google.com/translate_a/element.js"
 TRUSTED_GOOGLE_MAP_HOSTS = {"www.google.com", "google.com", "maps.google.com"}
+TRUSTED_GOOGLE_STATIC_MAP_HOSTS = {"maps.googleapis.com"}
 LANGUAGE_CODE_PATTERN = re.compile(r"^[a-z]{2,3}(?:-[a-z]{2,8})*$")
 PHONE_PATTERN = re.compile(r"(?:\+?\d[\d\s().-]{6,}\d)")
 EMAIL_PATTERN = re.compile(r"\b[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}\b")
@@ -84,6 +85,9 @@ PDF_SNAPSHOT_ALLOWED_BODY_TAGS = {
 PDF_WIDGET_TRANSLATION_NOTE = "Machine translated using the language selected on the guest guide."
 PDF_FOOTER_LINE_PATTERN = re.compile(r"^Page\s+\d+\s+of\s+\d+$")
 NOINDEX_ROBOTS_CONTENT = "noindex, nofollow, noarchive, nosnippet, noimageindex"
+GUEST_GUIDE_EXCLUDED_WEB_ASSET_PREFIXES = (
+	"/assets/propms/day/assets/",
+)
 
 
 class PropertyInstruction(WebsiteGenerator):
@@ -196,6 +200,9 @@ class PropertyInstruction(WebsiteGenerator):
 		context.no_cache = 1
 		context.no_breadcrumbs = 1
 		context.sitemap = 0
+		context.body_class = "guest-guide-page"
+		context.web_include_css = self.get_guest_guide_web_assets(getattr(context, "web_include_css", None), "css")
+		context.web_include_js = self.get_guest_guide_web_assets(getattr(context, "web_include_js", None), "js")
 		context.update(page_context)
 		context.metatags = frappe._dict(context.get("metatags") or {})
 		context.metatags["robots"] = NOINDEX_ROBOTS_CONTENT
@@ -351,6 +358,14 @@ class PropertyInstruction(WebsiteGenerator):
 			uses_api_key=bool(embed_url and "embed/v1/place" in embed_url),
 		)
 
+	def get_guest_guide_web_assets(self, existing_assets=None, asset_type="css"):
+		assets = list(existing_assets or frappe.get_hooks(f"web_include_{asset_type}") or [])
+		return [
+			asset
+			for asset in assets
+			if asset and not asset.startswith(GUEST_GUIDE_EXCLUDED_WEB_ASSET_PREFIXES)
+		]
+
 	def get_map_external_url(self):
 		if self.google_maps_url:
 			return self.google_maps_url
@@ -399,13 +414,16 @@ class PropertyInstruction(WebsiteGenerator):
 		language_codes = self.parse_google_translate_languages(
 			self.get_property_management_setting("guest_guide_translate_languages")
 		)
+		callback_name = f"propmsGuestGuideTranslateInit_{self.scrub(self.name or self.slug or 'guide')}"
 		config = {"pageLanguage": source_language}
 		if language_codes:
 			config["includedLanguages"] = ",".join(language_codes)
 		return frappe._dict(
 			enabled=bool(enabled),
 			container_id="google_translate_element" if enabled else None,
-			script_url=GOOGLE_TRANSLATE_SCRIPT_URL if enabled else None,
+			script_id=f"{callback_name}_script" if enabled else None,
+			callback_name=callback_name if enabled else None,
+			script_url=f"{GOOGLE_TRANSLATE_SCRIPT_BASE_URL}?cb={callback_name}" if enabled else None,
 			source_language=source_language,
 			included_languages=language_codes,
 			included_languages_csv=",".join(language_codes) if language_codes else "",
@@ -737,6 +755,7 @@ class PropertyInstruction(WebsiteGenerator):
 		context.machine_translation_note = None
 		context.pdf_display_language = language_code or "en"
 		context.pdf_cover_image = self.get_pdf_asset_url(self.cover_image)
+		context.pdf_map = self.get_pdf_map_context()
 		context.pdf_machine_translated = False
 		context.pdf_sections = self.get_pdf_sections(context.sections)
 		context.generated_on_display = self.get_local_generated_date_display()
@@ -812,19 +831,65 @@ class PropertyInstruction(WebsiteGenerator):
 			for block in section.blocks or []:
 				pdf_block = frappe._dict(block)
 				pdf_block.pdf_image = self.get_pdf_asset_url(block.image)
+				pdf_block.pdf_link_display_url = self.get_display_url(block.link_url)
 				pdf_blocks.append(pdf_block)
 			pdf_sections.append(frappe._dict(section=section.section, anchor=section.anchor, blocks=pdf_blocks))
 		return pdf_sections
+
+	def get_pdf_map_context(self):
+		external_url = self.get_map_external_url()
+		if not external_url:
+			return frappe._dict(
+				external_url=None,
+				display_url=None,
+				image_url=None,
+				has_static_image=False,
+				link_label=_("Open property in Google Maps"),
+			)
+		image_url = self.get_static_map_image_url()
+		return frappe._dict(
+			external_url=external_url,
+			display_url=self.get_display_url(external_url),
+			image_url=image_url,
+			has_static_image=bool(image_url),
+			link_label=_("Open property in Google Maps"),
+		)
+
+	def get_static_map_image_url(self):
+		query = self.get_map_display_query()
+		if not query:
+			return None
+		api_key = self.get_map_embed_api_key()
+		if not api_key:
+			return None
+		params = {
+			"center": query,
+			"zoom": self.normalize_map_zoom(self.map_zoom),
+			"size": "1200x720",
+			"scale": 2,
+			"maptype": self.map_type if self.map_type in MAP_TYPES else "roadmap",
+			"markers": query,
+			"key": api_key,
+		}
+		return f"https://maps.googleapis.com/maps/api/staticmap?{urlencode(params)}"
 
 	def get_pdf_asset_url(self, asset_url):
 		if not asset_url:
 			return None
 		if asset_url.startswith(("http://", "https://", "data:")):
 			return asset_url
-		if asset_url.startswith(("/files/", "/private/files/")):
+		if asset_url.startswith("/files/"):
 			inline_asset = self.get_inline_asset_data_uri(asset_url)
 			if inline_asset:
 				return inline_asset
+			return frappe.utils.get_url(asset_url)
+		if asset_url.startswith("/private/files/"):
+			inline_asset = self.get_inline_asset_data_uri(asset_url)
+			if inline_asset:
+				return inline_asset
+			return None
+		if asset_url.startswith("/assets/"):
+			return frappe.utils.get_url(asset_url)
 		return asset_url
 
 	def get_inline_asset_data_uri(self, asset_url):
@@ -980,6 +1045,22 @@ class PropertyInstruction(WebsiteGenerator):
 				row.link_url,
 			]
 		)
+
+	def get_display_url(self, url):
+		if not url:
+			return None
+		parsed = urlparse(url.strip())
+		if not parsed.scheme or not parsed.netloc:
+			return url
+		display_path = parsed.path.rstrip("/")
+		if display_path and len(display_path) > 32:
+			display_path = f"{display_path[:29]}..."
+		display = parsed.netloc
+		if display_path:
+			display += display_path
+		if parsed.query:
+			display += "?"
+		return display
 
 	def cleanup_trailing_footer_only_page(self, pdf_bytes):
 		try:

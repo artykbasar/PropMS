@@ -512,6 +512,8 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 		self.set_conf("google_maps_embed_api_key", "test-key")
 		doc = self.make_instruction()
 		html = self.render_instruction(doc)
+		self.assertNotIn("page-header-wrapper", html)
+		self.assertNotIn("/assets/propms/day/assets/", html)
 		self.assertIn("Check-In", html)
 		self.assertIn("Parking", html)
 		self.assertIn("Open map", html)
@@ -625,6 +627,7 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 		self.assertEqual(html.count("translate.google.com/translate_a/element.js"), 1)
 		self.assertIn("id=\"google_translate_element\"", html)
 		self.assertIn('"includedLanguages": "es,fr,de"', html)
+		self.assertIn("propmsGuestGuideTranslateInit_", html)
 		self.assertNotIn("Language selector", html)
 		self.assertNotIn('class="pi-language-option', html)
 
@@ -710,6 +713,64 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 		self.assertNotIn("translate.google.com/translate_a/element.js", html)
 		self.assertNotIn("pi-copy-button", html)
 		self.assertNotIn("property-instruction-print", html)
+		self.assertIn("Open property in Google Maps", html)
+		self.assertIn('class="pdf-link-anchor"', html)
+
+	def test_pdf_public_images_are_inlined(self):
+		doc = self.make_instruction(
+			cover_image="/files/test-cover.jpg",
+			instruction_blocks=[
+				{
+					"section": "Finding the Property",
+					"block_type": "Image",
+					"title": "Entrance",
+					"image": "/files/test-guide-image.jpg",
+					"caption": "Guide image",
+				}
+			],
+		)
+		with patch.object(
+			doc,
+			"get_inline_asset_data_uri",
+			side_effect=["data:image/jpeg;base64,cover123", "data:image/jpeg;base64,guide123"],
+		):
+			html = doc.render_pdf_html()
+		self.assertIn('src="data:image/jpeg;base64,cover123"', html)
+		self.assertIn('src="data:image/jpeg;base64,guide123"', html)
+		self.assertNotIn('src="/files/test-cover.jpg"', html)
+		self.assertNotIn('src="/files/test-guide-image.jpg"', html)
+
+	def test_pdf_private_images_are_inlined(self):
+		doc = self.make_instruction(
+			instruction_blocks=[
+				{
+					"section": "Finding the Property",
+					"block_type": "Image",
+					"title": "Entrance",
+					"image": "/private/files/test-guide-image.jpg",
+					"caption": "Guide image",
+				}
+			],
+		)
+		with patch.object(doc, "get_inline_asset_data_uri", return_value="data:image/jpeg;base64,abc123"):
+			html = doc.render_pdf_html()
+		self.assertIn('src="data:image/jpeg;base64,abc123"', html)
+
+	def test_pdf_map_uses_static_image_when_google_key_available(self):
+		self.set_conf("google_maps_embed_api_key", "test-key")
+		doc = self.make_instruction(address="99A Burlington Road")
+		context = doc.get_pdf_render_context()
+		self.assertTrue(context.pdf_map.image_url)
+		self.assertIn("maps.googleapis.com/maps/api/staticmap", context.pdf_map.image_url)
+		self.assertIn("key=test-key", context.pdf_map.image_url)
+
+	def test_pdf_map_fallback_renders_without_google_key(self):
+		self.set_conf("google_maps_embed_api_key", None)
+		doc = self.make_instruction(address="99A Burlington Road")
+		html = self.render_pdf(doc)
+		self.assertIn("Map preview unavailable in this PDF", html)
+		self.assertIn("Open property in Google Maps", html)
+		self.assertIn("www.google.com/maps/place/99A+Burlington+Road", html)
 
 	def test_pdf_template_includes_public_password_only_when_enabled(self):
 		doc = self.make_instruction(show_wifi_password_publicly=1)
