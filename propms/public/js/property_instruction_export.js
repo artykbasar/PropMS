@@ -155,9 +155,20 @@
     var fieldContainer = valueElement.closest(".pi-meta-item, .pi-copy-row, .pi-address-row") || valueElement.parentElement;
     var labelElement = fieldContainer ? fieldContainer.querySelector(".pi-label") : null;
     return {
+      labelNodeId: getSemanticNodeId(labelElement),
+      valueNodeId: getSemanticNodeId(valueElement),
       label: getVisibleText(labelElement),
       value: getVisibleText(valueElement)
     };
+  }
+
+  function markExportNodeNotranslate(node) {
+    if (!node) {
+      return node;
+    }
+    node.classList.add("notranslate");
+    node.setAttribute("translate", "no");
+    return node;
   }
 
   function normalizeHref(rawHref) {
@@ -428,6 +439,22 @@
       redactedMap[nodeId] = redactSensitiveValue(nodeId, nodeMap[nodeId] || "");
     });
     return redactedMap;
+  }
+
+  function summarizeNodeMapDiff(actualMap, expectedMap) {
+    var mismatches = [];
+    Object.keys(expectedMap || {}).forEach(function (nodeId) {
+      var actualValue = normalizeText((actualMap && actualMap[nodeId]) || "");
+      var expectedValue = normalizeText(expectedMap[nodeId] || "");
+      if (actualValue !== expectedValue) {
+        mismatches.push({
+          nodeId: nodeId,
+          expectedLength: expectedValue.length,
+          actualLength: actualValue.length
+        });
+      }
+    });
+    return mismatches;
   }
 
   function getSnapshotProgressFingerprint(snapshot, snapshotAnalysis) {
@@ -1298,29 +1325,31 @@
     var label = documentNode.createElement("span");
     label.className = "pi-export-label";
     label.textContent = fieldData.label || "";
+    if (fieldData.labelNodeId) {
+      label.setAttribute("data-export-source-id", fieldData.labelNodeId);
+    }
     var value = documentNode.createElement("span");
     value.className = "pi-export-value";
     value.textContent = fieldData.value;
+    if (fieldData.valueNodeId) {
+      value.setAttribute("data-export-source-id", fieldData.valueNodeId);
+    }
     item.appendChild(label);
     item.appendChild(value);
     parentNode.appendChild(item);
   }
 
   function createExportRoot() {
-    var guideRoot = getGuideRoot();
     var exportRoot = document.createElement("div");
     exportRoot.className = "pi-pdf-export-root";
     exportRoot.setAttribute("data-property-instruction-export", "root");
     exportRoot.setAttribute("lang", "en");
     exportRoot.setAttribute("dir", "ltr");
     exportRoot.setAttribute("aria-hidden", "true");
+    markExportNodeNotranslate(exportRoot);
     exportRoot.style.position = "absolute";
     exportRoot.style.left = "0";
-    exportRoot.style.top = (
-      guideRoot
-        ? (guideRoot.getBoundingClientRect().bottom + window.scrollY + 48)
-        : Math.max(document.body.scrollHeight, document.documentElement.scrollHeight, window.innerHeight) + 48
-    ) + "px";
+    exportRoot.style.top = "0";
     exportRoot.style.width = PDF_EXPORT_WIDTH + "px";
     exportRoot.style.background = "#ffffff";
     exportRoot.style.pointerEvents = "none";
@@ -1328,6 +1357,19 @@
     exportRoot.style.visibility = "visible";
     exportRoot.style.opacity = "1";
     exportRoot.style.zIndex = "0";
+    return exportRoot;
+  }
+
+  function mountExportRoot(exportRoot) {
+    if (!exportRoot || exportRoot.parentNode) {
+      return exportRoot;
+    }
+    var guideRoot = getGuideRoot();
+    exportRoot.style.top = (
+      guideRoot
+        ? (guideRoot.getBoundingClientRect().bottom + window.scrollY + 48)
+        : Math.max(document.body.scrollHeight, document.documentElement.scrollHeight, window.innerHeight) + 48
+    ) + "px";
     document.body.appendChild(exportRoot);
     return exportRoot;
   }
@@ -1346,18 +1388,29 @@
     var pendingImages = [];
     var exportWrapper = document.createElement("div");
     exportWrapper.className = "pi-pdf-export";
+    markExportNodeNotranslate(exportWrapper);
 
     var exportDocument = document.createElement("article");
     exportDocument.className = "pi-export-document";
     exportDocument.setAttribute("lang", model.languageCode || "en");
     exportDocument.setAttribute("dir", model.direction || "ltr");
+    markExportNodeNotranslate(exportDocument);
 
     var header = document.createElement("header");
     header.className = "pi-export-header";
 
+    if (model.kicker) {
+      var kicker = document.createElement("p");
+      kicker.className = "pi-export-kicker";
+      kicker.textContent = model.kicker;
+      kicker.setAttribute("data-export-source-id", "guide:kicker");
+      header.appendChild(kicker);
+    }
+
     var title = document.createElement("h1");
     title.className = "pi-export-title";
     title.textContent = model.title;
+    title.setAttribute("data-export-source-id", "field:title");
     header.appendChild(title);
 
     if (model.address && model.address.value) {
@@ -1407,6 +1460,7 @@
         var mapTitle = document.createElement("h2");
         mapTitle.className = "pi-export-map-title";
         mapTitle.textContent = model.map.title;
+        mapTitle.setAttribute("data-export-source-id", "map:title");
         mapSection.appendChild(mapTitle);
       }
 
@@ -1416,6 +1470,7 @@
         mapLink.target = "_blank";
         mapLink.rel = "noopener noreferrer nofollow";
         mapLink.textContent = model.map.linkLabel || model.map.linkHref;
+        mapLink.setAttribute("data-export-source-id", "map:link_label");
         mapSection.appendChild(mapLink);
       }
 
@@ -1444,6 +1499,7 @@
       var sectionTitle = document.createElement("h2");
       sectionTitle.className = "pi-export-section-title";
       sectionTitle.textContent = sectionModel.title;
+      sectionTitle.setAttribute("data-export-source-id", "section:" + sectionModel.anchor + ":title");
       section.appendChild(sectionTitle);
 
       sectionModel.blocks.forEach(function (blockModel) {
@@ -1472,6 +1528,7 @@
             var cardTitle = document.createElement("h3");
             cardTitle.className = "pi-export-card-title";
             cardTitle.textContent = blockModel.title;
+            cardTitle.setAttribute("data-export-source-id", "block:" + blockModel.id + ":title");
             cardHead.appendChild(cardTitle);
           }
 
@@ -1481,6 +1538,7 @@
         if (blockModel.body) {
           var body = document.createElement("div");
           body.className = "pi-export-card-body";
+          body.setAttribute("data-export-source-id", "block:" + blockModel.id + ":body");
           appendStructuredContent(document, body, blockModel.bodyContent || []);
           card.appendChild(body);
         }
@@ -1504,6 +1562,7 @@
           var caption = document.createElement("p");
           caption.className = "pi-export-card-caption";
           caption.textContent = blockModel.caption;
+          caption.setAttribute("data-export-source-id", "block:" + blockModel.id + ":caption");
           card.appendChild(caption);
         }
 
@@ -1515,6 +1574,7 @@
           link.target = "_blank";
           link.rel = "noopener noreferrer nofollow";
           link.textContent = blockModel.linkLabel || blockModel.linkHref;
+          link.setAttribute("data-export-source-id", "block:" + blockModel.id + ":link_label");
           linkWrap.appendChild(link);
           card.appendChild(linkWrap);
         }
@@ -1529,6 +1589,7 @@
       var empty = document.createElement("p");
       empty.className = "pi-export-empty";
       empty.textContent = model.emptyMessage || "";
+      empty.setAttribute("data-export-source-id", "guide:empty");
       exportDocument.appendChild(empty);
     }
 
@@ -1549,6 +1610,7 @@
     content.setAttribute("data-property-instruction-export", "document");
     content.setAttribute("lang", sourceDocument.getAttribute("lang") || "en");
     content.setAttribute("dir", sourceDocument.getAttribute("dir") || "ltr");
+    markExportNodeNotranslate(content);
     return content;
   }
 
@@ -1559,6 +1621,7 @@
     page.setAttribute("data-property-instruction-export", "page");
     page.setAttribute("lang", sourceDocument.getAttribute("lang") || "en");
     page.setAttribute("dir", sourceDocument.getAttribute("dir") || "ltr");
+    markExportNodeNotranslate(page);
     page.style.width = PDF_EXPORT_WIDTH + "px";
     page.style.height = PDF_EXPORT_PAGE_HEIGHT + "px";
     page.style.padding =
@@ -1570,6 +1633,7 @@
     var viewport = documentNode.createElement("div");
     viewport.className = "pi-export-page-body";
     viewport.style.height = PDF_EXPORT_PAGE_BODY_HEIGHT + "px";
+    markExportNodeNotranslate(viewport);
 
     var body = createExportDocumentShell(documentNode, sourceDocument);
     viewport.appendChild(body);
@@ -1578,6 +1642,7 @@
     var footer = documentNode.createElement("footer");
     footer.className = "pi-export-footer";
     footer.setAttribute("dir", sourceDocument.getAttribute("dir") || "ltr");
+    markExportNodeNotranslate(footer);
     footer.style.minHeight = PDF_EXPORT_FOOTER_HEIGHT + "px";
     footer.style.bottom = PDF_EXPORT_PAGE_PADDING_BOTTOM + "px";
     footer.style.left = PDF_EXPORT_PAGE_PADDING_LEFT + "px";
@@ -1693,10 +1758,12 @@
       var left = document.createElement("span");
       left.className = "pi-export-footer-left";
       left.textContent = guideTitle + " " + footerDate;
+      markExportNodeNotranslate(left);
 
       var right = document.createElement("span");
       right.className = "pi-export-footer-right";
       right.textContent = (index + 1) + " / " + pageNodes.length;
+      markExportNodeNotranslate(right);
 
       footer.appendChild(left);
       footer.appendChild(right);
@@ -1768,6 +1835,137 @@
       modelParityMap: modelParityMap,
       mismatches: mismatches
     };
+  }
+
+  function captureExportDomTextMap(exportRoot) {
+    var textMap = {};
+    var duplicateNodeIds = [];
+    Array.prototype.slice.call((exportRoot || document).querySelectorAll("[data-export-source-id]")).forEach(function (element) {
+      var nodeId = String(element.getAttribute("data-export-source-id") || "").trim();
+      if (!nodeId) {
+        return;
+      }
+      var nextValue;
+      if (element.classList && element.classList.contains("pi-export-card-body")) {
+        nextValue = flattenStructuredContent(extractStructuredContent(element));
+      } else {
+        nextValue = normalizeText(element.innerText || element.textContent || "");
+      }
+      if (textMap.hasOwnProperty(nodeId) && textMap[nodeId] !== nextValue) {
+        duplicateNodeIds.push(nodeId);
+      }
+      textMap[nodeId] = nextValue;
+    });
+    return {
+      textMap: textMap,
+      duplicateNodeIds: duplicateNodeIds
+    };
+  }
+
+  function compareExportDomToParityMap(exportRoot, modelParityMap) {
+    var captured = captureExportDomTextMap(exportRoot);
+    var mismatches = summarizeNodeMapDiff(captured.textMap, modelParityMap);
+    var missingNodeIds = [];
+    Object.keys(modelParityMap || {}).forEach(function (nodeId) {
+      if (!captured.textMap.hasOwnProperty(nodeId) && normalizeText((modelParityMap || {})[nodeId] || "")) {
+        missingNodeIds.push(nodeId);
+      }
+    });
+    return {
+      textMap: captured.textMap,
+      duplicateNodeIds: captured.duplicateNodeIds,
+      missingNodeIds: missingNodeIds,
+      mismatches: mismatches
+    };
+  }
+
+  function recordExportDomStageSnapshot(stageName, exportRoot) {
+    var captured = captureExportDomTextMap(exportRoot);
+    window.__propertyInstructionLastExportDomStageSnapshots = window.__propertyInstructionLastExportDomStageSnapshots || {};
+    window.__propertyInstructionLastExportDomStageSnapshots[stageName] = {
+      capturedAt: Date.now(),
+      textMap: Object.assign({}, captured.textMap),
+      duplicateNodeIds: captured.duplicateNodeIds.slice()
+    };
+    return captured;
+  }
+
+  function startExportMutationGuard(exportRoot) {
+    var state = {
+      records: [],
+      startedAt: Date.now(),
+      observer: null
+    };
+
+    state.observer = new MutationObserver(function (mutations) {
+      mutations.forEach(function (mutation) {
+        var wrapperDetected = false;
+        Array.prototype.slice.call(mutation.addedNodes || []).forEach(function (node) {
+          if (node && node.nodeType === Node.ELEMENT_NODE) {
+            var tagName = String(node.tagName || "").toLowerCase();
+            if (tagName === "font" || tagName === "span" || tagName === "div") {
+              wrapperDetected = true;
+            }
+          }
+        });
+
+        var mutationNode = mutation.target && mutation.target.nodeType === Node.TEXT_NODE ? mutation.target.parentElement : mutation.target;
+        var sourceElement = mutationNode && mutationNode.closest ? mutationNode.closest("[data-export-source-id]") : null;
+        state.records.push({
+          timestamp: Date.now(),
+          nodeId: sourceElement ? String(sourceElement.getAttribute("data-export-source-id") || "").trim() : "",
+          type: mutation.type,
+          addedNodeCount: (mutation.addedNodes || []).length || 0,
+          removedNodeCount: (mutation.removedNodes || []).length || 0,
+          wrapperDetected: wrapperDetected
+        });
+      });
+      state.records = state.records.slice(-200);
+    });
+
+    state.observer.observe(exportRoot, {
+      subtree: true,
+      childList: true,
+      characterData: true
+    });
+
+    return state;
+  }
+
+  function stopExportMutationGuard(guardState) {
+    if (guardState && guardState.observer) {
+      guardState.observer.disconnect();
+    }
+  }
+
+  function validateExportDomParity(exportRoot, modelParityMap, stageName, mutationGuardState) {
+    recordExportDomStageSnapshot(stageName, exportRoot);
+    var exportParity = compareExportDomToParityMap(exportRoot, modelParityMap);
+    var recentMutations = mutationGuardState ? (mutationGuardState.records || []).slice(-50) : [];
+    var hasMutation = recentMutations.length > 0;
+
+    window.__propertyInstructionLastExportDomDiagnostics = {
+      stage: stageName,
+      duplicateNodeIds: exportParity.duplicateNodeIds.slice(),
+      missingNodeIds: exportParity.missingNodeIds.slice(),
+      mismatches: exportParity.mismatches.slice(),
+      mutationRecords: recentMutations.slice(),
+      exportTextMap: redactNodeMap(exportParity.textMap)
+    };
+
+    if (exportParity.duplicateNodeIds.length || exportParity.missingNodeIds.length || exportParity.mismatches.length || hasMutation) {
+      updateTranslationDiagnostics({
+        exportDomStage: stageName,
+        exportDomMismatches: exportParity.mismatches.slice(),
+        exportDomMissingNodeIds: exportParity.missingNodeIds.slice(),
+        exportDomDuplicateNodeIds: exportParity.duplicateNodeIds.slice(),
+        exportDomMutationRecords: recentMutations.slice(-20)
+      });
+      setTranslationAbortReason("Export DOM mutated after translation", "export-dom-mutated-after-translation");
+      throw new Error("Export DOM mutated after translation");
+    }
+
+    return exportParity;
   }
 
   function validateExportParity(model, exportState, sourceSnapshot) {
@@ -2183,18 +2381,20 @@
     }, 1000);
   }
 
-  async function renderExportPagesToPdf(exportState, filename) {
+  async function renderExportPagesToPdf(exportState, filename, modelParityMap, mutationGuardState) {
     var pageNodes = Array.prototype.slice.call(exportState.exportRoot.querySelectorAll("[data-pdf-page]"));
     if (!pageNodes.length) {
       throw new Error("No PDF pages were created.");
     }
 
+    validateExportDomParity(exportState.exportRoot, modelParityMap, "pre-render", mutationGuardState);
     await waitForFonts();
     var imageSourceDiagnostics = assertExportImageSourcesAreCapturable(exportState.exportRoot);
     var imageDiagnostics = await waitForImages(exportState.exportRoot);
     var canvasPaintabilityDiagnostics = validateExportImagesCanPaintToCanvas(exportState.exportRoot);
     await waitForTwoAnimationFrames();
     var imageRatioDiagnostics = validateImageAspectRatios(exportState.exportRoot);
+    validateExportDomParity(exportState.exportRoot, modelParityMap, "post-fonts-images", mutationGuardState);
 
     var jsPDF = window.jspdf.jsPDF;
     var pdf = new jsPDF({
@@ -2215,6 +2415,7 @@
 
     for (var index = 0; index < pageNodes.length; index += 1) {
       var pageNode = pageNodes[index];
+      validateExportDomParity(exportState.exportRoot, modelParityMap, "before-canvas-page-" + (index + 1), mutationGuardState);
       var diagnostics = collectPageDiagnostics(pageNode);
       window.__propertyInstructionPdfStep = "render-page-" + (index + 1);
 
@@ -2296,6 +2497,8 @@
       throw new Error("PDF page count did not match export page count.");
     }
 
+    validateExportDomParity(exportState.exportRoot, modelParityMap, "post-render", mutationGuardState);
+
     window.__propertyInstructionLastPdfDiagnostics = {
       imageSourceDiagnostics: imageSourceDiagnostics,
       imageDiagnostics: imageDiagnostics,
@@ -2315,6 +2518,7 @@
     const filename = getPdfFilename(downloadButton);
     const guideTitle = getGuideTitle();
     var exportState = null;
+    var mutationGuardState = null;
 
     downloadButton.classList.add("is-disabled");
     downloadButton.setAttribute("aria-disabled", "true");
@@ -2338,8 +2542,16 @@
       updateTranslationDiagnostics({
         selectedLanguage: guideModel.languageCode || SOURCE_LANGUAGE
       });
+      var preMountParity = compareSnapshotToModel(settledSnapshot, guideModel);
+      window.__propertyInstructionLastExportParityMap = redactNodeMap(preMountParity.modelParityMap);
+      if (preMountParity.mismatches.length) {
+        throw new Error("Guide translation changed before PDF rendering");
+      }
       updateExportProgress(downloadButton, statusElement, null, null, "build-export");
       exportState = buildPdfExportDocument(guideModel);
+      validateExportDomParity(exportState.exportRoot, preMountParity.modelParityMap, "detached-build");
+      mountExportRoot(exportState.exportRoot);
+      validateExportDomParity(exportState.exportRoot, preMountParity.modelParityMap, "post-mount");
       updateExportProgress(downloadButton, statusElement, null, null, "wait-images");
       await Promise.all(exportState.pendingImages);
       updateExportProgress(downloadButton, statusElement, null, null, "prepare-layout");
@@ -2348,6 +2560,8 @@
       updateExportProgress(downloadButton, statusElement, null, null, "paginate");
       paginateExportDocument(exportState);
       populatePageFooters(exportState, guideModel.title || guideTitle);
+      validateExportDomParity(exportState.exportRoot, preMountParity.modelParityMap, "post-pagination");
+      mutationGuardState = startExportMutationGuard(exportState.exportRoot);
       updateExportProgress(downloadButton, statusElement, null, null, "validate");
       validateExportParity(guideModel, exportState, settledSnapshot);
       var finalSnapshot = captureSemanticSnapshot();
@@ -2364,7 +2578,7 @@
 
       updateExportProgress(downloadButton, statusElement, null, null, "render-pdf");
       var pdf = await withTimeout(
-        renderExportPagesToPdf(exportState, filename),
+        renderExportPagesToPdf(exportState, filename, preMountParity.modelParityMap, mutationGuardState),
         PDF_EXPORT_TIMEOUT_MS,
         "PDF export timed out"
       );
@@ -2391,6 +2605,7 @@
       window.__propertyInstructionLastPdfBlob = pdfBlob;
       window.__propertyInstructionLastPdfLanguage = guideModel.languageCode || SOURCE_LANGUAGE;
       window.__propertyInstructionPdfStep = "download-ready";
+      stopExportMutationGuard(mutationGuardState);
       triggerBlobDownload(pdfBlob, filename);
       destroyExportRoot(exportState.exportRoot);
 
@@ -2403,12 +2618,14 @@
         setTranslationAbortReason(error && error.message ? error.message : "Unable to prepare PDF", "translation-timeout-unknown");
       }
       if (typeof exportState !== "undefined" && exportState && exportState.exportRoot) {
+        stopExportMutationGuard(mutationGuardState);
         destroyExportRoot(exportState.exportRoot);
       }
       if (statusElement) {
         statusElement.textContent = "Translation is temporarily unavailable. Please wait and try again.";
       }
     } finally {
+      stopExportMutationGuard(mutationGuardState);
       downloadButton.classList.remove("is-disabled");
       downloadButton.removeAttribute("aria-disabled");
       downloadButton.textContent = originalLabel;

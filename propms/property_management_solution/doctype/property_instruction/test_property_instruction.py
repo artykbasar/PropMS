@@ -526,6 +526,8 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 		self.assertIn("redactSnapshot", source)
 		self.assertIn("syncTranslationLanguageState", source)
 		self.assertIn("analyzeSnapshotState(currentSnapshot, translationState.originalSnapshot, expectedLanguage)", source)
+		self.assertIn("markExportNodeNotranslate(exportRoot)", source)
+		self.assertIn("mountExportRoot(exportState.exportRoot)", source)
 		self.assertIn("data-guide-translation-kind", self.render_instruction(self.make_instruction()))
 		self.assertIn("snapshotsEqual(settledSnapshot, finalSnapshot)", source)
 		self.assertNotIn("download_pdf?", source)
@@ -597,6 +599,10 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 		self.assertIn("intentionallyUnchangedNodes", source)
 		self.assertIn("lastSemanticProgressAt", source)
 		self.assertIn("getSnapshotProgressFingerprint", source)
+		self.assertIn("export-dom-mutated-after-translation", source)
+		self.assertIn("startExportMutationGuard", source)
+		self.assertIn("validateExportDomParity", source)
+		self.assertIn("data-export-source-id", source)
 		self.assertIn('throw new Error("Guide translation changed before PDF rendering")', source)
 		self.assertIn('throw new Error("Selected translation changed during PDF export")', source)
 		self.assertIn('throw new Error("PDF export content does not match the visible guide")', source)
@@ -610,6 +616,35 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 		self.assertIn("validateExportImagesCanPaintToCanvas", source)
 		self.assertIn("validateCanvasPaintedImages(pageNode, canvas, index)", source)
 		self.assertIn('throw new Error("image-not-painted")', source)
+
+	def test_export_script_marks_export_dom_notranslate_before_mount(self):
+		source = self.get_export_script_source()
+		self.assertIn("function markExportNodeNotranslate(node)", source)
+		self.assertIn('node.classList.add("notranslate")', source)
+		self.assertIn('node.setAttribute("translate", "no")', source)
+		self.assertIn("markExportNodeNotranslate(exportRoot);", source)
+		self.assertIn("return exportRoot;", source)
+		self.assertIn("document.body.appendChild(exportRoot);", source)
+		self.assertLess(
+			source.index("markExportNodeNotranslate(exportRoot);"),
+			source.index("document.body.appendChild(exportRoot);"),
+		)
+		self.assertIn("markExportNodeNotranslate(exportWrapper);", source)
+		self.assertIn("markExportNodeNotranslate(exportDocument);", source)
+		self.assertIn("markExportNodeNotranslate(page);", source)
+		self.assertIn("markExportNodeNotranslate(viewport);", source)
+		self.assertIn("markExportNodeNotranslate(footer);", source)
+
+	def test_export_script_checks_export_dom_parity_after_mount_and_before_canvas(self):
+		source = self.get_export_script_source()
+		self.assertIn('validateExportDomParity(exportState.exportRoot, preMountParity.modelParityMap, "detached-build")', source)
+		self.assertIn('validateExportDomParity(exportState.exportRoot, preMountParity.modelParityMap, "post-mount")', source)
+		self.assertIn('validateExportDomParity(exportState.exportRoot, preMountParity.modelParityMap, "post-pagination")', source)
+		self.assertIn('validateExportDomParity(exportState.exportRoot, modelParityMap, "pre-render", mutationGuardState)', source)
+		self.assertIn('validateExportDomParity(exportState.exportRoot, modelParityMap, "post-fonts-images", mutationGuardState)', source)
+		self.assertIn('validateExportDomParity(exportState.exportRoot, modelParityMap, "before-canvas-page-" + (index + 1), mutationGuardState)', source)
+		self.assertIn('validateExportDomParity(exportState.exportRoot, modelParityMap, "post-render", mutationGuardState)', source)
+		self.assertIn('setTranslationAbortReason("Export DOM mutated after translation", "export-dom-mutated-after-translation")', source)
 
 	def test_export_script_uses_language_sync_without_relying_only_on_change_event(self):
 		source = self.get_export_script_source()

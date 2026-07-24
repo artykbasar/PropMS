@@ -24,6 +24,7 @@ Potentially affected:
 - application Download PDF can capture an earlier partially translated semantic state
 - previous export readiness used a short mutation quiet period and a truncated signature
 - previous export also created new English strings after translation had already finished
+- the temporary PDF export DOM was mounted into the live document without translation protection, so Google Translate could translate already translated Turkmen text a second time
 
 ## Constraints
 
@@ -54,6 +55,11 @@ The exported semantic text must exactly match the visible settled guide text at 
 - snapshot analysis now accepts intentionally unchanged translatable values only when they are explicitly allowlisted for the current language
 - semantic progress timing now updates only when the translated snapshot fingerprint changes, which prevents false “still progressing” timestamps after translation has actually stalled
 - image, parity, shell-count, link-annotation, and protected-value checks remain strict
+- the PDF export DOM is built while detached, then marked with both `class="notranslate"` and `translate="no"` before mount
+- the same no-translate protection is applied to the export root, export document, every export page shell, page body shell, and PDF footer
+- export DOM parity is now checked after build, after mount, after pagination, before each page capture, and after rendering
+- a temporary export-root mutation guard aborts export if any unexpected post-mount mutation occurs
+- Turkmen HAR validation confirms no later `translateHtml` request resubmits already translated guest-guide instruction text from the mounted export DOM
 
 ## Legitimate Identical Translation Case
 
@@ -74,6 +80,13 @@ This node remains `data-guide-translation-kind="translatable"`. It is not global
 | Turkmen | 5 | 8 | 8/8 painted | Pass | 2 | Pass |
 | German | 5 | 8 | 8/8 painted | Pass | 2 | Pass |
 | Arabic | 5 | 8 | 8/8 painted | Pass | 2 | Pass (RTL) |
+
+## Double-Translation Proof
+
+- reproduction root cause: Google Translate translated the mounted temporary export DOM a second time, corrupting already translated Turkmen text before capture
+- protection added: `class="notranslate"` plus `translate="no"` on every mounted export shell before insertion into `document.body`
+- Turkmen HAR result: no post-mount `translateHtml` request contained settled Turkmen instruction text as input
+- export DOM parity result: detached build, post-mount, post-pagination, pre-capture, and post-render snapshots all matched the settled visible guide text for the same run
 
 ## Release Blockers
 
