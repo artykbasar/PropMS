@@ -382,8 +382,9 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 		self.assertIn("Map", block_type_field["options"].splitlines())
 		self.assertEqual(embed_field["fieldtype"], "Code")
 		self.assertEqual(embed_field["options"], "HTML")
-		self.assertEqual(embed_field["depends_on"], 'eval:doc.block_type == "Map"')
+		self.assertEqual(embed_field["depends_on"], 'eval:doc.block_type')
 		self.assertEqual(embed_field["mandatory_depends_on"], 'eval:doc.block_type == "Map"')
+		self.assertIn("Required for Map blocks. Optional for Step/Text/Image/Warning/Link.", embed_field["description"])
 
 	def test_map_block_accepts_valid_google_embed_and_excludes_raw_html_from_context(self):
 		embed_html = '<iframe src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d2484.0!2d-0.249!3d51.399!2m3!1f0!2f0!3f0!3m2!1i1024!2i768"></iframe>'
@@ -469,6 +470,72 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 		self.assertEqual(grouped_sections[0].blocks[0].block_type, "Map")
 		self.assertIsNone(grouped_sections[0].blocks[0].map_latitude)
 		self.assertIn("https://www.google.com/maps", grouped_sections[0].blocks[0].map_external_url)
+
+	def test_step_block_with_embed_html_renders_a_validated_map(self):
+		embed_html = '<iframe src="https://www.google.com/maps/embed?pb=!1m18!2m3!1d1!2d-0.249!3d51.399!3m2!1i1024!2i768!4f13.1"></iframe>'
+		doc = self.make_instruction(
+			instruction_blocks=[
+				{
+					"section": "Check-In",
+					"block_type": "Step",
+					"title": "Find the entrance",
+					"body": "<p>Use this map to find the side entrance.</p>",
+					"google_maps_embed_html": embed_html,
+				},
+			]
+		)
+		block = doc.get_grouped_blocks()[0].blocks[0]
+		self.assertEqual(block.block_type, "Step")
+		self.assertEqual(block.map_embed_url, "https://www.google.com/maps/embed?pb=!1m18!2m3!1d1!2d-0.249!3d51.399!3m2!1i1024!2i768!4f13.1")
+		html = self.render_instruction(doc)
+		self.assertIn('data-guide-block-map', html)
+		self.assertIn('class="pi-instruction-map"', html)
+
+	def test_text_block_with_embed_html_renders_a_validated_map(self):
+		embed_html = '<iframe src="https://www.google.com/maps?output=embed&q=51.399,-0.249"></iframe>'
+		doc = self.make_instruction(
+			instruction_blocks=[
+				{
+					"section": "Finding the Property",
+					"block_type": "Text",
+					"title": "Map details",
+					"body": "<p>Approach from the high street.</p>",
+					"google_maps_embed_html": embed_html,
+				},
+			]
+		)
+		block = doc.get_grouped_blocks()[0].blocks[0]
+		self.assertEqual(block.block_type, "Text")
+		self.assertEqual(block.map_embed_url, "https://www.google.com/maps?output=embed&q=51.399,-0.249")
+		self.assertAlmostEqual(block.map_latitude, 51.399)
+		self.assertAlmostEqual(block.map_longitude, -0.249)
+
+	def test_non_map_blocks_do_not_require_embed_html(self):
+		doc = self.make_instruction(
+			instruction_blocks=[
+				{
+					"section": "Check-In",
+					"block_type": "Step",
+					"title": "No map needed",
+					"body": "<p>Use the front gate.</p>",
+				},
+			]
+		)
+		self.assertEqual(doc.get_grouped_blocks()[0].blocks[0].block_type, "Step")
+
+	def test_invalid_non_map_embed_html_is_rejected(self):
+		with self.assertRaises(frappe.ValidationError):
+			self.make_instruction(
+				instruction_blocks=[
+					{
+						"section": "Check-In",
+						"block_type": "Step",
+						"title": "Bad step map",
+						"body": "<p>Bad map.</p>",
+						"google_maps_embed_html": '<iframe src="https://example.com/maps/embed"></iframe>',
+					},
+				]
+			)
 
 	def test_google_translate_widget_disabled_by_default(self):
 		self.set_property_management_setting("enable_guest_guide_google_translate", 0)
@@ -581,6 +648,10 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 		self.assertLess(html.index('data-guide-toolbar'), html.index('data-guide-screen'))
 		self.assertIn('data-guide-language-select', html)
 		self.assertIn('Powered by Google Translate', html)
+		self.assertIn('iframe.goog-te-banner-frame', html)
+		self.assertIn('iframe.VIpgJd-ZVi9od-ORHb-OEVmcd', html)
+		self.assertIn('.VIpgJd-ZVi9od-xl07Ob-OEVmcd', html)
+		self.assertIn('.VIpgJd-ZVi9od-SmfZ-OEVmcd', html)
 
 	def test_template_includes_empty_state_hook_when_no_sections(self):
 		doc = self.make_instruction(instruction_blocks=[])
@@ -775,6 +846,7 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 		self.assertIn("expireCookie(\"googtrans\")", source)
 		self.assertIn("pi-google-translate-engine", self.render_instruction(self.make_instruction()))
 		self.assertIn("getPdfFilename(downloadButton)", source)
+		self.assertIn("normalize(\"NFKC\")", source)
 
 	def test_export_script_validates_image_clipping_separately_from_ratio(self):
 		source = self.get_export_script_source()
@@ -786,6 +858,60 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 		self.assertIn("clippedVertically", source)
 		self.assertIn("frame.style.height = fitted.height + \"px\";", source)
 		self.assertIn("frame.style.maxHeight = \"none\";", source)
+
+	def test_export_script_hides_modern_google_translation_ui_and_resets_offsets(self):
+		source = self.get_export_script_source()
+		html = self.render_instruction(self.make_instruction())
+		self.assertIn("function resetGoogleInjectedOffsets()", source)
+		self.assertIn("GOOGLE_PRESENTATION_SELECTORS", source)
+		self.assertIn("iframe.goog-te-banner-frame", source)
+		self.assertIn("iframe.VIpgJd-ZVi9od-ORHb-OEVmcd", source)
+		self.assertIn(".VIpgJd-ZVi9od-xl07Ob-OEVmcd", source)
+		self.assertIn(".VIpgJd-ZVi9od-SmfZ-OEVmcd", source)
+		self.assertIn('node.style.setProperty("display", "none", "important")', source)
+		self.assertIn('node.style.setProperty("visibility", "hidden", "important")', source)
+		self.assertIn('node.style.setProperty("top", "0px", "important")', source)
+		self.assertIn('node.style.setProperty("margin-top", "0px", "important")', source)
+		self.assertIn('node.style.setProperty("transform", "none", "important")', source)
+		self.assertIn("scheduleGoogleUiHide()", source)
+		self.assertIn("window.__propertyInstructionGoogleUiDiagnostics", source)
+		self.assertIn('iframe.goog-te-banner-frame', html)
+
+	def test_export_script_loads_dedicated_pdf_fonts_and_typography(self):
+		source = self.get_export_script_source()
+		html = self.render_instruction(self.make_instruction())
+		self.assertIn('@font-face', html)
+		self.assertIn('font-family: "PropMS PDF Inter"', html)
+		self.assertIn('/assets/frappe/css/fonts/inter/Inter-Regular.woff2', html)
+		self.assertIn('/assets/frappe/css/fonts/inter/Inter-Medium.woff2', html)
+		self.assertIn('/assets/frappe/css/fonts/inter/Inter-SemiBold.woff2', html)
+		self.assertIn('/assets/frappe/css/fonts/inter/Inter-Bold.woff2', html)
+		self.assertIn("PDF_EXPORT_FONT_LOADS", source)
+		self.assertIn("frameDocument.fonts.load(fontSpec)", source)
+		self.assertIn("frameDocument.fonts.check(fontSpec)", source)
+		self.assertIn('setTranslationAbortReason("PDF font load failed", "pdf-font-load-failed")', source)
+		self.assertIn("window.__propertyInstructionPdfTypographyDiagnostics", source)
+		self.assertIn("collectTypographyDiagnostics", source)
+		self.assertIn("word-spacing: 0.08em;", html)
+		self.assertIn("word-spacing: 0.07em;", html)
+		self.assertIn("word-spacing: normal;", html)
+
+	def test_rendered_instruction_text_preserves_ordinary_spaces(self):
+		doc = self.make_instruction(
+			address="99A Burlington Road",
+			instruction_blocks=[
+				{
+					"section": "Check-In",
+					"block_type": "Step",
+					"title": "Property's entrance on the side of this shop",
+					"body": "<p>This is the entrance door of the property</p>",
+				},
+			],
+		)
+		html = self.render_instruction(doc)
+		self.assertIn("Property's entrance on the side of this shop", html)
+		self.assertIn("This is the entrance door of the property", html)
+		self.assertIn("99A Burlington Road", html)
 
 	def test_export_script_marks_export_dom_notranslate_before_mount(self):
 		source = self.get_export_script_source()

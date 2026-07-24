@@ -22,12 +22,30 @@
   var PDF_EXPORT_TIMEOUT_MS = 240000;
   var PDF_EXPORT_IMAGE_RATIO_TOLERANCE = 0.02;
   var PDF_EXPORT_IMAGE_CLIP_TOLERANCE = 1.5;
+  var PDF_EXPORT_FONT_FAMILY = '"PropMS PDF Inter"';
+  var PDF_EXPORT_FONT_LOADS = [
+    '400 16px "PropMS PDF Inter"',
+    '500 16px "PropMS PDF Inter"',
+    '600 16px "PropMS PDF Inter"',
+    '700 16px "PropMS PDF Inter"'
+  ];
   var GUIDE_SETTLE_TIMEOUT_MS = 45000;
   var GUIDE_SETTLE_QUIET_MS = 2500;
   var GUIDE_SETTLE_STABLE_INTERVAL_MS = 1500;
   var GUIDE_SETTLE_STABLE_PASSES = 2;
   var SOURCE_LANGUAGE = "en";
   var RTL_LANGUAGE_PREFIXES = ["ar", "fa", "he", "ku", "ps", "ur", "yi"];
+  var GOOGLE_PRESENTATION_SELECTORS = [
+    "iframe.goog-te-banner-frame",
+    "iframe.VIpgJd-ZVi9od-ORHb-OEVmcd",
+    ".goog-te-banner-frame.skiptranslate",
+    ".VIpgJd-ZVi9od-xl07Ob-OEVmcd",
+    ".VIpgJd-ZVi9od-SmfZ-OEVmcd",
+    "#goog-gt-tt",
+    ".goog-te-balloon-frame",
+    ".goog-tooltip",
+    ".goog-text-highlight"
+  ];
   var PDF_MAP_RENDER_TIMEOUT_MS = 10000;
   var PDF_WARM_PREPARE_TIMEOUT_MS = 1500;
   var PROTECTED_GUIDE_FIELDS = {
@@ -58,7 +76,9 @@
     preparationPromise: null,
     preparationKey: "",
     warmupScheduled: false,
-    warmupIdleHandle: null
+    warmupIdleHandle: null,
+    googleUiObserverBound: false,
+    googleUiEnforceScheduled: false
   };
   var pdfPreparationState = {
     preparedState: null,
@@ -69,6 +89,7 @@
     imageDataCache: new Map(),
     mapImageCache: new Map()
   };
+  var instructionBlockMapModels = null;
 
   function getGoogleWidgetState() {
     window.__propertyInstructionGoogleWidgetState = window.__propertyInstructionGoogleWidgetState || {};
@@ -406,14 +427,158 @@
     hiddenSelect.dispatchEvent(new Event("input", { bubbles: true }));
   }
 
-  function enforceGoogleUiHidden() {
-    document.body.style.top = "0";
-    document.documentElement.style.top = "0";
-    Array.prototype.slice.call(document.querySelectorAll(".goog-te-banner-frame, .goog-te-balloon-frame, #goog-gt-tt")).forEach(function (node) {
-      if (node && node.style) {
-        node.style.display = "none";
+  function getInstructionBlockMapModels() {
+    if (instructionBlockMapModels) {
+      return instructionBlockMapModels;
+    }
+    var dataNode = document.getElementById("pi-instruction-block-maps-data");
+    if (!dataNode) {
+      instructionBlockMapModels = [];
+      return instructionBlockMapModels;
+    }
+    try {
+      var parsed = JSON.parse(dataNode.textContent || "[]");
+      instructionBlockMapModels = Array.isArray(parsed) ? parsed : [];
+    } catch (error) {
+      instructionBlockMapModels = [];
+    }
+    return instructionBlockMapModels;
+  }
+
+  function createInstructionBlockMapShell(mapModel) {
+    if (!mapModel || !mapModel.embed_url) {
+      return null;
+    }
+    var shell = document.createElement("div");
+    shell.className = "pi-instruction-map-shell notranslate";
+    shell.setAttribute("translate", "no");
+    shell.setAttribute("data-guide-block-map", "");
+    shell.setAttribute("data-guide-block-map-embed-url", mapModel.embed_url || "");
+    shell.setAttribute("data-guide-block-map-latitude", mapModel.latitude != null ? String(mapModel.latitude) : "");
+    shell.setAttribute("data-guide-block-map-longitude", mapModel.longitude != null ? String(mapModel.longitude) : "");
+    shell.setAttribute("data-guide-block-map-zoom", mapModel.zoom != null ? String(mapModel.zoom) : "");
+    shell.setAttribute("data-guide-block-map-external-url", mapModel.external_url || "");
+    shell.setAttribute("data-guide-block-map-attribution", mapModel.attribution || "© OpenStreetMap contributors");
+
+    var iframe = document.createElement("iframe");
+    iframe.className = "pi-instruction-map";
+    iframe.src = mapModel.embed_url;
+    iframe.loading = "lazy";
+    iframe.allowFullscreen = true;
+    iframe.referrerPolicy = "no-referrer-when-downgrade";
+    iframe.title = String(mapModel.title || "Map");
+    iframe.setAttribute("translate", "no");
+    shell.appendChild(iframe);
+
+    return shell;
+  }
+
+  function createInstructionBlockMapLink(mapModel) {
+    if (!mapModel || !mapModel.external_url) {
+      return null;
+    }
+    var linkWrap = document.createElement("div");
+    linkWrap.className = "pi-link";
+    var link = document.createElement("a");
+    link.href = mapModel.external_url;
+    link.target = "_blank";
+    link.rel = "noopener noreferrer nofollow";
+    link.setAttribute("data-pdf-block-field", "link_label");
+    link.setAttribute("data-guide-block-link", "");
+    link.setAttribute("data-guide-signature", "");
+    link.setAttribute("data-guide-translation-kind", "translatable");
+    link.textContent = String(mapModel.link_label || "Open in Google Maps");
+    linkWrap.appendChild(link);
+    return linkWrap;
+  }
+
+  function hydrateInstructionBlockMaps() {
+    getInstructionBlockMapModels().forEach(function (mapModel) {
+      if (!mapModel || !mapModel.name) {
+        return;
+      }
+      var blockNode = document.querySelector('[data-guide-block-id="' + CSS.escape(String(mapModel.name)) + '"]');
+      if (!blockNode) {
+        return;
+      }
+      if (!blockNode.querySelector("[data-guide-block-map]")) {
+        var mapShell = createInstructionBlockMapShell(mapModel);
+        if (mapShell) {
+          var existingLinkWrap = blockNode.querySelector(".pi-link");
+          if (existingLinkWrap) {
+            blockNode.insertBefore(mapShell, existingLinkWrap);
+          } else {
+            blockNode.appendChild(mapShell);
+          }
+        }
+      }
+      if (mapModel.external_url && !blockNode.querySelector(".pi-link")) {
+        var linkWrap = createInstructionBlockMapLink(mapModel);
+        if (linkWrap) {
+          blockNode.appendChild(linkWrap);
+        }
       }
     });
+  }
+
+  function getGooglePresentationNodes() {
+    return Array.prototype.slice.call(document.querySelectorAll(GOOGLE_PRESENTATION_SELECTORS.join(", "))).filter(function (node) {
+      return !node.closest(".pi-google-translate-engine");
+    });
+  }
+
+  function resetGoogleInjectedOffsets() {
+    [
+      document.body,
+      document.documentElement,
+      document.querySelector(".page-content-wrapper"),
+      document.querySelector(".page_content"),
+      document.querySelector(".pi-page")
+    ].forEach(function (node) {
+      if (!node || !node.style) {
+        return;
+      }
+      node.style.setProperty("top", "0px", "important");
+      node.style.setProperty("margin-top", "0px", "important");
+      node.style.setProperty("transform", "none", "important");
+    });
+  }
+
+  function scheduleGoogleUiHide() {
+    if (translationState.googleUiEnforceScheduled) {
+      return;
+    }
+    translationState.googleUiEnforceScheduled = true;
+    window.requestAnimationFrame(function () {
+      translationState.googleUiEnforceScheduled = false;
+      enforceGoogleUiHidden();
+    });
+  }
+
+  function enforceGoogleUiHidden() {
+    resetGoogleInjectedOffsets();
+    var matchedSelectors = [];
+    getGooglePresentationNodes().forEach(function (node) {
+      if (node && node.style) {
+        node.style.setProperty("display", "none", "important");
+        node.style.setProperty("visibility", "hidden", "important");
+        node.style.setProperty("height", "0px", "important");
+        node.style.setProperty("max-height", "0px", "important");
+        node.style.setProperty("margin", "0px", "important");
+        node.style.setProperty("padding", "0px", "important");
+        node.setAttribute("aria-hidden", "true");
+        matchedSelectors.push(node.className || node.id || node.tagName.toLowerCase());
+      }
+    });
+    window.__propertyInstructionGoogleUiDiagnostics = {
+      matchedSelectors: matchedSelectors,
+      bodyTop: document.body && document.body.style ? document.body.style.getPropertyValue("top") : "",
+      bodyMarginTop: document.body && document.body.style ? document.body.style.getPropertyValue("margin-top") : "",
+      htmlTop: document.documentElement && document.documentElement.style ? document.documentElement.style.getPropertyValue("top") : "",
+      htmlMarginTop: document.documentElement && document.documentElement.style ? document.documentElement.style.getPropertyValue("margin-top") : "",
+      computedBodyTop: window.getComputedStyle(document.body).top,
+      computedHtmlTop: window.getComputedStyle(document.documentElement).top
+    };
   }
 
   function isRtlLanguage(languageCode) {
@@ -998,6 +1163,7 @@
 
     var widgetObserver = new MutationObserver(function () {
       syncTranslationLanguageState();
+      scheduleGoogleUiHide();
     });
     widgetObserver.observe(document.body, {
       subtree: true,
@@ -1006,8 +1172,40 @@
       attributeFilter: ["value", "lang", "dir", "class"]
     });
 
+    if (!translationState.googleUiObserverBound) {
+      var googleUiObserver = new MutationObserver(function (mutations) {
+        var shouldUpdate = mutations.some(function (mutation) {
+          if (mutation.type === "attributes") {
+            return mutation.target === document.body
+              || mutation.target === document.documentElement
+              || GOOGLE_PRESENTATION_SELECTORS.some(function (selector) {
+                return mutation.target.matches && mutation.target.matches(selector);
+              });
+          }
+          return Array.prototype.slice.call(mutation.addedNodes || []).some(function (node) {
+            return node.nodeType === 1 && (
+              GOOGLE_PRESENTATION_SELECTORS.some(function (selector) {
+                return (node.matches && node.matches(selector)) || (node.querySelector && node.querySelector(selector));
+              })
+            );
+          });
+        });
+        if (shouldUpdate) {
+          scheduleGoogleUiHide();
+        }
+      });
+      googleUiObserver.observe(document.documentElement, {
+        subtree: true,
+        childList: true,
+        attributes: true,
+        attributeFilter: ["style", "class"]
+      });
+      translationState.googleUiObserverBound = true;
+    }
+
     translationState.guideObserverBound = true;
     setTranslationStatus("");
+    scheduleGoogleUiHide();
   }
 
   function ensureOriginalSnapshotCaptured() {
@@ -2440,7 +2638,7 @@
           );
         }
 
-        if (blockModel.type === "Map" && blockModel.mapImageSrc) {
+        if (blockModel.mapImageSrc) {
           mediaColumn.appendChild(
             createManagedImage(document, {
               src: blockModel.mapImageSrc,
@@ -2474,7 +2672,7 @@
           textColumn.appendChild(linkWrap);
         }
 
-        if (blockModel.type === "Map" && blockModel.mapAttribution && !blockModel.mapImageSrc) {
+        if (blockModel.mapAttribution && !blockModel.mapImageSrc) {
           var blockMapAttribution = document.createElement("p");
           blockMapAttribution.className = "pi-export-map-attribution notranslate";
           blockMapAttribution.textContent = blockModel.mapAttribution;
@@ -3974,14 +4172,61 @@
       performanceState.frameCreatedAt = startedAt || Date.now();
       recordPdfPerformance(performanceState, "frameStylesReadyMs", startedAt || Date.now());
     }
-    return (frameDocument.fonts && frameDocument.fonts.ready
-      ? frameDocument.fonts.ready.catch(function () { return null; })
-      : Promise.resolve()
-    ).then(function () {
-      if (performanceState) {
-        recordPdfPerformance(performanceState, "frameFontsReadyMs", startedAt || Date.now());
-      }
+    return ensureCaptureFrameFonts(frameDocument, performanceState, startedAt || Date.now());
+  }
+
+  async function ensureCaptureFrameFonts(frameDocument, performanceState, startedAt) {
+    if (!frameDocument || !frameDocument.fonts) {
+      setTranslationAbortReason("PDF font load failed", "pdf-font-load-failed");
+      throw new Error("PDF font load failed");
+    }
+
+    await Promise.all(PDF_EXPORT_FONT_LOADS.map(function (fontSpec) {
+      return frameDocument.fonts.load(fontSpec);
+    }));
+    await frameDocument.fonts.ready;
+
+    var allFontsLoaded = PDF_EXPORT_FONT_LOADS.every(function (fontSpec) {
+      return frameDocument.fonts.check(fontSpec);
     });
+
+    if (!allFontsLoaded) {
+      setTranslationAbortReason("PDF font load failed", "pdf-font-load-failed");
+      throw new Error("PDF font load failed");
+    }
+
+    if (performanceState) {
+      recordPdfPerformance(performanceState, "frameFontsReadyMs", startedAt || Date.now());
+    }
+  }
+
+  function collectTypographyDiagnostics(rootNode, languageCode) {
+    var view = rootNode && rootNode.ownerDocument ? rootNode.ownerDocument.defaultView : window;
+    function readTypography(selector, label) {
+      var node = rootNode && rootNode.querySelector ? rootNode.querySelector(selector) : null;
+      if (!node) {
+        return null;
+      }
+      var styles = view.getComputedStyle(node);
+      return {
+        label: label,
+        language: languageCode || SOURCE_LANGUAGE,
+        semanticNodeId: node.getAttribute("data-export-source-id") || "",
+        fontFamily: styles.fontFamily,
+        fontWeight: styles.fontWeight,
+        letterSpacing: styles.letterSpacing,
+        wordSpacing: styles.wordSpacing,
+        lineHeight: styles.lineHeight
+      };
+    }
+
+    return [
+      readTypography(".pi-export-card-body", "body"),
+      readTypography(".pi-export-card-title", "card-title"),
+      readTypography(".pi-export-section-title", "section-title"),
+      readTypography(".pi-export-label", "meta-label"),
+      readTypography(".pi-export-footer", "footer")
+    ].filter(Boolean);
   }
 
   function createCaptureRootNode(frameDocument, pageNode) {
@@ -4042,6 +4287,10 @@
     frameDocument.body.appendChild(captureNodes.root);
     await waitForImages(captureNodes.root);
     await waitForTwoAnimationFrames();
+    window.__propertyInstructionPdfTypographyDiagnostics = collectTypographyDiagnostics(
+      captureNodes.root,
+      captureNodes.page.getAttribute("lang") || SOURCE_LANGUAGE
+    );
     if (performanceState) {
       performanceState.pageDomReplacementMs.push(Date.now() - domStartedAt);
     }
@@ -4551,6 +4800,8 @@
       window.print();
     }
   });
+
+  hydrateInstructionBlockMaps();
 
   document.addEventListener("pointerenter", function (event) {
     if (event.target && event.target.closest && event.target.closest(".pi-pdf-download")) {

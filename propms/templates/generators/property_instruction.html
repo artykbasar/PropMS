@@ -500,7 +500,11 @@
     height: 1px !important;
     opacity: 0.01;
   }
+  iframe.goog-te-banner-frame,
+  iframe.VIpgJd-ZVi9od-ORHb-OEVmcd,
   .goog-te-banner-frame.skiptranslate,
+  .VIpgJd-ZVi9od-xl07Ob-OEVmcd,
+  .VIpgJd-ZVi9od-SmfZ-OEVmcd,
   .goog-te-balloon-frame,
   #goog-gt-tt,
   .goog-tooltip,
@@ -696,6 +700,34 @@
   }
 </style>
 <style id="property-instruction-pdf-export-css">
+  @font-face {
+    font-family: "PropMS PDF Inter";
+    font-style: normal;
+    font-weight: 400;
+    src: url("/assets/frappe/css/fonts/inter/Inter-Regular.woff2") format("woff2");
+    font-display: swap;
+  }
+  @font-face {
+    font-family: "PropMS PDF Inter";
+    font-style: normal;
+    font-weight: 500;
+    src: url("/assets/frappe/css/fonts/inter/Inter-Medium.woff2") format("woff2");
+    font-display: swap;
+  }
+  @font-face {
+    font-family: "PropMS PDF Inter";
+    font-style: normal;
+    font-weight: 600;
+    src: url("/assets/frappe/css/fonts/inter/Inter-SemiBold.woff2") format("woff2");
+    font-display: swap;
+  }
+  @font-face {
+    font-family: "PropMS PDF Inter";
+    font-style: normal;
+    font-weight: 700;
+    src: url("/assets/frappe/css/fonts/inter/Inter-Bold.woff2") format("woff2");
+    font-display: swap;
+  }
   [data-property-instruction-export] .pi-pdf-export {
     width: 794px;
     background: #fff;
@@ -728,15 +760,54 @@
     width: 100%;
     background: #fff;
     color: #111827;
-    font-family: Inter, "Helvetica Neue", Arial, sans-serif;
+    font-family: "PropMS PDF Inter", Arial, sans-serif;
     font-size: 14px;
     line-height: 1.45;
+    font-kerning: normal;
+    font-variant-ligatures: none;
+    text-rendering: geometricPrecision;
     direction: ltr;
     text-align: left;
   }
   [data-property-instruction-export] .pi-export-document[dir="rtl"] {
     direction: rtl;
     text-align: right;
+  }
+  [data-property-instruction-export] .pi-export-card-body,
+  [data-property-instruction-export] .pi-export-card-caption,
+  [data-property-instruction-export] .pi-export-card-link,
+  [data-property-instruction-export] .pi-export-empty {
+    letter-spacing: 0.005em;
+    word-spacing: 0.08em;
+  }
+  [data-property-instruction-export] .pi-export-card-title {
+    letter-spacing: 0.005em;
+    word-spacing: 0.07em;
+  }
+  [data-property-instruction-export] .pi-export-section-title,
+  [data-property-instruction-export] .pi-export-map-title {
+    letter-spacing: 0;
+    word-spacing: 0.04em;
+  }
+  [data-property-instruction-export] .pi-export-address,
+  [data-property-instruction-export] .pi-export-label,
+  [data-property-instruction-export] .pi-export-value,
+  [data-property-instruction-export] .pi-export-kicker,
+  [data-property-instruction-export] .pi-export-map-attribution,
+  [data-property-instruction-export] .pi-export-footer,
+  [data-property-instruction-export] .pi-export-footer * {
+    letter-spacing: normal;
+    word-spacing: normal;
+  }
+  [data-property-instruction-export] .pi-export-document[dir="rtl"] .pi-export-card-body,
+  [data-property-instruction-export] .pi-export-document[dir="rtl"] .pi-export-card-caption,
+  [data-property-instruction-export] .pi-export-document[dir="rtl"] .pi-export-card-link,
+  [data-property-instruction-export] .pi-export-document[dir="rtl"] .pi-export-card-title,
+  [data-property-instruction-export] .pi-export-document[dir="rtl"] .pi-export-section-title,
+  [data-property-instruction-export] .pi-export-document[dir="rtl"] .pi-export-map-title,
+  [data-property-instruction-export] .pi-export-document[dir="rtl"] .pi-export-empty {
+    letter-spacing: 0;
+    word-spacing: normal;
   }
   [data-property-instruction-export] .pi-export-document a {
     color: #115e59;
@@ -1174,6 +1245,7 @@
 {% endmacro %}
 
 {% macro render_screen_block(block) %}
+  {% set block_map = instruction_block_maps.get(block.name) if instruction_block_maps is defined and instruction_block_maps else None %}
   <div
     class="pi-block pi-block-{{ block.block_type | lower | replace(' ', '-') }}"
     data-pdf-block="{{ block.name }}"
@@ -1197,19 +1269,19 @@
     <img class="pi-image" src="{{ block.image }}" alt="{{ block.image_alt }}" data-guide-block-image>
     {% endif %}
 
-    {% if block.block_type == "Map" and block.map_embed_url %}
+    {% if block_map and block_map.embed_url %}
     <div
       class="pi-instruction-map-shell notranslate"
       translate="no"
       data-guide-block-map
-      data-guide-block-map-embed-url="{{ block.map_embed_url }}"
-      data-guide-block-map-latitude="{{ block.map_latitude if block.map_latitude is not none else '' }}"
-      data-guide-block-map-longitude="{{ block.map_longitude if block.map_longitude is not none else '' }}"
-      data-guide-block-map-zoom="{{ block.map_zoom if block.map_zoom is not none else '' }}"
-      data-guide-block-map-external-url="{{ block.map_external_url or '' }}"
-      data-guide-block-map-attribution="{{ block.map_attribution or '© OpenStreetMap contributors' }}">
+      data-guide-block-map-embed-url="{{ block_map.embed_url }}"
+      data-guide-block-map-latitude="{{ block_map.latitude if block_map.latitude is not none else '' }}"
+      data-guide-block-map-longitude="{{ block_map.longitude if block_map.longitude is not none else '' }}"
+      data-guide-block-map-zoom="{{ block_map.zoom if block_map.zoom is not none else '' }}"
+      data-guide-block-map-external-url="{{ block_map.external_url or '' }}"
+      data-guide-block-map-attribution="{{ block_map.attribution or '© OpenStreetMap contributors' }}">
       <iframe
-        src="{{ block.map_embed_url }}"
+        src="{{ block_map.embed_url }}"
         loading="lazy"
         allowfullscreen
         referrerpolicy="no-referrer-when-downgrade"
@@ -1223,10 +1295,10 @@
     <div class="pi-caption{% if block.caption_translation_protected %} notranslate{% endif %}" data-pdf-block-field="caption" data-guide-block-caption data-guide-signature data-guide-translation-kind="{% if block.caption_translation_protected %}proper_name_or_identifier{% else %}translatable{% endif %}"{% if block.caption_translation_protected %} translate="no"{% endif %}>{{ block.caption }}</div>
     {% endif %}
 
-    {% if block.link_url or (block.block_type == "Map" and block.map_external_url) %}
+    {% if block.link_url or block.map_external_url or (block_map and block_map.external_url) %}
     <div class="pi-link">
-      {% set block_link_href = block.link_url or block.map_external_url %}
-      {% set block_link_label = block.display_link_label or ("Open in Google Maps" if block.block_type == "Map" else block_link_href) %}
+      {% set block_link_href = block.link_url or block.map_external_url or block_map.external_url %}
+      {% set block_link_label = block.display_link_label or ("Open in Google Maps" if (block.map_external_url or (block_map and block_map.external_url)) else block_link_href) %}
       <a href="{{ block_link_href }}" target="_blank" rel="noopener noreferrer nofollow" data-pdf-block-field="link_label" data-guide-block-link data-guide-signature data-guide-translation-kind="{% if block.display_link_label_translation_protected %}proper_name_or_identifier{% else %}translatable{% endif %}"{% if block.display_link_label_translation_protected %} class="notranslate" translate="no"{% endif %}>{{ block_link_label }}</a>
     </div>
     {% endif %}
@@ -1504,10 +1576,13 @@
           <p>No published instruction content is available for this property yet.</p>
         </div>
       </section>
-      {% endif %}
+  {% endif %}
     </div>
   </div>
 </div>
+<script type="application/json" id="pi-instruction-block-maps-data">
+  {{ (instruction_block_maps.values() | list if instruction_block_maps is defined and instruction_block_maps else []) | tojson }}
+</script>
 <script src="/assets/propms/js/property_instruction_export.js?ver={{ build_version }}"></script>
 {% if google_translate and google_translate.enabled %}
 <script>

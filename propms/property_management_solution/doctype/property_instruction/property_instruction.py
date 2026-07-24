@@ -188,7 +188,7 @@ class PropertyInstruction(WebsiteGenerator):
 				self.validate_external_link(row.link_url, _("Instruction Block #{0} link").format(row.idx))
 			if row.block_type == "Link" and not row.link_url:
 				frappe.throw(_("Instruction Block #{0} is missing a link URL.").format(row.idx))
-			if row.block_type == "Map":
+			if (row.google_maps_embed_html or "").strip() or row.block_type == "Map":
 				self.validate_map_block(row)
 
 	def validate_external_link(self, url, label):
@@ -204,12 +204,15 @@ class PropertyInstruction(WebsiteGenerator):
 			frappe.throw(_("Google Maps URL must use a trusted Google Maps hostname."))
 
 	def validate_map_block(self, row):
-		if not (row.google_maps_embed_html or "").strip():
+		embed_html = (row.google_maps_embed_html or "").strip()
+		if row.block_type == "Map" and not embed_html:
 			frappe.throw(
 				_("Instruction Block #{0} is missing Google Maps Embed HTML.").format(row.idx)
 			)
+		if not embed_html:
+			return
 		try:
-			self.extract_google_maps_embed_url(row.google_maps_embed_html)
+			self.extract_google_maps_embed_url(embed_html)
 		except frappe.ValidationError:
 			raise
 		except Exception as error:
@@ -248,6 +251,8 @@ class PropertyInstruction(WebsiteGenerator):
 
 	def get_public_render_context(self):
 		property_map = self.get_property_map()
+		sections = self.get_grouped_blocks()
+		instruction_block_maps = self.get_instruction_block_maps(sections)
 		map_static_image_url = self.get_public_pdf_image_src(property_map.static_image_url)
 		google_translate = self.get_google_translate_settings()
 		wifi_password_public = self.get_public_wifi_password()
@@ -255,8 +260,8 @@ class PropertyInstruction(WebsiteGenerator):
 			title=self.title,
 			page_title=self.title,
 			noindex_robots_content=NOINDEX_ROBOTS_CONTENT,
-			sections=self.get_grouped_blocks(),
-			has_sections=bool(self.get_grouped_blocks()),
+			sections=sections,
+			has_sections=bool(sections),
 			address=self.address,
 			cover_image=self.get_public_pdf_image_src(self.cover_image),
 			google_maps_url=property_map.external_url,
@@ -265,6 +270,7 @@ class PropertyInstruction(WebsiteGenerator):
 			map_display_query=self.get_map_display_query(),
 			map_zoom=self.map_zoom,
 			map_type=self.map_type,
+			instruction_block_maps=instruction_block_maps,
 			show_embedded_map=bool(cint(self.show_embedded_map or 0)),
 			google_maps_place_id=self.google_maps_place_id,
 			map_search_query=self.map_search_query,
@@ -302,30 +308,31 @@ class PropertyInstruction(WebsiteGenerator):
 				block_row = row.as_dict()
 				block_row.pop("google_maps_embed_html", None)
 				block_map = self.get_block_map_data(row)
+				block_data = dict(block_row)
+				block_data.update(
+					title_translation_protected=self.should_protect_identifier_value(row.title),
+					body_translation_protected=self.should_protect_body_value(row.body),
+					caption_translation_protected=self.should_protect_identifier_value(row.caption),
+					display_section=section,
+					safe_body=self.get_safe_body(row.body),
+					anchor=self.scrub(section),
+					display_step_number=row.step_number or step_counter or None,
+					display_link_label=row.link_label or row.link_url,
+					image=self.get_public_pdf_image_src(row.image),
+					map_embed_url=block_map.embed_url,
+					map_latitude=block_map.latitude,
+					map_longitude=block_map.longitude,
+					map_zoom=block_map.zoom,
+					map_external_url=block_map.external_url,
+					map_attribution=block_map.attribution,
+					display_link_label_translation_protected=self.should_protect_identifier_value(
+						row.link_label or row.link_url
+					),
+					image_alt=row.caption or row.title or f"{self.title} - {section}",
+					hide_in_print=self.should_hide_block_in_print(row, self.get_map_external_url()),
+				)
 				section_blocks.append(
-					frappe._dict(
-						block_row,
-						title_translation_protected=self.should_protect_identifier_value(row.title),
-						body_translation_protected=self.should_protect_body_value(row.body),
-						caption_translation_protected=self.should_protect_identifier_value(row.caption),
-						display_section=section,
-						safe_body=self.get_safe_body(row.body),
-						anchor=self.scrub(section),
-						display_step_number=row.step_number or step_counter or None,
-						display_link_label=row.link_label or row.link_url,
-						image=self.get_public_pdf_image_src(row.image),
-						map_embed_url=block_map.embed_url,
-						map_latitude=block_map.latitude,
-						map_longitude=block_map.longitude,
-						map_zoom=block_map.zoom,
-						map_external_url=block_map.external_url,
-						map_attribution=block_map.attribution,
-						display_link_label_translation_protected=self.should_protect_identifier_value(
-							row.link_label or row.link_url
-						),
-						image_alt=row.caption or row.title or f"{self.title} - {section}",
-						hide_in_print=self.should_hide_block_in_print(row, self.get_map_external_url()),
-					)
+					frappe._dict(block_data)
 				)
 
 			if section_blocks:
@@ -338,6 +345,33 @@ class PropertyInstruction(WebsiteGenerator):
 				)
 
 		return grouped
+
+	def get_instruction_block_maps(self, sections=None):
+		block_maps = frappe._dict()
+		sorted_rows = sorted(
+			self.instruction_blocks or [],
+			key=lambda row: ((row.sort_order or row.idx or 0), row.idx or 0),
+		)
+		for row in sorted_rows:
+			if not row.get("name") or not self.block_has_content(row):
+				continue
+			if not (row.google_maps_embed_html or "").strip():
+				continue
+			block_map = self.get_block_map_data(row)
+			if not (block_map.embed_url or block_map.external_url):
+				continue
+			block_maps[row.name] = frappe._dict(
+				name=row.name,
+				title=row.title,
+				embed_url=block_map.embed_url,
+				latitude=block_map.latitude,
+				longitude=block_map.longitude,
+				zoom=block_map.zoom,
+				external_url=block_map.external_url,
+				attribution=block_map.attribution,
+				link_label=row.link_label or row.link_url,
+			)
+		return block_maps
 
 	def normalize_map_fields(self):
 		self.show_embedded_map = cint(self.show_embedded_map or 0)
@@ -708,7 +742,7 @@ class PropertyInstruction(WebsiteGenerator):
 				row.image,
 				row.caption,
 				row.link_url,
-				row.google_maps_embed_html if row.block_type == "Map" else None,
+				row.google_maps_embed_html,
 			]
 		)
 
@@ -747,7 +781,7 @@ class PropertyInstruction(WebsiteGenerator):
 		return parsed.geturl()
 
 	def get_block_map_data(self, row):
-		if row.block_type != "Map":
+		if not (row.google_maps_embed_html or "").strip():
 			return frappe._dict(
 				embed_url=None,
 				latitude=None,

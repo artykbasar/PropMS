@@ -78,8 +78,8 @@
    "label": "Link Label"
   },
   {
-   "depends_on": "eval:doc.block_type == \"Map\"",
-   "description": "Paste the iframe HTML from Google Maps > Share > Embed a map.",
+   "depends_on": "eval:doc.block_type",
+   "description": "Paste the iframe HTML from Google Maps > Share > Embed a map. Required for Map blocks. Optional for Step/Text/Image/Warning/Link.",
    "fieldname": "google_maps_embed_html",
    "fieldtype": "Code",
    "label": "Google Maps Embed HTML",
