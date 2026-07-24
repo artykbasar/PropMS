@@ -15,7 +15,8 @@
   "image",
   "caption",
   "link_url",
-  "link_label"
+  "link_label",
+  "google_maps_embed_html"
  ],
  "fields": [
   {
@@ -31,7 +32,7 @@
    "fieldtype": "Select",
    "in_list_view": 1,
    "label": "Block Type",
-   "options": "Text\nStep\nImage\nWarning\nLink",
+   "options": "Text\nStep\nImage\nWarning\nLink\nMap",
    "reqd": 1
   },
   {
@@ -75,6 +76,15 @@
    "fieldname": "link_label",
    "fieldtype": "Data",
    "label": "Link Label"
+  },
+  {
+   "depends_on": "eval:doc.block_type == \"Map\"",
+   "description": "Paste the iframe HTML from Google Maps > Share > Embed a map.",
+   "fieldname": "google_maps_embed_html",
+   "fieldtype": "Code",
+   "label": "Google Maps Embed HTML",
+   "mandatory_depends_on": "eval:doc.block_type == \"Map\"",
+   "options": "HTML"
   }
  ],
  "index_web_pages_for_search": 1,

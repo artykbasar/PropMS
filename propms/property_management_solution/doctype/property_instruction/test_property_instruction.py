@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import json
 import os
 import unittest
 import uuid
@@ -37,6 +38,14 @@ EXPORT_SCRIPT_PATH = os.path.abspath(
 		"public",
 		"js",
 		"property_instruction_export.js",
+	)
+)
+BLOCK_DOCTYPE_PATH = os.path.abspath(
+	os.path.join(
+		os.path.dirname(__file__),
+		"..",
+		"property_instruction_block",
+		"property_instruction_block.json",
 	)
 )
 
@@ -209,6 +218,10 @@ class PropertyInstructionTestMixin:
 		with open(EXPORT_SCRIPT_PATH) as export_script_file:
 			return export_script_file.read()
 
+	def get_block_doctype_json(self):
+		with open(BLOCK_DOCTYPE_PATH) as block_doctype_file:
+			return json.load(block_doctype_file)
+
 	def make_site_file(self, filename, content=PNG_BYTES, private=False):
 		base_path = frappe.get_site_path("private" if private else "public", "files")
 		os.makedirs(base_path, exist_ok=True)
@@ -362,6 +375,101 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 		self.assertIn("https://www.google.com/maps/search/", doc.get_map_external_url())
 		self.assertIn("99A+Burlington+Road", doc.get_map_external_url())
 
+	def test_map_block_option_and_embed_field_exist_in_schema(self):
+		schema = self.get_block_doctype_json()
+		block_type_field = next(field for field in schema["fields"] if field["fieldname"] == "block_type")
+		embed_field = next(field for field in schema["fields"] if field["fieldname"] == "google_maps_embed_html")
+		self.assertIn("Map", block_type_field["options"].splitlines())
+		self.assertEqual(embed_field["fieldtype"], "Code")
+		self.assertEqual(embed_field["options"], "HTML")
+		self.assertEqual(embed_field["depends_on"], 'eval:doc.block_type == "Map"')
+		self.assertEqual(embed_field["mandatory_depends_on"], 'eval:doc.block_type == "Map"')
+
+	def test_map_block_accepts_valid_google_embed_and_excludes_raw_html_from_context(self):
+		embed_html = '<iframe src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d2484.0!2d-0.249!3d51.399!2m3!1f0!2f0!3f0!3m2!1i1024!2i768"></iframe>'
+		doc = self.make_instruction(
+			instruction_blocks=[
+				{
+					"section": "Finding the Property",
+					"block_type": "Map",
+					"title": "Front entrance map",
+					"google_maps_embed_html": embed_html,
+				},
+			]
+		)
+		grouped_sections = doc.get_grouped_blocks()
+		block = grouped_sections[0].blocks[0]
+		self.assertEqual(block.block_type, "Map")
+		self.assertEqual(block.map_embed_url, "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d2484.0!2d-0.249!3d51.399!2m3!1f0!2f0!3f0!3m2!1i1024!2i768")
+		self.assertNotIn("google_maps_embed_html", block)
+		html = self.render_instruction(doc)
+		self.assertIn('class="pi-instruction-map"', html)
+		self.assertIn('src="https://www.google.com/maps/embed?pb=', html)
+		self.assertNotIn("onclick=", html)
+		self.assertNotIn("google_maps_embed_html", html)
+
+	def test_map_block_rejects_invalid_google_embed_html(self):
+		with self.assertRaises(frappe.ValidationError):
+			self.make_instruction(
+				instruction_blocks=[
+					{
+						"section": "Finding the Property",
+						"block_type": "Map",
+						"title": "Bad map",
+						"google_maps_embed_html": '<iframe src="https://example.com/maps/embed"></iframe>',
+					},
+				]
+			)
+		with self.assertRaises(frappe.ValidationError):
+			self.make_instruction(
+				instruction_blocks=[
+					{
+						"section": "Finding the Property",
+						"block_type": "Map",
+						"title": "Bad map",
+						"google_maps_embed_html": '<iframe srcdoc="<script>alert(1)</script>" src="https://www.google.com/maps/embed?pb=1"></iframe>',
+					},
+				]
+			)
+		with self.assertRaises(frappe.ValidationError):
+			self.make_instruction(
+				instruction_blocks=[
+					{
+						"section": "Finding the Property",
+						"block_type": "Map",
+						"title": "Bad map",
+						"google_maps_embed_html": '<iframe src="javascript:alert(1)"></iframe>',
+					},
+				]
+			)
+
+	def test_map_block_coordinate_parsing_supports_embed_formats(self):
+		doc = self.make_instruction()
+		for url in (
+			"https://www.google.com/maps/@51.399,-0.249,16z",
+			"https://www.google.com/maps?output=embed&q=51.399,-0.249",
+			"https://www.google.com/maps/embed?pb=!1m18!2m3!1d1!2d-0.249!3d51.399!3m2!1i1024!2i768!4f13.1",
+		):
+			coordinates = doc.parse_map_coordinates_from_url(url)
+			self.assertAlmostEqual(coordinates.latitude, 51.399)
+			self.assertAlmostEqual(coordinates.longitude, -0.249)
+
+	def test_map_block_counts_as_content_and_uses_link_fallback_without_coordinates(self):
+		doc = self.make_instruction(
+			instruction_blocks=[
+				{
+					"section": "Finding the Property",
+					"block_type": "Map",
+					"title": "Arrival map",
+					"google_maps_embed_html": '<iframe src="https://www.google.com/maps?output=embed&q=99A+Burlington+Road"></iframe>',
+				},
+			]
+		)
+		grouped_sections = doc.get_grouped_blocks()
+		self.assertEqual(grouped_sections[0].blocks[0].block_type, "Map")
+		self.assertIsNone(grouped_sections[0].blocks[0].map_latitude)
+		self.assertIn("https://www.google.com/maps", grouped_sections[0].blocks[0].map_external_url)
+
 	def test_google_translate_widget_disabled_by_default(self):
 		self.set_property_management_setting("enable_guest_guide_google_translate", 0)
 		doc = self.make_instruction()
@@ -460,6 +568,19 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 		self.assertNotIn("download_pdf?", html)
 		self.assertNotIn("Property Instruction Translation", html)
 		self.assertNotIn("Google Cloud Translation", html)
+		self.assertIn('data-guide-toolbar', html)
+		self.assertIn('class="pi-google-translate-engine"', html)
+		self.assertNotIn('class="pi-translate-shell"', html)
+
+	def test_template_uses_sticky_toolbar_outside_guide_screen_without_duplicate_actions(self):
+		self.set_property_management_setting("enable_guest_guide_google_translate", 1)
+		doc = self.make_instruction()
+		html = self.render_instruction(doc)
+		self.assertEqual(html.count("pi-pdf-download"), 1)
+		self.assertEqual(html.count("property-instruction-print"), 1)
+		self.assertLess(html.index('data-guide-toolbar'), html.index('data-guide-screen'))
+		self.assertIn('data-guide-language-select', html)
+		self.assertIn('Powered by Google Translate', html)
 
 	def test_template_includes_empty_state_hook_when_no_sections(self):
 		doc = self.make_instruction(instruction_blocks=[])
@@ -642,6 +763,18 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 		self.assertIn('node.setAttribute("data-html2canvas-ignore", "true")', source)
 		self.assertIn("destroyCaptureFrame(captureFrame)", source)
 		self.assertIn("prepareCaptureClone(clonedDocument)", source)
+
+	def test_export_script_builds_translated_filenames_and_custom_toolbar_sync(self):
+		source = self.get_export_script_source()
+		self.assertIn("function sanitizePdfFilenamePart(value)", source)
+		self.assertIn("function buildTranslatedPdfFilename(fallbackFilename)", source)
+		self.assertIn("getVisibleText(document.querySelector(\"[data-guide-kicker]\"))", source)
+		self.assertIn("syncCustomLanguageSelectorFromGoogle", source)
+		self.assertIn("applyCustomLanguageSelection", source)
+		self.assertIn("resetToSourceLanguage", source)
+		self.assertIn("expireCookie(\"googtrans\")", source)
+		self.assertIn("pi-google-translate-engine", self.render_instruction(self.make_instruction()))
+		self.assertIn("getPdfFilename(downloadButton)", source)
 
 	def test_export_script_validates_image_clipping_separately_from_ratio(self):
 		source = self.get_export_script_source()

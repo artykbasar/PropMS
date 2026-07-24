@@ -250,8 +250,43 @@
     return getVisibleText(document.querySelector("[data-guide-field='title']"));
   }
 
+  function sanitizePdfFilenamePart(value) {
+    var normalized = String(value || "");
+    if (normalized.normalize) {
+      normalized = normalized.normalize("NFKC");
+    }
+    normalized = normalized
+      .replace(/[\u0000-\u001f\u007f]+/g, " ")
+      .replace(/[\/\\:*?"<>|]+/g, " ")
+      .replace(/\s+/g, " ")
+      .replace(/[. ]+$/g, "")
+      .trim();
+    return normalized;
+  }
+
+  function buildTranslatedPdfFilename(fallbackFilename) {
+    var fallback = String(fallbackFilename || "guest-guide.pdf").trim() || "guest-guide.pdf";
+    var translatedTitle = sanitizePdfFilenamePart(getGuideTitle());
+    var translatedKicker = sanitizePdfFilenamePart(
+      getVisibleText(document.querySelector("[data-guide-kicker]"))
+    );
+    var parts = [translatedTitle, translatedKicker].filter(Boolean);
+    if (!parts.length) {
+      return fallback;
+    }
+    var stem = parts.join(" - ").replace(/\s{2,}/g, " ").trim();
+    if (!stem) {
+      return fallback;
+    }
+    if (stem.length > 136) {
+      stem = stem.slice(0, 136).replace(/[. ]+$/g, "").trim();
+    }
+    return (stem || sanitizePdfFilenamePart(fallback.replace(/\.pdf$/i, "")) || "guest-guide") + ".pdf";
+  }
+
   function getPdfFilename(downloadButton) {
-    return String(downloadButton.getAttribute("data-pdf-filename") || "guest-guide.pdf").trim() || "guest-guide.pdf";
+    var fallback = String(downloadButton.getAttribute("data-pdf-filename") || "guest-guide.pdf").trim() || "guest-guide.pdf";
+    return buildTranslatedPdfFilename(fallback);
   }
 
   function getWidgetLanguage() {
@@ -269,6 +304,116 @@
         .trim()
         .toLowerCase()
     );
+  }
+
+  function getGoogleTranslateEngineContainer() {
+    return document.querySelector(".pi-google-translate-engine");
+  }
+
+  function getCustomLanguageSelect() {
+    return document.querySelector("[data-guide-language-select]");
+  }
+
+  function getTranslationStatusElement() {
+    return document.querySelector("[data-guide-translation-status]");
+  }
+
+  function setTranslationStatus(message) {
+    var statusElement = getTranslationStatusElement();
+    if (statusElement) {
+      statusElement.textContent = String(message || "");
+    }
+  }
+
+  function expireCookie(name) {
+    var host = window.location.hostname || "";
+    var domains = ["", host];
+    if (host && host.indexOf(".") !== -1) {
+      domains.push("." + host);
+    }
+    domains.forEach(function (domain) {
+      document.cookie = name + "=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/"
+        + (domain ? "; domain=" + domain : "");
+    });
+  }
+
+  function resetToSourceLanguage() {
+    expireCookie("googtrans");
+    try {
+      window.localStorage.removeItem("googtrans");
+    } catch (error) {
+      // Ignore storage access failures.
+    }
+    var currentUrl = new URL(window.location.href);
+    window.location.assign(currentUrl.pathname + currentUrl.search + currentUrl.hash);
+  }
+
+  function syncCustomLanguageSelectorFromGoogle() {
+    var customSelect = getCustomLanguageSelect();
+    var hiddenSelect = document.querySelector(".goog-te-combo");
+    if (!customSelect) {
+      return;
+    }
+    if (!hiddenSelect) {
+      customSelect.disabled = true;
+      return;
+    }
+    var optionMarkup = [];
+    optionMarkup.push('<option value="' + SOURCE_LANGUAGE + '">Original - English</option>');
+    Array.prototype.slice.call(hiddenSelect.options || []).forEach(function (optionNode) {
+      var optionValue = String(optionNode.value || "").trim().toLowerCase();
+      var optionLabel = String(optionNode.textContent || optionNode.innerText || "").trim();
+      if (!optionValue || optionValue === SOURCE_LANGUAGE) {
+        return;
+      }
+      optionMarkup.push(
+        '<option value="' + optionValue.replace(/"/g, "&quot;") + '" translate="no">' +
+        optionLabel.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;") +
+        '</option>'
+      );
+    });
+    if (customSelect.getAttribute("data-options-signature") !== optionMarkup.join("|")) {
+      customSelect.innerHTML = optionMarkup.join("");
+      customSelect.setAttribute("data-options-signature", optionMarkup.join("|"));
+    }
+    customSelect.disabled = false;
+    var selectedLanguage = getWidgetLanguage() || SOURCE_LANGUAGE;
+    if (customSelect.value !== selectedLanguage) {
+      customSelect.value = selectedLanguage;
+    }
+  }
+
+  function applyCustomLanguageSelection(nextLanguage) {
+    var hiddenSelect = document.querySelector(".goog-te-combo");
+    var normalizedLanguage = String(nextLanguage || SOURCE_LANGUAGE).trim().toLowerCase() || SOURCE_LANGUAGE;
+    if (normalizedLanguage === SOURCE_LANGUAGE) {
+      if (hiddenSelect && Array.prototype.slice.call(hiddenSelect.options || []).some(function (optionNode) {
+        return String(optionNode.value || "").trim().toLowerCase() === SOURCE_LANGUAGE;
+      })) {
+        hiddenSelect.value = SOURCE_LANGUAGE;
+        hiddenSelect.dispatchEvent(new Event("change", { bubbles: true }));
+        hiddenSelect.dispatchEvent(new Event("input", { bubbles: true }));
+        return;
+      }
+      resetToSourceLanguage();
+      return;
+    }
+    if (!hiddenSelect) {
+      return;
+    }
+    hiddenSelect.value = normalizedLanguage;
+    hiddenSelect.dispatchEvent(new Event("change", { bubbles: true }));
+    hiddenSelect.dispatchEvent(new Event("input", { bubbles: true }));
+  }
+
+  function enforceGoogleUiHidden() {
+    document.body.style.top = "0";
+    document.documentElement.style.top = "0";
+    Array.prototype.slice.call(document.querySelectorAll(".goog-te-banner-frame, .goog-te-balloon-frame, #goog-gt-tt")).forEach(function (node) {
+      if (node && node.style) {
+        node.style.display = "none";
+      }
+    });
   }
 
   function isRtlLanguage(languageCode) {
@@ -755,7 +900,7 @@
     if (widgetSelect && !translationState.selectAppearedAt) {
       translationState.selectAppearedAt = selectAppearedAt;
     }
-    var container = document.querySelector(".pi-translate-widget");
+    var container = getGoogleTranslateEngineContainer();
     if (container && container.children.length && !translationState.widgetContainerPopulatedAt) {
       translationState.widgetContainerPopulatedAt = Date.now();
     }
@@ -795,6 +940,8 @@
         lastSemanticProgressAt: Number(translationState.lastSemanticProgressAt || 0) || 0
       }
     });
+    syncCustomLanguageSelectorFromGoogle();
+    enforceGoogleUiHidden();
     return translationState.requestedLanguage || SOURCE_LANGUAGE;
   }
 
@@ -833,6 +980,12 @@
     });
 
     document.addEventListener("change", function (event) {
+      var customSelect = event.target.closest("[data-guide-language-select]");
+      if (customSelect) {
+        setTranslationStatus("");
+        applyCustomLanguageSelection(customSelect.value || SOURCE_LANGUAGE);
+        return;
+      }
       var widgetSelect = event.target.closest(".goog-te-combo");
       if (!widgetSelect) {
         return;
@@ -854,6 +1007,7 @@
     });
 
     translationState.guideObserverBound = true;
+    setTranslationStatus("");
   }
 
   function ensureOriginalSnapshotCaptured() {
@@ -1870,6 +2024,7 @@
         var caption = getVisibleText(blockNode.querySelector("[data-guide-block-caption]"));
         var linkNode = blockNode.querySelector("[data-guide-block-link]");
         var imageNode = blockNode.querySelector("[data-guide-block-image]");
+        var mapNode = blockNode.querySelector("[data-guide-block-map]");
         return {
           id: blockNode.getAttribute("data-guide-block-id") || "",
           type: blockNode.getAttribute("data-guide-block-type") || "Text",
@@ -1881,10 +2036,16 @@
           linkLabel: getVisibleText(linkNode),
           linkHref: normalizeHref(linkNode && linkNode.getAttribute("href")),
           imageSrc: imageNode ? String(imageNode.getAttribute("src") || "").trim() : "",
-          imageAlt: imageNode ? String(imageNode.getAttribute("alt") || "").trim() : ""
+          imageAlt: imageNode ? String(imageNode.getAttribute("alt") || "").trim() : "",
+          mapEmbedUrl: mapNode ? String(mapNode.getAttribute("data-guide-block-map-embed-url") || "").trim() : "",
+          mapLatitude: parseNumericDataAttribute(mapNode, "data-guide-block-map-latitude"),
+          mapLongitude: parseNumericDataAttribute(mapNode, "data-guide-block-map-longitude"),
+          mapZoom: parseNumericDataAttribute(mapNode, "data-guide-block-map-zoom") || 16,
+          mapExternalUrl: normalizeHref(mapNode && mapNode.getAttribute("data-guide-block-map-external-url")),
+          mapAttribution: mapNode ? String(mapNode.getAttribute("data-guide-block-map-attribution") || "").trim() : ""
         };
       }).filter(function (block) {
-        return block.title || block.body || block.caption || block.linkLabel || block.imageSrc;
+        return block.title || block.body || block.caption || block.linkLabel || block.imageSrc || block.mapEmbedUrl;
       });
 
       return {
@@ -2279,6 +2440,19 @@
           );
         }
 
+        if (blockModel.type === "Map" && blockModel.mapImageSrc) {
+          mediaColumn.appendChild(
+            createManagedImage(document, {
+              src: blockModel.mapImageSrc,
+              alt: blockModel.title || sectionModel.title,
+              className: "pi-export-map-image pi-export-map-image--block",
+              frameClassName: "pi-export-image-frame pi-export-map-image-frame pi-export-map-image-frame--block",
+              imageRole: "map",
+              placeholderClass: "pi-export-map-placeholder"
+            }, pendingImages)
+          );
+        }
+
         if (blockModel.caption) {
           var caption = document.createElement("p");
           caption.className = "pi-export-card-caption";
@@ -2300,8 +2474,16 @@
           textColumn.appendChild(linkWrap);
         }
 
+        if (blockModel.type === "Map" && blockModel.mapAttribution && !blockModel.mapImageSrc) {
+          var blockMapAttribution = document.createElement("p");
+          blockMapAttribution.className = "pi-export-map-attribution notranslate";
+          blockMapAttribution.textContent = blockModel.mapAttribution;
+          blockMapAttribution.setAttribute("translate", "no");
+          textColumn.appendChild(blockMapAttribution);
+        }
+
         cardLayout.appendChild(textColumn);
-        if (blockModel.imageSrc) {
+        if (blockModel.imageSrc || blockModel.mapImageSrc) {
           cardLayout.appendChild(mediaColumn);
         }
         card.appendChild(cardLayout);
@@ -2327,7 +2509,8 @@
       exportRoot: exportRoot,
       exportPage: exportWrapper,
       exportDocument: exportDocument,
-      pendingImages: pendingImages
+      pendingImages: pendingImages,
+      model: model
     };
   }
 
@@ -3153,7 +3336,8 @@
     var mapStartedAt = Date.now();
     var mapDiagnostics = {
       propertyMap: null,
-      parkingMap: null
+      parkingMap: null,
+      blockMaps: []
     };
 
     try {
@@ -3199,6 +3383,45 @@
       mapDiagnostics.parkingMap = {
         code: error && error.message ? error.message : "map-render-failed"
       };
+    }
+
+    for (var sectionIndex = 0; sectionIndex < preparedModel.sections.length; sectionIndex += 1) {
+      var sectionModel = preparedModel.sections[sectionIndex];
+      for (var blockIndex = 0; blockIndex < sectionModel.blocks.length; blockIndex += 1) {
+        var blockModel = sectionModel.blocks[blockIndex];
+        if (blockModel.type !== "Map") {
+          continue;
+        }
+        if (Number.isFinite(blockModel.mapLatitude) && Number.isFinite(blockModel.mapLongitude)) {
+          try {
+            var blockMapSnapshot = await getOrCreateMapSnapshot({
+              kind: "block-" + (blockModel.id || "map"),
+              latitude: blockModel.mapLatitude,
+              longitude: blockModel.mapLongitude,
+              zoom: blockModel.mapZoom || 16,
+              width: 760,
+              height: 280,
+              attribution: blockModel.mapAttribution || "© OpenStreetMap contributors"
+            }, mapImageCache, exportImageDataCache);
+            blockModel.mapImageSrc = blockMapSnapshot.dataUri;
+            blockModel.mapAttribution = blockMapSnapshot.attribution || blockModel.mapAttribution;
+            mapDiagnostics.blockMaps.push({
+              blockId: blockModel.id,
+              code: "ok"
+            });
+          } catch (error) {
+            mapDiagnostics.blockMaps.push({
+              blockId: blockModel.id,
+              code: error && error.message ? error.message : "block-map-render-failed"
+            });
+          }
+          continue;
+        }
+        mapDiagnostics.blockMaps.push({
+          blockId: blockModel.id,
+          code: "block-map-coordinates-missing"
+        });
+      }
     }
 
     return {
@@ -3895,6 +4118,13 @@
       format: "a4",
       compress: true
     });
+    if (typeof pdf.setProperties === "function") {
+      pdf.setProperties({
+        title: [exportState.model && exportState.model.title, exportState.model && exportState.model.kicker].filter(Boolean).join(" - "),
+        subject: exportState.model && exportState.model.languageCode ? exportState.model.languageCode : SOURCE_LANGUAGE,
+        creator: "PropMS guest guide PDF export"
+      });
+    }
 
     var pdfWidth = pdf.internal.pageSize.getWidth();
     var pdfHeight = pdf.internal.pageSize.getHeight();
@@ -4050,7 +4280,6 @@
   async function downloadTranslatedPdf(downloadButton) {
     const statusElement = document.querySelector(".pi-action-status");
     const originalLabel = downloadButton.textContent;
-    const filename = getPdfFilename(downloadButton);
     const guideTitle = getGuideTitle();
     const guideIdentity = getGuideIdentity(downloadButton);
     var exportState = null;
@@ -4079,12 +4308,13 @@
       );
       var immediateCachedPdf = getCachedPdfBlob(immediateCacheKey);
       if (immediateCachedPdf && immediateCachedPdf.blob) {
+        var immediateFilename = getPdfFilename(downloadButton);
         recordPdfPerformance(performanceState, "warmRepeatedDownloadMs", clickStartedAt);
         recordPdfPerformance(performanceState, "totalMs", performanceState.startedAt);
         window.__propertyInstructionLastPdfBlob = immediateCachedPdf.blob;
         window.__propertyInstructionLastPdfLanguage = currentLanguage;
         window.__propertyInstructionPdfStep = "download-ready";
-        triggerBlobDownload(immediateCachedPdf.blob, filename);
+        triggerBlobDownload(immediateCachedPdf.blob, immediateFilename);
         if (statusElement) {
           statusElement.textContent = "";
         }
@@ -4100,11 +4330,12 @@
       var cacheKey = getPreparedStateKey(guideIdentity, exportLanguage, exportGeneration, snapshotHash);
       var cachedPdf = getCachedPdfBlob(cacheKey);
       if (cachedPdf && cachedPdf.blob) {
+        var cachedFilename = getPdfFilename(downloadButton);
         recordPdfPerformance(performanceState, "warmRepeatedDownloadMs", clickStartedAt);
         recordPdfPerformance(performanceState, "totalMs", performanceState.startedAt);
         window.__propertyInstructionLastPdfBlob = cachedPdf.blob;
         window.__propertyInstructionPdfStep = "download-ready";
-        triggerBlobDownload(cachedPdf.blob, filename);
+        triggerBlobDownload(cachedPdf.blob, cachedFilename);
         if (statusElement) {
           statusElement.textContent = "";
         }
@@ -4194,7 +4425,7 @@
 
       updateExportProgress(downloadButton, statusElement, null, null, "render-pdf");
       var pdf = await withTimeout(
-        renderExportPagesToPdf(exportState, filename, preMountParity.modelParityMap, mutationGuardState),
+        renderExportPagesToPdf(exportState, getPdfFilename(downloadButton), preMountParity.modelParityMap, mutationGuardState),
         PDF_EXPORT_TIMEOUT_MS,
         "PDF export timed out"
       );
@@ -4236,7 +4467,7 @@
         performance: performanceState
       });
       stopExportMutationGuard(mutationGuardState);
-      triggerBlobDownload(pdfBlob, filename);
+      triggerBlobDownload(pdfBlob, getPdfFilename(downloadButton));
       destroyExportRoot(exportState.exportRoot);
 
       if (statusElement) {

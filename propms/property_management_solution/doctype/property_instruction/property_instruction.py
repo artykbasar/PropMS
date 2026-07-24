@@ -8,9 +8,10 @@ import os
 import re
 import socket
 from datetime import timedelta
+from html.parser import HTMLParser
 from ipaddress import ip_address
 from urllib.error import HTTPError
-from urllib.parse import quote, urlencode, urljoin, urlparse, urlunparse
+from urllib.parse import parse_qs, quote, urlencode, urljoin, urlparse, urlunparse
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 import frappe
@@ -40,6 +41,7 @@ MIN_MAP_ZOOM = 0
 MAX_MAP_ZOOM = 21
 GOOGLE_TRANSLATE_SCRIPT_BASE_URL = "https://translate.google.com/translate_a/element.js"
 TRUSTED_GOOGLE_MAP_HOSTS = {"www.google.com", "google.com", "maps.google.com"}
+TRUSTED_GOOGLE_MAP_EMBED_PATH_PREFIXES = ("/maps", "/maps/embed")
 TRUSTED_EXTERNAL_PDF_IMAGE_HOSTS = {"maps.googleapis.com", "tile.openstreetmap.org"}
 LANGUAGE_CODE_PATTERN = re.compile(r"^[a-z]{2,3}(?:-[a-z]{2,8})*$")
 PHONE_PATTERN = re.compile(r"(?:\+?\d[\d\s().-]{6,}\d)")
@@ -49,6 +51,8 @@ ROAD_NAME_PATTERN = re.compile(
 	re.IGNORECASE,
 )
 GOOGLE_MAP_AT_PATTERN = re.compile(r"@(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)")
+GOOGLE_MAP_3D4D_PATTERN = re.compile(r"!3d(-?\d+(?:\.\d+)?)!4d(-?\d+(?:\.\d+)?)")
+GOOGLE_MAP_2D3D_PATTERN = re.compile(r"!2d(-?\d+(?:\.\d+)?)!3d(-?\d+(?:\.\d+)?)")
 COORDINATE_TEXT_PATTERN = re.compile(r"(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)")
 NOINDEX_ROBOTS_CONTENT = "noindex, nofollow, noarchive, nosnippet, noimageindex"
 GUEST_GUIDE_EXCLUDED_WEB_ASSET_PREFIXES = (
@@ -66,6 +70,41 @@ PUBLIC_PDF_IMAGE_ALLOWED_CONTENT_TYPES = {
 	"image/gif",
 	"image/avif",
 }
+
+
+class GoogleMapsEmbedParser(HTMLParser):
+	def __init__(self):
+		super().__init__()
+		self.iframe_attrs = None
+		self.iframe_count = 0
+		self.invalid_reason = ""
+
+	def handle_starttag(self, tag, attrs):
+		tag_name = (tag or "").lower()
+		if tag_name != "iframe":
+			self.invalid_reason = "only-iframe-embed-allowed"
+			return
+		self.iframe_count += 1
+		if self.iframe_count > 1:
+			self.invalid_reason = "multiple-iframes-not-allowed"
+			return
+		normalized_attrs = {}
+		for key, value in attrs:
+			attribute_name = (key or "").strip().lower()
+			if not attribute_name:
+				continue
+			if attribute_name.startswith("on"):
+				self.invalid_reason = "event-handler-attributes-not-allowed"
+				return
+			normalized_attrs[attribute_name] = value or ""
+		self.iframe_attrs = normalized_attrs
+
+	def handle_startendtag(self, tag, attrs):
+		self.handle_starttag(tag, attrs)
+
+	def handle_data(self, data):
+		if data and data.strip():
+			self.invalid_reason = "embed-html-must-contain-only-an-iframe"
 
 
 class PropertyInstruction(WebsiteGenerator):
@@ -149,6 +188,8 @@ class PropertyInstruction(WebsiteGenerator):
 				self.validate_external_link(row.link_url, _("Instruction Block #{0} link").format(row.idx))
 			if row.block_type == "Link" and not row.link_url:
 				frappe.throw(_("Instruction Block #{0} is missing a link URL.").format(row.idx))
+			if row.block_type == "Map":
+				self.validate_map_block(row)
 
 	def validate_external_link(self, url, label):
 		parsed = urlparse((url or "").strip())
@@ -161,6 +202,23 @@ class PropertyInstruction(WebsiteGenerator):
 		hostname = (urlparse((self.google_maps_url or "").strip()).hostname or "").lower()
 		if hostname not in TRUSTED_GOOGLE_MAP_HOSTS:
 			frappe.throw(_("Google Maps URL must use a trusted Google Maps hostname."))
+
+	def validate_map_block(self, row):
+		if not (row.google_maps_embed_html or "").strip():
+			frappe.throw(
+				_("Instruction Block #{0} is missing Google Maps Embed HTML.").format(row.idx)
+			)
+		try:
+			self.extract_google_maps_embed_url(row.google_maps_embed_html)
+		except frappe.ValidationError:
+			raise
+		except Exception as error:
+			frappe.throw(
+				_("Instruction Block #{0} has an invalid Google Maps embed: {1}").format(
+					row.idx,
+					frappe.safe_decode(str(error)),
+				)
+			)
 
 	def get_page_info(self):
 		page_info = super().get_page_info()
@@ -241,9 +299,12 @@ class PropertyInstruction(WebsiteGenerator):
 					continue
 				if row.block_type == "Step":
 					step_counter += 1
+				block_row = row.as_dict()
+				block_row.pop("google_maps_embed_html", None)
+				block_map = self.get_block_map_data(row)
 				section_blocks.append(
 					frappe._dict(
-						row.as_dict(),
+						block_row,
 						title_translation_protected=self.should_protect_identifier_value(row.title),
 						body_translation_protected=self.should_protect_body_value(row.body),
 						caption_translation_protected=self.should_protect_identifier_value(row.caption),
@@ -253,6 +314,12 @@ class PropertyInstruction(WebsiteGenerator):
 						display_step_number=row.step_number or step_counter or None,
 						display_link_label=row.link_label or row.link_url,
 						image=self.get_public_pdf_image_src(row.image),
+						map_embed_url=block_map.embed_url,
+						map_latitude=block_map.latitude,
+						map_longitude=block_map.longitude,
+						map_zoom=block_map.zoom,
+						map_external_url=block_map.external_url,
+						map_attribution=block_map.attribution,
 						display_link_label_translation_protected=self.should_protect_identifier_value(
 							row.link_label or row.link_url
 						),
@@ -379,13 +446,47 @@ class PropertyInstruction(WebsiteGenerator):
 			if latitude is not None and longitude is not None:
 				return frappe._dict(latitude=latitude, longitude=longitude, source="google_maps_url")
 
+		match = GOOGLE_MAP_3D4D_PATTERN.search(text)
+		if match:
+			latitude = self.parse_coordinate_value(match.group(1))
+			longitude = self.parse_coordinate_value(match.group(2))
+			if latitude is not None and longitude is not None:
+				return frappe._dict(latitude=latitude, longitude=longitude, source="google_maps_url_pb")
+
+		match = GOOGLE_MAP_2D3D_PATTERN.search(text)
+		if match:
+			longitude = self.parse_coordinate_value(match.group(1))
+			latitude = self.parse_coordinate_value(match.group(2))
+			if latitude is not None and longitude is not None:
+				return frappe._dict(latitude=latitude, longitude=longitude, source="google_maps_url_pb")
+
 		parsed = urlparse(text)
+		query_params = parse_qs(parsed.query or "", keep_blank_values=False)
+		for key in ("q", "query"):
+			query_values = query_params.get(key) or []
+			for query_value in query_values:
+				query_coordinates = self.parse_map_coordinates_from_text(query_value)
+				if query_coordinates:
+					query_coordinates.source = f"google_maps_url_{key}"
+					return query_coordinates
 		query_coordinates = self.parse_map_coordinates_from_text(parsed.query or "")
 		if query_coordinates:
 			query_coordinates.source = "google_maps_url_query"
 			return query_coordinates
 
 		return None
+
+	def parse_map_zoom_from_url(self, url, default_zoom=None):
+		parsed = urlparse((url or "").strip())
+		query_values = parse_qs(parsed.query or "", keep_blank_values=False)
+		for key in ("z", "zoom"):
+			values = query_values.get(key) or []
+			if values:
+				return self.normalize_map_zoom(values[0])
+		match = re.search(r"@-?\d+(?:\.\d+)?,-?\d+(?:\.\d+)?,(\d+)(?:z|m)", url or "")
+		if match:
+			return self.normalize_map_zoom(match.group(1))
+		return self.normalize_map_zoom(default_zoom or self.map_zoom)
 
 	def get_guest_guide_web_assets(self, existing_assets=None, asset_type="css"):
 		assets = list(existing_assets or frappe.get_hooks(f"web_include_{asset_type}") or [])
@@ -607,7 +708,72 @@ class PropertyInstruction(WebsiteGenerator):
 				row.image,
 				row.caption,
 				row.link_url,
+				row.google_maps_embed_html if row.block_type == "Map" else None,
 			]
+		)
+
+	def extract_google_maps_embed_url(self, embed_html):
+		parser = GoogleMapsEmbedParser()
+		parser.feed((embed_html or "").strip())
+		parser.close()
+		if parser.invalid_reason:
+			frappe.throw(_("Google Maps embed is invalid: {0}").format(parser.invalid_reason))
+		if parser.iframe_count != 1 or not parser.iframe_attrs:
+			frappe.throw(_("Google Maps embed must contain exactly one iframe."))
+		iframe_attrs = parser.iframe_attrs
+		if iframe_attrs.get("srcdoc"):
+			frappe.throw(_("Google Maps embed cannot use srcdoc."))
+		src = (iframe_attrs.get("src") or "").strip()
+		if not src:
+			frappe.throw(_("Google Maps embed iframe is missing src."))
+		return self.validate_google_maps_embed_url(src)
+
+	def validate_google_maps_embed_url(self, url):
+		self.validate_external_link(url, _("Google Maps embed URL"))
+		parsed = urlparse((url or "").strip())
+		if parsed.scheme.lower() != "https":
+			frappe.throw(_("Google Maps embed URL must use HTTPS."))
+		if parsed.username or parsed.password:
+			frappe.throw(_("Google Maps embed URL cannot include credentials."))
+		hostname = (parsed.hostname or "").lower()
+		if hostname not in TRUSTED_GOOGLE_MAP_HOSTS:
+			frappe.throw(_("Google Maps embed URL must use a trusted Google Maps hostname."))
+		if not parsed.path.startswith(TRUSTED_GOOGLE_MAP_EMBED_PATH_PREFIXES):
+			frappe.throw(_("Google Maps embed URL must use a supported Google Maps embed path."))
+		query_values = parse_qs(parsed.query or "", keep_blank_values=True)
+		is_embed_path = parsed.path.startswith("/maps/embed")
+		if not is_embed_path and not (query_values.get("output") == ["embed"] or "pb" in query_values):
+			frappe.throw(_("Google Maps embed URL must use a supported embed format."))
+		return parsed.geturl()
+
+	def get_block_map_data(self, row):
+		if row.block_type != "Map":
+			return frappe._dict(
+				embed_url=None,
+				latitude=None,
+				longitude=None,
+				zoom=None,
+				external_url=None,
+				attribution="© OpenStreetMap contributors",
+			)
+		embed_url = self.extract_google_maps_embed_url(row.google_maps_embed_html)
+		coordinates = self.parse_map_coordinates_from_url(embed_url)
+		zoom = self.parse_map_zoom_from_url(embed_url, self.map_zoom)
+		external_url = (row.link_url or "").strip()
+		if not external_url and coordinates:
+			external_url = (
+				"https://www.google.com/maps/search/?"
+				+ urlencode({"api": 1, "query": f"{coordinates.latitude},{coordinates.longitude}"})
+			)
+		if not external_url and embed_url:
+			external_url = embed_url
+		return frappe._dict(
+			embed_url=embed_url,
+			latitude=coordinates.latitude if coordinates else None,
+			longitude=coordinates.longitude if coordinates else None,
+			zoom=zoom,
+			external_url=external_url,
+			attribution="© OpenStreetMap contributors",
 		)
 
 	def set_noindex_response_header(self):

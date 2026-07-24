@@ -45,8 +45,8 @@
     display: block;
   }
   .pi-print-layout {
-    position: absolute;
-    left: -200vw;
+    position: fixed;
+    left: -10000px;
     top: 0;
     width: 1080px;
     opacity: 0;
@@ -336,8 +336,11 @@
   .pi-map-card {
     margin-bottom: 1.25rem;
     padding: 1rem;
+    min-width: 0;
   }
   .pi-map-shell {
+    width: 100%;
+    max-width: 100%;
     aspect-ratio: 16 / 9;
     min-height: 320px;
     overflow: hidden;
@@ -347,6 +350,7 @@
   }
   .pi-map {
     width: 100%;
+    max-width: 100%;
     height: 100%;
     border: 0;
     display: block;
@@ -411,6 +415,118 @@
     background: #fff;
     color: var(--pi-ink);
   }
+  .pi-guide-toolbar {
+    position: sticky;
+    top: max(.5rem, env(safe-area-inset-top));
+    z-index: 1000;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: .9rem 1rem;
+    margin-bottom: 1rem;
+    padding: .9rem 1rem;
+    background: rgba(255, 255, 255, 0.92);
+    border: 1px solid rgba(215, 222, 229, 0.92);
+    border-radius: 20px;
+    box-shadow: 0 16px 34px rgba(15, 23, 42, 0.08);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+  }
+  .pi-toolbar-language,
+  .pi-toolbar-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: .75rem;
+  }
+  .pi-toolbar-language {
+    flex: 1 1 320px;
+  }
+  .pi-toolbar-label {
+    display: inline-flex;
+    align-items: center;
+    gap: .45rem;
+    font-size: .88rem;
+    font-weight: 700;
+    color: var(--pi-ink);
+  }
+  .pi-toolbar-label svg {
+    width: 1rem;
+    height: 1rem;
+    stroke: currentColor;
+    stroke-width: 1.8;
+    fill: none;
+  }
+  .pi-guide-language-select {
+    min-height: 2.75rem;
+    min-width: min(320px, 100%);
+    padding: .7rem 1rem;
+    border: 1px solid var(--pi-border);
+    border-radius: 999px;
+    background: #fff;
+    color: var(--pi-ink);
+    font: inherit;
+  }
+  .pi-translation-status {
+    min-height: 1.25rem;
+    color: var(--pi-muted);
+    font-size: .9rem;
+  }
+  .pi-translate-attribution {
+    color: var(--pi-muted);
+    font-size: .82rem;
+  }
+  .pi-google-translate-engine {
+    position: fixed;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+    opacity: 0.01;
+    pointer-events: none;
+    white-space: nowrap;
+    left: -10000px;
+    top: 0;
+  }
+  .pi-google-translate-engine .goog-te-gadget {
+    font-size: 1px !important;
+    color: transparent !important;
+  }
+  .pi-google-translate-engine .goog-te-combo {
+    min-width: 1px !important;
+    width: 1px !important;
+    height: 1px !important;
+    opacity: 0.01;
+  }
+  .goog-te-banner-frame.skiptranslate,
+  .goog-te-balloon-frame,
+  #goog-gt-tt,
+  .goog-tooltip,
+  .goog-text-highlight {
+    display: none !important;
+  }
+  body {
+    top: 0 !important;
+  }
+  .pi-instruction-map-shell {
+    margin-top: .85rem;
+    border: 1px solid var(--pi-border);
+    border-radius: 18px;
+    overflow: hidden;
+    background: #edf2f4;
+  }
+  .pi-instruction-map {
+    display: block;
+    width: 100%;
+    min-height: 320px;
+    height: min(52vw, 420px);
+    border: 0;
+  }
+  .pi-sections [data-guide-section] {
+    scroll-margin-top: 6rem;
+  }
   @media (max-width: 768px) {
     .pi-address-row,
     .pi-copy-row {
@@ -421,6 +537,17 @@
       width: 2.5rem;
     }
     .pi-actions .pi-btn {
+      width: 100%;
+    }
+    .pi-guide-toolbar {
+      padding: .8rem .9rem;
+    }
+    .pi-toolbar-language,
+    .pi-toolbar-actions {
+      width: 100%;
+    }
+    .pi-guide-language-select,
+    .pi-toolbar-actions .pi-btn {
       width: 100%;
     }
   }
@@ -1070,13 +1197,37 @@
     <img class="pi-image" src="{{ block.image }}" alt="{{ block.image_alt }}" data-guide-block-image>
     {% endif %}
 
+    {% if block.block_type == "Map" and block.map_embed_url %}
+    <div
+      class="pi-instruction-map-shell notranslate"
+      translate="no"
+      data-guide-block-map
+      data-guide-block-map-embed-url="{{ block.map_embed_url }}"
+      data-guide-block-map-latitude="{{ block.map_latitude if block.map_latitude is not none else '' }}"
+      data-guide-block-map-longitude="{{ block.map_longitude if block.map_longitude is not none else '' }}"
+      data-guide-block-map-zoom="{{ block.map_zoom if block.map_zoom is not none else '' }}"
+      data-guide-block-map-external-url="{{ block.map_external_url or '' }}"
+      data-guide-block-map-attribution="{{ block.map_attribution or '© OpenStreetMap contributors' }}">
+      <iframe
+        src="{{ block.map_embed_url }}"
+        loading="lazy"
+        allowfullscreen
+        referrerpolicy="no-referrer-when-downgrade"
+        title="{{ block.title or 'Map' }}"
+        class="pi-instruction-map"
+        translate="no"></iframe>
+    </div>
+    {% endif %}
+
     {% if block.caption %}
     <div class="pi-caption{% if block.caption_translation_protected %} notranslate{% endif %}" data-pdf-block-field="caption" data-guide-block-caption data-guide-signature data-guide-translation-kind="{% if block.caption_translation_protected %}proper_name_or_identifier{% else %}translatable{% endif %}"{% if block.caption_translation_protected %} translate="no"{% endif %}>{{ block.caption }}</div>
     {% endif %}
 
-    {% if block.link_url %}
+    {% if block.link_url or (block.block_type == "Map" and block.map_external_url) %}
     <div class="pi-link">
-      <a href="{{ block.link_url }}" target="_blank" rel="noopener noreferrer nofollow" data-pdf-block-field="link_label" data-guide-block-link data-guide-signature data-guide-translation-kind="{% if block.display_link_label_translation_protected %}proper_name_or_identifier{% else %}translatable{% endif %}"{% if block.display_link_label_translation_protected %} class="notranslate" translate="no"{% endif %}>{{ block.display_link_label }}</a>
+      {% set block_link_href = block.link_url or block.map_external_url %}
+      {% set block_link_label = block.display_link_label or ("Open in Google Maps" if block.block_type == "Map" else block_link_href) %}
+      <a href="{{ block_link_href }}" target="_blank" rel="noopener noreferrer nofollow" data-pdf-block-field="link_label" data-guide-block-link data-guide-signature data-guide-translation-kind="{% if block.display_link_label_translation_protected %}proper_name_or_identifier{% else %}translatable{% endif %}"{% if block.display_link_label_translation_protected %} class="notranslate" translate="no"{% endif %}>{{ block_link_label }}</a>
     </div>
     {% endif %}
   </div>
@@ -1143,14 +1294,40 @@
   data-guide-root
   data-guide-identity="{{ route or slug or title }}">
   <div class="pi-shell">
-    <div class="pi-screen-layout" data-guide-screen>
+    <section class="pi-guide-toolbar" data-guide-toolbar aria-label="Guide tools">
+      <div class="pi-toolbar-language">
+        <label class="pi-toolbar-label" for="pi-guide-language">
+          <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24">
+            <path d="M4 5h10"></path>
+            <path d="M9 3v2"></path>
+            <path d="M6 12c1.5-1 4-4 5-7"></path>
+            <path d="M6 12c1.5 1 4 4 5 7"></path>
+            <path d="M14 13h6"></path>
+            <path d="M17 10v6"></path>
+          </svg>
+          <span>Language</span>
+        </label>
+        <select id="pi-guide-language" class="pi-guide-language-select" data-guide-language-select {% if not (google_translate and google_translate.enabled) %}disabled{% endif %}>
+          <option value="">{% if google_translate and google_translate.enabled %}Loading languages…{% else %}Translation unavailable{% endif %}</option>
+        </select>
+        <span class="pi-translation-status" data-guide-translation-status aria-live="polite"></span>
+      </div>
+      <div class="pi-toolbar-actions">
+        <button
+          type="button"
+          class="pi-btn pi-btn-secondary pi-pdf-download"
+          data-pdf-filename="{{ pdf_download_filename }}"
+          data-guide-identity="{{ route or slug or title }}"
+        >Download PDF</button>
+        <button type="button" class="pi-btn pi-btn-secondary property-instruction-print">Print guide</button>
+      </div>
       {% if google_translate and google_translate.enabled %}
-      <section class="pi-translate-shell" aria-label="Instant translation">
-        <p class="pi-translate-copy">Translate this guide instantly</p>
-        <div id="{{ google_translate.container_id }}" class="pi-translate-widget"></div>
-      </section>
+      <small class="pi-translate-attribution">Powered by Google Translate</small>
+      <div id="{{ google_translate.container_id }}" class="pi-google-translate-engine" aria-hidden="true"></div>
       {% endif %}
-
+      <p class="pi-action-status sr-only" aria-live="polite"></p>
+    </section>
+    <div class="pi-screen-layout" data-guide-screen>
       <article class="pi-hero">
         {% if cover_image %}
         <img class="pi-cover" src="{{ cover_image }}" alt="{{ title }} cover image" data-guide-cover>
@@ -1205,14 +1382,6 @@
             {% if screen_map_external_url %}
             <a class="pi-btn pi-btn-primary" href="{{ screen_map_external_url }}" target="_blank" rel="noopener noreferrer nofollow">Open in Google Maps</a>
             {% endif %}
-            <button
-              type="button"
-              class="pi-btn pi-btn-secondary pi-pdf-download"
-              data-pdf-filename="{{ pdf_download_filename }}"
-              data-guide-identity="{{ route or slug or title }}"
-              >Download PDF</button>
-            <button type="button" class="pi-btn pi-btn-secondary property-instruction-print">Print guide</button>
-            <p class="pi-action-status sr-only" aria-live="polite"></p>
           </div>
         </div>
       </article>
