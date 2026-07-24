@@ -88,6 +88,42 @@ This node remains `data-guide-translation-kind="translatable"`. It is not global
 - Turkmen HAR result: no post-mount `translateHtml` request contained settled Turkmen instruction text as input
 - export DOM parity result: detached build, post-mount, post-pagination, pre-capture, and post-render snapshots all matched the settled visible guide text for the same run
 
+## Performance And Image Follow-Up
+
+- follow-up base: `b622dc1`
+- goal: reduce browser-side PDF export time without changing the translation-readiness or per-page renderer architecture
+- confirmed bottleneck: per-page `html2canvas` captures repeatedly re-fetched proxy images while cloning the larger live document
+- confirmed clipping root cause: portrait photos kept the correct aspect ratio but were still clipped by export image frames that used `max-height` with overflow clipping while the image width expanded to the full available card width
+
+### Follow-Up Fix
+
+- export images are now fetched once per unique proxy URL, converted to data URIs, cached in-memory, and reused across the detached export DOM, the mounted export DOM, and the isolated page-capture stage
+- live guide proxy images are temporarily inlined during capture preparation so `html2canvas` does not trigger another round of proxy downloads while cloning the owner document
+- per-page capture now renders an isolated off-screen same-origin iframe containing only the current export page plus cloned styles, rather than letting `html2canvas` clone the full live document tree
+- export performance timings are recorded per stage in `window.__propertyInstructionPdfPerformance`
+- final image sizing is now computed from intrinsic image dimensions before pagination, with exact fitted width and height assigned to both the image and its frame
+- image validation now rejects export images that preserve ratio but still extend outside their frame bounds
+
+### Before / After
+
+| Metric | Before | After |
+| --- | --- | --- |
+| Total export time | about `31.3s` | about `10.33s` |
+| Proxy image requests | `96` total | `24` total |
+| Unique proxy image URLs | `8` | `8` |
+| Maximum requests per image | `12` | `3` |
+| Approx. transferred proxy-image bytes | about `35.4 MB` | about `8.85 MB` |
+| Page capture timings | capture checkpoints around `+16s`, `+20s`, `+23s`, `+26s`, `+29s` | `108ms`, `192ms`, `201ms`, `318ms`, `209ms` |
+
+### Current Result
+
+- the representative Turkmen guide renders with five page shells and five PDF pages
+- all eight expected images paint into the PDF canvas
+- portrait instruction photos are no longer clipped
+- two clickable map links remain present
+- Wi-Fi password remains visible in the rendered PDF
+- no blank or duplicate pages were detected in the validated runs
+
 ## Release Blockers
 
 - Manual Safari validation where a compatible environment is available

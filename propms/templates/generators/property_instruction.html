@@ -638,21 +638,23 @@
   }
   [data-property-instruction-export] .pi-export-image-frame {
     width: 100%;
+    min-height: 0;
+    max-height: none;
     display: flex;
     align-items: center;
     justify-content: center;
     overflow: hidden;
-    background: #f8fafc;
+    background: #f4f7f6;
   }
   [data-property-instruction-export] .pi-export-image-frame img {
     display: block;
+    flex: none;
     width: auto;
     height: auto;
-    max-width: 100%;
-    max-height: 100%;
+    max-width: none;
+    max-height: none;
     object-fit: contain;
     object-position: center;
-    flex: 0 0 auto;
   }
   [data-property-instruction-export] .pi-export-cover-frame {
     margin: 18px 0 0;
