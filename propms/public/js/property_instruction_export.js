@@ -7,6 +7,8 @@
   var HTML2CANVAS_LIBRARY_URL = "/assets/propms/js/vendor/html2canvas.min.js";
   var JSPDF_LIBRARY_URL = "/assets/propms/js/vendor/jspdf.umd.min.js";
   var PUBLIC_PDF_IMAGE_ENDPOINT = "/api/method/propms.property_management_solution.doctype.property_instruction.property_instruction.public_pdf_image";
+  var OPEN_STREET_MAP_TILE_TEMPLATE = "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
+  var PDF_LAYOUT_VERSION = "2026-07-24-adaptive-osm-raster-v1";
   var PDF_EXPORT_WIDTH = 794;
   var PDF_EXPORT_PAGE_HEIGHT = 1122;
   var PDF_EXPORT_PAGE_PADDING_TOP = 34;
@@ -25,6 +27,8 @@
   var GUIDE_SETTLE_STABLE_PASSES = 2;
   var SOURCE_LANGUAGE = "en";
   var RTL_LANGUAGE_PREFIXES = ["ar", "fa", "he", "ku", "ps", "ur", "yi"];
+  var PDF_MAP_RENDER_TIMEOUT_MS = 10000;
+  var PDF_WARM_PREPARE_TIMEOUT_MS = 1500;
   var PROTECTED_GUIDE_FIELDS = {
     address: true,
     wifi_name: true,
@@ -45,7 +49,24 @@
     sectionReadiness: {},
     stableGeneration: 0,
     progressObservations: [],
-    diagnostics: {}
+    diagnostics: {},
+    readyAt: 0,
+    lastLanguageSelectedAt: Date.now(),
+    settlingPromise: null,
+    settlingGeneration: 0,
+    preparationPromise: null,
+    preparationKey: "",
+    warmupScheduled: false,
+    warmupIdleHandle: null
+  };
+  var pdfPreparationState = {
+    preparedState: null,
+    preparedStatesByKey: {},
+    blobCache: {},
+    warmupPromise: null,
+    warmupKey: "",
+    imageDataCache: new Map(),
+    mapImageCache: new Map()
   };
 
   function getGoogleWidgetState() {
@@ -56,19 +77,28 @@
   function startPdfPerformance() {
     window.__propertyInstructionPdfPerformance = {
       startedAt: Date.now(),
+      languageSelectedToTranslationReadyMs: 0,
+      translationReadyToExportPreparedMs: 0,
       translationReadyMs: 0,
       modelExtractionMs: 0,
       exportDomConstructionMs: 0,
       imagePreparationMs: 0,
+      mapPreparationMs: 0,
       paginationMs: 0,
       fontReadinessMs: 0,
       pageCaptureMs: [],
       encodingMs: 0,
       jsPdfAssemblyMs: 0,
       blobCreationMs: 0,
+      buttonClickToPdfBlobMs: 0,
+      warmRepeatedDownloadMs: 0,
       totalMs: 0
     };
     return window.__propertyInstructionPdfPerformance;
+  }
+
+  function getPdfPerformanceState() {
+    return window.__propertyInstructionPdfPerformance || startPdfPerformance();
   }
 
   function recordPdfPerformance(performanceState, key, startedAt, value) {
@@ -76,6 +106,74 @@
       return;
     }
     performanceState[key] = typeof value === "number" ? value : (Date.now() - startedAt);
+  }
+
+  function requestIdleWork(callback, timeoutMs) {
+    var effectiveTimeout = timeoutMs || PDF_WARM_PREPARE_TIMEOUT_MS;
+    if (window.requestIdleCallback) {
+      var completed = false;
+      var timeoutHandle = 0;
+      var idleHandle = window.requestIdleCallback(function (deadline) {
+        if (completed) {
+          return;
+        }
+        completed = true;
+        if (timeoutHandle) {
+          window.clearTimeout(timeoutHandle);
+        }
+        callback(deadline);
+      }, {
+        timeout: effectiveTimeout
+      });
+      timeoutHandle = window.setTimeout(function () {
+        if (completed) {
+          return;
+        }
+        completed = true;
+        if (window.cancelIdleCallback) {
+          window.cancelIdleCallback(idleHandle);
+        }
+        callback({
+          didTimeout: true,
+          timeRemaining: function () { return 0; }
+        });
+      }, effectiveTimeout);
+      return {
+        idleHandle: idleHandle,
+        timeoutHandle: timeoutHandle
+      };
+    }
+    return window.setTimeout(callback, Math.min(effectiveTimeout, 250));
+  }
+
+  function cancelIdleWork(handle) {
+    if (!handle) {
+      return;
+    }
+    if (typeof handle === "object") {
+      if (handle.timeoutHandle) {
+        window.clearTimeout(handle.timeoutHandle);
+      }
+      if (handle.idleHandle && window.cancelIdleCallback) {
+        window.cancelIdleCallback(handle.idleHandle);
+      }
+      return;
+    }
+    if (window.cancelIdleCallback) {
+      window.cancelIdleCallback(handle);
+      return;
+    }
+    window.clearTimeout(handle);
+  }
+
+  function hashString(value) {
+    var text = String(value || "");
+    var hash = 5381;
+    for (var index = 0; index < text.length; index += 1) {
+      hash = ((hash << 5) + hash) + text.charCodeAt(index);
+      hash = hash >>> 0;
+    }
+    return hash.toString(16);
   }
 
   async function copyValue(value) {
@@ -419,6 +517,39 @@
     return true;
   }
 
+  function getSnapshotHash(snapshot) {
+    if (!snapshot) {
+      return "";
+    }
+    return hashString(JSON.stringify({
+      languageCode: snapshot.languageCode,
+      direction: snapshot.direction,
+      sections: snapshot.sections,
+      blocks: snapshot.blocks,
+      orderedNodeIds: snapshot.orderedNodeIds,
+      nodeMap: snapshot.nodeMap
+    }));
+  }
+
+  function getGuideIdentity(downloadButton) {
+    var buttonIdentity = downloadButton ? String(downloadButton.getAttribute("data-guide-identity") || "").trim() : "";
+    if (buttonIdentity) {
+      return buttonIdentity;
+    }
+    var guideRoot = getGuideRoot();
+    return String((guideRoot && guideRoot.getAttribute("data-guide-identity")) || window.location.pathname || "property-instruction").trim();
+  }
+
+  function getPreparedStateKey(guideIdentity, languageCode, generation, snapshotHash) {
+    return [
+      guideIdentity || "property-instruction",
+      languageCode || SOURCE_LANGUAGE,
+      String(generation || 0),
+      snapshotHash || "",
+      PDF_LAYOUT_VERSION
+    ].join("::");
+  }
+
   function countMeaningfulSnapshotChanges(currentSnapshot, originalSnapshot) {
     if (!currentSnapshot || !originalSnapshot) {
       return 0;
@@ -561,25 +692,37 @@
     });
   }
 
+  function invalidatePreparedPdfArtifacts() {
+    translationState.preparationPromise = null;
+    translationState.preparationKey = "";
+    pdfPreparationState.preparedState = null;
+    pdfPreparationState.warmupPromise = null;
+    pdfPreparationState.warmupKey = "";
+  }
+
   function clearTranslationReadyState() {
     translationState.readyLanguage = "";
     translationState.readySnapshot = null;
     translationState.sectionReadiness = {};
     translationState.stablePassTimestamps = [];
     translationState.stableGeneration = 0;
+    translationState.readyAt = 0;
+    invalidatePreparedPdfArtifacts();
   }
 
   function resetTranslationGeneration(nextLanguage) {
     translationState.generation += 1;
     translationState.requestedLanguage = nextLanguage || SOURCE_LANGUAGE;
+    translationState.lastLanguageSelectedAt = Date.now();
     clearTranslationReadyState();
     translationState.lastMutationAt = Date.now();
     initializeTranslationDiagnostics();
+    schedulePdfPreparationWarmup(document.querySelector(".pi-pdf-download"));
   }
 
   function syncTranslationLanguageState() {
     var widgetLanguage = getWidgetLanguage();
-    var currentLanguage = widgetLanguage || SOURCE_LANGUAGE;
+    var currentLanguage = widgetLanguage || translationState.requestedLanguage || SOURCE_LANGUAGE;
     var widgetState = getGoogleWidgetState();
     var widgetSelect = document.querySelector(".goog-te-combo");
     var widgetOptions = widgetSelect ? Array.prototype.slice.call(widgetSelect.options || []) : [];
@@ -594,7 +737,15 @@
     if (!translationState.requestedLanguage) {
       translationState.requestedLanguage = SOURCE_LANGUAGE;
     }
-    if (currentLanguage !== translationState.requestedLanguage) {
+    if (
+      widgetLanguage &&
+      currentLanguage !== translationState.requestedLanguage &&
+      !(
+        currentLanguage === SOURCE_LANGUAGE &&
+        translationState.requestedLanguage &&
+        translationState.requestedLanguage !== SOURCE_LANGUAGE
+      )
+    ) {
       resetTranslationGeneration(currentLanguage);
     }
     updateTranslationDiagnostics({
@@ -693,6 +844,7 @@
         baselineCapturedAt: translationState.baselineCapturedAt,
         widgetScriptRequestedAt: translationState.widgetScriptRequestedAt
       });
+      schedulePdfPreparationWarmup(document.querySelector(".pi-pdf-download"));
     }
   }
 
@@ -976,9 +1128,15 @@
       if (translationState.stablePassTimestamps.length >= GUIDE_SETTLE_STABLE_PASSES) {
         translationState.readyLanguage = expectedLanguage;
         translationState.readySnapshot = currentSnapshot;
+        translationState.readyAt = Date.now();
         updateTranslationDiagnostics({
           settledSnapshot: captureSemanticSnapshot({ redactProtectedValues: true })
         });
+        getPdfPerformanceState().languageSelectedToTranslationReadyMs =
+          translationState.lastLanguageSelectedAt
+            ? Math.max(0, translationState.readyAt - translationState.lastLanguageSelectedAt)
+            : 0;
+        schedulePdfPreparationWarmup(document.querySelector(".pi-pdf-download"));
         return currentSnapshot;
       }
 
@@ -999,6 +1157,46 @@
       }
       throw error;
     });
+  }
+
+  function getCurrentSnapshotIfReady(expectedLanguage, expectedGeneration) {
+    if (!translationState.readySnapshot) {
+      return null;
+    }
+    if ((translationState.readyLanguage || SOURCE_LANGUAGE) !== (expectedLanguage || SOURCE_LANGUAGE)) {
+      return null;
+    }
+    if ((translationState.stableGeneration || translationState.generation) !== (expectedGeneration || translationState.generation)) {
+      return null;
+    }
+    var currentSnapshot = captureSemanticSnapshot();
+    return snapshotsEqual(currentSnapshot, translationState.readySnapshot) ? translationState.readySnapshot : null;
+  }
+
+  function ensureSettledGuideSnapshot() {
+    ensureOriginalSnapshotCaptured();
+    syncTranslationLanguageState();
+    var expectedLanguage = translationState.requestedLanguage || SOURCE_LANGUAGE;
+    var expectedGeneration = translationState.generation;
+    var readySnapshot = getCurrentSnapshotIfReady(expectedLanguage, expectedGeneration);
+    if (readySnapshot) {
+      return Promise.resolve(readySnapshot);
+    }
+
+    if (
+      translationState.settlingPromise &&
+      translationState.settlingGeneration === expectedGeneration
+    ) {
+      return translationState.settlingPromise;
+    }
+
+    translationState.settlingGeneration = expectedGeneration;
+    translationState.settlingPromise = waitForGuideToSettle().finally(function () {
+      if (translationState.settlingGeneration === expectedGeneration) {
+        translationState.settlingPromise = null;
+      }
+    });
+    return translationState.settlingPromise;
   }
 
   function extractStructuredInlineContent(node) {
@@ -1381,10 +1579,10 @@
     var role = String(img.getAttribute("data-export-image-role") || "image");
     var ratio = img.naturalWidth / img.naturalHeight;
     if (role === "cover") {
-      return ratio < 0.9 ? 260 : 220;
+      return ratio < 0.9 ? 340 : 240;
     }
     if (role === "map") {
-      return ratio < 0.9 ? 250 : 220;
+      return 300;
     }
     if (ratio < 0.9) {
       return 330;
@@ -1393,6 +1591,33 @@
       return 310;
     }
     return 285;
+  }
+
+  function chooseCardImageLayout(cardNode, img, fitted, availableWidth) {
+    var ratio = img.naturalWidth / img.naturalHeight;
+    var bodyTextLength = cardNode ? normalizeText(cardNode.innerText || cardNode.textContent || "").length : 0;
+    if (ratio < 0.9) {
+      return {
+        layout: "portrait-side-by-side",
+        mediaWidth: Math.min(Math.max(fitted.width, 320), Math.min(availableWidth, 380))
+      };
+    }
+    if (ratio > 1.15) {
+      return {
+        layout: "landscape-stacked",
+        mediaWidth: availableWidth
+      };
+    }
+    if (bodyTextLength > 220) {
+      return {
+        layout: "portrait-side-by-side",
+        mediaWidth: Math.min(Math.max(fitted.width, 300), Math.min(availableWidth, 360))
+      };
+    }
+    return {
+      layout: "landscape-stacked",
+      mediaWidth: availableWidth
+    };
   }
 
   function applyExportImageSizing(exportRoot) {
@@ -1422,22 +1647,53 @@
         availableWidth,
         getPdfImageMaxHeight(img)
       );
+      var role = String(img.getAttribute("data-export-image-role") || "image");
+      var cardNode = role === "card" ? img.closest(".pi-export-card") : null;
+      var chosenLayout = null;
+      var mediaWidth = availableWidth;
+
+      if (cardNode) {
+        chosenLayout = chooseCardImageLayout(cardNode, img, fitted, availableWidth);
+        mediaWidth = chosenLayout.mediaWidth;
+        cardNode.classList.remove("pi-export-card--portrait-side", "pi-export-card--landscape-stacked");
+        cardNode.classList.add(
+          chosenLayout.layout === "portrait-side-by-side"
+            ? "pi-export-card--portrait-side"
+            : "pi-export-card--landscape-stacked"
+        );
+        var mediaColumn = cardNode.querySelector(".pi-export-card-media");
+        if (mediaColumn) {
+          mediaColumn.style.width = chosenLayout.layout === "portrait-side-by-side"
+            ? mediaWidth + "px"
+            : "100%";
+          mediaColumn.style.minWidth = chosenLayout.layout === "portrait-side-by-side"
+            ? mediaWidth + "px"
+            : "0";
+        }
+      } else if (role === "cover") {
+        mediaWidth = Math.min(availableWidth, 320);
+      }
 
       img.style.width = fitted.width + "px";
       img.style.height = fitted.height + "px";
+      frame.style.width = role === "card" && chosenLayout && chosenLayout.layout === "portrait-side-by-side"
+        ? mediaWidth + "px"
+        : "100%";
       frame.style.height = fitted.height + "px";
       frame.style.maxHeight = "none";
       frame.style.minHeight = "0";
 
       diagnostics.push({
         src: String(img.getAttribute("data-export-image-original-src") || img.currentSrc || img.src || "").trim(),
-        role: String(img.getAttribute("data-export-image-role") || "image"),
+        role: role,
         naturalWidth: img.naturalWidth,
         naturalHeight: img.naturalHeight,
         renderedWidth: fitted.width,
         renderedHeight: fitted.height,
         frameWidth: Number(frame.clientWidth.toFixed ? frame.clientWidth.toFixed(2) : frame.clientWidth),
-        frameHeight: fitted.height
+        frameHeight: fitted.height,
+        imageRatio: Number((img.naturalWidth / img.naturalHeight).toFixed(6)),
+        chosenLayout: chosenLayout ? chosenLayout.layout : (role === "cover" ? "cover-two-column" : role === "map" ? "map-full-width" : "default")
       });
     });
     return diagnostics;
@@ -1478,6 +1734,52 @@
       }
       return diagnostics;
     });
+  }
+
+  function parseNumericDataAttribute(element, attributeName) {
+    if (!element) {
+      return null;
+    }
+    var rawValue = String(element.getAttribute(attributeName) || "").trim();
+    if (!rawValue) {
+      return null;
+    }
+    var parsedValue = Number(rawValue);
+    return Number.isFinite(parsedValue) ? parsedValue : null;
+  }
+
+  function parseGoogleMapCoordinatesFromUrl(rawUrl) {
+    var text = String(rawUrl || "").trim();
+    if (!text) {
+      return null;
+    }
+    var atMatch = text.match(/@(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/);
+    if (atMatch) {
+      return {
+        latitude: Number(atMatch[1]),
+        longitude: Number(atMatch[2])
+      };
+    }
+    return null;
+  }
+
+  function getSectionGoogleMapsLink(sectionModel) {
+    var blocks = (sectionModel && sectionModel.blocks) || [];
+    for (var index = 0; index < blocks.length; index += 1) {
+      var block = blocks[index];
+      if (!block || !block.linkHref) {
+        continue;
+      }
+      var normalizedHref = normalizeHref(block.linkHref);
+      if (normalizedHref.indexOf("https://www.google.com/maps") === 0 || normalizedHref.indexOf("https://maps.google.com") === 0) {
+        return {
+          href: normalizedHref,
+          label: block.linkLabel || normalizedHref,
+          sourceNodeId: block.id ? ("block:" + block.id + ":link_label") : ""
+        };
+      }
+    }
+    return null;
   }
 
   function extractGuideModel() {
@@ -1536,6 +1838,20 @@
     var languageCode = getGuideLanguage();
     var emptyNode = document.querySelector("[data-guide-empty-state]");
     var guideKicker = document.querySelector("[data-guide-kicker]");
+    var parkingSection = sections.find(function (sectionModel) {
+      return sectionModel.anchor === "parking";
+    });
+    var parkingLink = getSectionGoogleMapsLink(parkingSection);
+    var mapLinkHref = normalizeHref(mapLink && mapLink.getAttribute("href"));
+    var fallbackCoordinates = parseGoogleMapCoordinatesFromUrl(mapLinkHref);
+    var propertyLatitude = parseNumericDataAttribute(mapCard, "data-guide-map-latitude");
+    var propertyLongitude = parseNumericDataAttribute(mapCard, "data-guide-map-longitude");
+    if (!Number.isFinite(propertyLatitude) && fallbackCoordinates) {
+      propertyLatitude = fallbackCoordinates.latitude;
+    }
+    if (!Number.isFinite(propertyLongitude) && fallbackCoordinates) {
+      propertyLongitude = fallbackCoordinates.longitude;
+    }
 
     return {
       languageCode: languageCode,
@@ -1557,8 +1873,21 @@
       map: {
         title: getVisibleText(document.querySelector("[data-guide-map-title]")),
         imageSrc: mapCard ? String(mapCard.getAttribute("data-guide-map-image") || "").trim() : "",
-        linkHref: normalizeHref(mapLink && mapLink.getAttribute("href")),
-        linkLabel: getVisibleText(mapLink)
+        linkHref: mapLinkHref,
+        linkLabel: getVisibleText(mapLink),
+        latitude: propertyLatitude,
+        longitude: propertyLongitude,
+        zoom: parseNumericDataAttribute(mapCard, "data-guide-map-zoom") || 16,
+        attribution: mapCard ? String(mapCard.getAttribute("data-guide-map-attribution") || "").trim() : ""
+      },
+      parkingMap: {
+        linkHref: parkingLink ? parkingLink.href : "",
+        linkLabel: parkingLink ? parkingLink.label : "",
+        linkSourceNodeId: parkingLink ? parkingLink.sourceNodeId : "",
+        latitude: propertyLatitude,
+        longitude: propertyLongitude,
+        zoom: parseNumericDataAttribute(mapCard, "data-guide-map-parking-zoom") || 15,
+        attribution: mapCard ? String(mapCard.getAttribute("data-guide-map-attribution") || "").trim() : ""
       },
       sections: sections,
       counts: {
@@ -1651,40 +1980,32 @@
     var header = document.createElement("header");
     header.className = "pi-export-header";
 
+    var heroTop = document.createElement("div");
+    heroTop.className = "pi-export-hero-top";
+
+    var heroCopy = document.createElement("div");
+    heroCopy.className = "pi-export-hero-copy";
+
     if (model.kicker) {
       var kicker = document.createElement("p");
       kicker.className = "pi-export-kicker";
       kicker.textContent = model.kicker;
       kicker.setAttribute("data-export-source-id", "guide:kicker");
-      header.appendChild(kicker);
+      heroCopy.appendChild(kicker);
     }
 
     var title = document.createElement("h1");
     title.className = "pi-export-title";
     title.textContent = model.title;
     title.setAttribute("data-export-source-id", "field:title");
-    header.appendChild(title);
+    heroCopy.appendChild(title);
 
     if (model.address && model.address.value) {
       var address = document.createElement("p");
       address.className = "pi-export-address";
       address.textContent = model.address.value;
-      header.appendChild(address);
-    }
-
-    if (model.coverImage && model.coverImage.src) {
-      header.appendChild(
-        createManagedImage(document, {
-          src: model.coverImage.src,
-          alt: model.coverImage.alt || model.title,
-          className: "pi-export-cover",
-          frameClassName: "pi-export-image-frame pi-export-cover-frame",
-          frameMinHeight: "140px",
-          frameMaxHeight: "240px",
-          imageRole: "cover",
-          placeholderClass: "pi-export-image-placeholder"
-        }, pendingImages)
-      );
+      address.setAttribute("data-export-source-id", "field:address");
+      heroCopy.appendChild(address);
     }
 
     var metaList = document.createElement("div");
@@ -1702,7 +2023,26 @@
     if (model.address && model.address.value) {
       appendExportMetaItem(document, metaList, model.address);
     }
-    header.appendChild(metaList);
+    heroCopy.appendChild(metaList);
+    heroTop.appendChild(heroCopy);
+
+    if (model.coverImage && model.coverImage.src) {
+      var heroMedia = document.createElement("div");
+      heroMedia.className = "pi-export-hero-cover";
+      heroMedia.appendChild(
+        createManagedImage(document, {
+          src: model.coverImage.src,
+          alt: model.coverImage.alt || model.title,
+          className: "pi-export-cover",
+          frameClassName: "pi-export-image-frame pi-export-cover-frame",
+          imageRole: "cover",
+          placeholderClass: "pi-export-image-placeholder"
+        }, pendingImages)
+      );
+      heroTop.appendChild(heroMedia);
+    }
+
+    header.appendChild(heroTop);
     exportDocument.appendChild(header);
 
     if (model.map.linkHref || model.map.imageSrc) {
@@ -1716,6 +2056,22 @@
         mapSection.appendChild(mapTitle);
       }
 
+      if (model.map.imageSrc) {
+        mapSection.appendChild(
+          createManagedImage(document, {
+            src: model.map.imageSrc,
+            alt: model.map.title || "",
+            className: "pi-export-map-image",
+            frameClassName: "pi-export-image-frame pi-export-map-image-frame",
+            imageRole: "map",
+            placeholderClass: "pi-export-map-placeholder"
+          }, pendingImages)
+        );
+      }
+
+      var mapMeta = document.createElement("div");
+      mapMeta.className = "pi-export-map-meta";
+
       if (model.map.linkHref) {
         var mapLink = document.createElement("a");
         mapLink.href = model.map.linkHref;
@@ -1723,22 +2079,19 @@
         mapLink.rel = "noopener noreferrer nofollow";
         mapLink.textContent = model.map.linkLabel || model.map.linkHref;
         mapLink.setAttribute("data-export-source-id", "map:link_label");
-        mapSection.appendChild(mapLink);
+        mapMeta.appendChild(mapLink);
       }
 
-      if (model.map.imageSrc) {
-        mapSection.appendChild(
-          createManagedImage(document, {
-            src: model.map.imageSrc,
-            alt: model.map.title || "Property location map",
-            className: "pi-export-map-image",
-            frameClassName: "pi-export-image-frame pi-export-map-image-frame",
-            frameMinHeight: "120px",
-            frameMaxHeight: "220px",
-            imageRole: "map",
-            placeholderClass: "pi-export-map-placeholder"
-          }, pendingImages)
-        );
+      if (model.map.attribution) {
+        var mapAttribution = document.createElement("span");
+        mapAttribution.className = "pi-export-map-attribution notranslate";
+        mapAttribution.textContent = model.map.attribution;
+        mapAttribution.setAttribute("translate", "no");
+        mapMeta.appendChild(mapAttribution);
+      }
+
+      if (mapMeta.childNodes.length) {
+        mapSection.appendChild(mapMeta);
       }
 
       exportDocument.appendChild(mapSection);
@@ -1754,6 +2107,41 @@
       sectionTitle.setAttribute("data-export-source-id", "section:" + sectionModel.anchor + ":title");
       section.appendChild(sectionTitle);
 
+      if (
+        sectionModel.anchor === "parking" &&
+        model.parkingMap &&
+        model.parkingMap.imageSrc
+      ) {
+        var parkingMap = document.createElement("div");
+        parkingMap.className = "pi-export-parking-map";
+
+        if (model.parkingMap.imageSrc) {
+          parkingMap.appendChild(
+            createManagedImage(document, {
+              src: model.parkingMap.imageSrc,
+              alt: "",
+              className: "pi-export-map-image pi-export-map-image--parking",
+              frameClassName: "pi-export-image-frame pi-export-map-image-frame pi-export-map-image-frame--parking",
+              imageRole: "map",
+              placeholderClass: "pi-export-map-placeholder"
+            }, pendingImages)
+          );
+        }
+
+        if (model.parkingMap.attribution) {
+          var parkingMapMeta = document.createElement("div");
+          parkingMapMeta.className = "pi-export-map-meta";
+          var parkingAttribution = document.createElement("span");
+          parkingAttribution.className = "pi-export-map-attribution notranslate";
+          parkingAttribution.textContent = model.parkingMap.attribution;
+          parkingAttribution.setAttribute("translate", "no");
+          parkingMapMeta.appendChild(parkingAttribution);
+          parkingMap.appendChild(parkingMapMeta);
+        }
+
+        section.appendChild(parkingMap);
+      }
+
       sectionModel.blocks.forEach(function (blockModel) {
         var card = document.createElement("article");
         card.className = "pi-export-card pi-export-card--" + String(blockModel.type || "text").toLowerCase().replace(/\s+/g, "-");
@@ -1764,6 +2152,13 @@
         if (blockModel.type === "Step") {
           card.classList.add("pi-export-card--step");
         }
+
+        var cardLayout = document.createElement("div");
+        cardLayout.className = "pi-export-card-layout";
+        var textColumn = document.createElement("div");
+        textColumn.className = "pi-export-card-text";
+        var mediaColumn = document.createElement("div");
+        mediaColumn.className = "pi-export-card-media";
 
         if (blockModel.stepNumber || blockModel.title) {
           var cardHead = document.createElement("div");
@@ -1784,7 +2179,7 @@
             cardHead.appendChild(cardTitle);
           }
 
-          card.appendChild(cardHead);
+          textColumn.appendChild(cardHead);
         }
 
         if (blockModel.body) {
@@ -1792,18 +2187,16 @@
           body.className = "pi-export-card-body";
           body.setAttribute("data-export-source-id", "block:" + blockModel.id + ":body");
           appendStructuredContent(document, body, blockModel.bodyContent || []);
-          card.appendChild(body);
+          textColumn.appendChild(body);
         }
 
         if (blockModel.imageSrc) {
-          card.appendChild(
+          mediaColumn.appendChild(
             createManagedImage(document, {
               src: blockModel.imageSrc,
               alt: blockModel.imageAlt || blockModel.title || sectionModel.title,
               className: "pi-export-card-image",
               frameClassName: "pi-export-image-frame pi-export-card-image-frame",
-              frameMinHeight: "120px",
-              frameMaxHeight: "270px",
               imageRole: "card",
               placeholderClass: "pi-export-image-placeholder"
             }, pendingImages)
@@ -1815,7 +2208,7 @@
           caption.className = "pi-export-card-caption";
           caption.textContent = blockModel.caption;
           caption.setAttribute("data-export-source-id", "block:" + blockModel.id + ":caption");
-          card.appendChild(caption);
+          textColumn.appendChild(caption);
         }
 
         if (blockModel.linkHref) {
@@ -1828,8 +2221,14 @@
           link.textContent = blockModel.linkLabel || blockModel.linkHref;
           link.setAttribute("data-export-source-id", "block:" + blockModel.id + ":link_label");
           linkWrap.appendChild(link);
-          card.appendChild(linkWrap);
+          textColumn.appendChild(linkWrap);
         }
+
+        cardLayout.appendChild(textColumn);
+        if (blockModel.imageSrc) {
+          cardLayout.appendChild(mediaColumn);
+        }
+        card.appendChild(cardLayout);
 
         section.appendChild(card);
       });
@@ -2296,6 +2695,558 @@
     }
   }
 
+  function collectModelImageSources(model) {
+    var imageSources = [];
+    function pushSource(sourceUrl) {
+      if (!sourceUrl) {
+        return;
+      }
+      var resolvedUrl = resolveExportImageUrl(sourceUrl);
+      if (!resolvedUrl || imageSources.indexOf(resolvedUrl) !== -1) {
+        return;
+      }
+      imageSources.push(resolvedUrl);
+    }
+
+    if (model.coverImage && model.coverImage.src) {
+      pushSource(model.coverImage.src);
+    }
+    (model.sections || []).forEach(function (sectionModel) {
+      (sectionModel.blocks || []).forEach(function (blockModel) {
+        pushSource(blockModel.imageSrc);
+      });
+    });
+
+    return imageSources;
+  }
+
+  function deepCloneModel(model) {
+    return JSON.parse(JSON.stringify(model || {}));
+  }
+
+  async function prewarmImageDataCacheForModel(model, exportImageDataCache) {
+    var imageSources = collectModelImageSources(model);
+    await Promise.all(imageSources.map(function (resolvedUrl) {
+      return getExportImageDataUri(resolvedUrl, exportImageDataCache);
+    }));
+    return {
+      uniqueImageCount: imageSources.length
+    };
+  }
+
+  function getMapSnapshotCacheKey(mapConfig) {
+    return [
+      Number(mapConfig.longitude).toFixed(6),
+      Number(mapConfig.latitude).toFixed(6),
+      String(mapConfig.zoom || 16),
+      String(mapConfig.width || 760),
+      String(mapConfig.height || 300),
+      OPEN_STREET_MAP_TILE_TEMPLATE,
+      PDF_LAYOUT_VERSION
+    ].join("::");
+  }
+
+  function getMapDiagnosticsStore() {
+    window.__propertyInstructionLastMapDiagnostics = window.__propertyInstructionLastMapDiagnostics || {
+      maps: []
+    };
+    return window.__propertyInstructionLastMapDiagnostics;
+  }
+
+  function pushMapDiagnostic(diagnostic) {
+    var diagnosticsStore = getMapDiagnosticsStore();
+    diagnosticsStore.maps.push(diagnostic);
+    diagnosticsStore.maps = diagnosticsStore.maps.slice(-20);
+  }
+
+  function createMapMarkerCanvas() {
+    var markerCanvas = document.createElement("canvas");
+    markerCanvas.width = 34;
+    markerCanvas.height = 46;
+    var ctx = markerCanvas.getContext("2d");
+    ctx.fillStyle = "#115e59";
+    ctx.beginPath();
+    ctx.arc(17, 14, 11, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(17, 42);
+    ctx.lineTo(8, 20);
+    ctx.lineTo(26, 20);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = "#ffffff";
+    ctx.beginPath();
+    ctx.arc(17, 14, 4.5, 0, Math.PI * 2);
+    ctx.fill();
+    return markerCanvas;
+  }
+
+  function drawMapAttribution(targetContext, width, mapHeight, attribution) {
+    targetContext.fillStyle = "#ffffff";
+    targetContext.fillRect(0, mapHeight, width, 28);
+    targetContext.fillStyle = "#475569";
+    targetContext.font = "12px Inter, Arial, sans-serif";
+    targetContext.textBaseline = "middle";
+    targetContext.fillText(attribution, 12, mapHeight + 14);
+  }
+
+  function buildMapSnapshotDataUri(mapCanvas, mapConfig) {
+    var exportCanvas = document.createElement("canvas");
+    exportCanvas.width = mapConfig.width;
+    exportCanvas.height = mapConfig.height + 28;
+    var ctx = exportCanvas.getContext("2d");
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
+    ctx.drawImage(mapCanvas, 0, 0, mapConfig.width, mapConfig.height);
+
+    var markerCanvas = createMapMarkerCanvas();
+    var markerX = Math.round((mapConfig.width - markerCanvas.width) / 2);
+    var markerY = Math.round((mapConfig.height - markerCanvas.height) / 2) - 6;
+    ctx.drawImage(markerCanvas, markerX, markerY);
+    drawMapAttribution(ctx, exportCanvas.width, mapConfig.height, mapConfig.attribution);
+
+    return exportCanvas.toDataURL("image/png");
+  }
+
+  function projectLongitudeToWorldX(longitude, zoomLevel) {
+    var scale = 256 * Math.pow(2, zoomLevel);
+    return ((longitude + 180) / 360) * scale;
+  }
+
+  function projectLatitudeToWorldY(latitude, zoomLevel) {
+    var sinLatitude = Math.sin((latitude * Math.PI) / 180);
+    var scale = 256 * Math.pow(2, zoomLevel);
+    return (
+      (0.5 - (Math.log((1 + sinLatitude) / (1 - sinLatitude)) / (4 * Math.PI))) * scale
+    );
+  }
+
+  function buildOpenStreetMapTileUrl(zoomLevel, tileX, tileY) {
+    return OPEN_STREET_MAP_TILE_TEMPLATE
+      .replace("{z}", String(zoomLevel))
+      .replace("{x}", String(tileX))
+      .replace("{y}", String(tileY));
+  }
+
+  function loadImageFromDataUri(dataUri) {
+    return new Promise(function (resolve, reject) {
+      var image = new Image();
+      image.decoding = "sync";
+      image.onload = function () {
+        if (typeof image.decode === "function") {
+          image.decode().catch(function () {
+            return null;
+          }).finally(function () {
+            resolve(image);
+          });
+          return;
+        }
+        resolve(image);
+      };
+      image.onerror = function () {
+        reject(new Error("map-tile-load-failed"));
+      };
+      image.src = dataUri;
+    });
+  }
+
+  function sampleCanvasPaintStats(sourceCanvas) {
+    if (!sourceCanvas || !sourceCanvas.width || !sourceCanvas.height) {
+      return {
+        width: 0,
+        height: 0,
+        variance: 0,
+        nonWhiteRatio: 0,
+        painted: false
+      };
+    }
+
+    var sampleWidth = Math.max(1, Math.min(sourceCanvas.width, 160));
+    var sampleHeight = Math.max(1, Math.min(sourceCanvas.height, 120));
+    var analysisCanvas = document.createElement("canvas");
+    analysisCanvas.width = sampleWidth;
+    analysisCanvas.height = sampleHeight;
+    var analysisContext = analysisCanvas.getContext("2d", { willReadFrequently: true });
+    if (!analysisContext) {
+      return {
+        width: sourceCanvas.width,
+        height: sourceCanvas.height,
+        variance: 0,
+        nonWhiteRatio: 0,
+        painted: false
+      };
+    }
+
+    analysisContext.drawImage(sourceCanvas, 0, 0, sampleWidth, sampleHeight);
+    var imageData = analysisContext.getImageData(0, 0, sampleWidth, sampleHeight).data;
+    var pixelCount = imageData.length / 4;
+    var sum = 0;
+    var sumSquares = 0;
+    var nonWhiteCount = 0;
+    for (var index = 0; index < imageData.length; index += 4) {
+      var red = imageData[index];
+      var green = imageData[index + 1];
+      var blue = imageData[index + 2];
+      var luminance = (0.2126 * red) + (0.7152 * green) + (0.0722 * blue);
+      sum += luminance;
+      sumSquares += luminance * luminance;
+      if (red < 250 || green < 250 || blue < 250) {
+        nonWhiteCount += 1;
+      }
+    }
+
+    var mean = pixelCount ? (sum / pixelCount) : 0;
+    var variance = pixelCount ? Math.max(0, (sumSquares / pixelCount) - (mean * mean)) : 0;
+    var nonWhiteRatio = pixelCount ? (nonWhiteCount / pixelCount) : 0;
+
+    return {
+      width: sourceCanvas.width,
+      height: sourceCanvas.height,
+      variance: Number(variance.toFixed(3)),
+      nonWhiteRatio: Number(nonWhiteRatio.toFixed(4)),
+      painted: variance > 8 || (nonWhiteRatio > 0.05 && nonWhiteRatio < 0.98)
+    };
+  }
+
+  async function waitForMapCanvasPaint(map, diagnostic, timeoutMs) {
+    var startedAt = Date.now();
+    var lastPaintStats = null;
+
+    while (Date.now() - startedAt < timeoutMs) {
+      map.resize();
+      map.triggerRepaint();
+      await sleep(250);
+
+      var renderCanvas = map.getCanvas();
+      if (!renderCanvas || !renderCanvas.width || !renderCanvas.height) {
+        continue;
+      }
+
+      try {
+        lastPaintStats = sampleCanvasPaintStats(renderCanvas);
+      } catch (error) {
+        diagnostic.events.push({
+          type: "paint-sample-error",
+          timestamp: Date.now(),
+          message: error && error.message ? error.message : "paint-sample-error"
+        });
+        continue;
+      }
+
+      diagnostic.lastPaintStats = lastPaintStats;
+      diagnostic.events.push({
+        type: "paint-sample",
+        timestamp: Date.now(),
+        painted: !!lastPaintStats.painted,
+        variance: lastPaintStats.variance,
+        nonWhiteRatio: lastPaintStats.nonWhiteRatio,
+        tilesLoaded: typeof map.areTilesLoaded === "function" ? !!map.areTilesLoaded() : true
+      });
+
+      if (lastPaintStats.painted) {
+        return {
+          canvas: renderCanvas,
+          paintStats: lastPaintStats
+        };
+      }
+    }
+
+    var paintError = new Error("map-render-timeout");
+    paintError.lastPaintStats = lastPaintStats;
+    throw paintError;
+  }
+
+  async function renderStaticMapSnapshot(mapConfig, exportImageDataCache) {
+    if (!mapConfig || !Number.isFinite(mapConfig.latitude) || !Number.isFinite(mapConfig.longitude)) {
+      throw new Error("map-coordinates-missing");
+    }
+    var diagnostic = {
+      kind: mapConfig.kind,
+      latitude: Number(mapConfig.latitude.toFixed(6)),
+      longitude: Number(mapConfig.longitude.toFixed(6)),
+      zoom: mapConfig.zoom,
+      style: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+      width: mapConfig.width,
+      height: mapConfig.height,
+      startedAt: Date.now(),
+      events: [],
+      code: ""
+    };
+
+    try {
+      var tileCanvas = document.createElement("canvas");
+      tileCanvas.width = mapConfig.width;
+      tileCanvas.height = mapConfig.height;
+      var tileContext = tileCanvas.getContext("2d");
+      if (!tileContext) {
+        throw new Error("map-canvas-export-failed");
+      }
+      tileContext.fillStyle = "#eef2f4";
+      tileContext.fillRect(0, 0, mapConfig.width, mapConfig.height);
+
+      var zoomLevel = Math.max(0, Math.min(19, Math.round(mapConfig.zoom || 16)));
+      var worldX = projectLongitudeToWorldX(mapConfig.longitude, zoomLevel);
+      var worldY = projectLatitudeToWorldY(mapConfig.latitude, zoomLevel);
+      var leftWorldX = worldX - (mapConfig.width / 2);
+      var topWorldY = worldY - (mapConfig.height / 2);
+      var startTileX = Math.floor(leftWorldX / 256);
+      var endTileX = Math.floor((leftWorldX + mapConfig.width - 1) / 256);
+      var startTileY = Math.floor(topWorldY / 256);
+      var endTileY = Math.floor((topWorldY + mapConfig.height - 1) / 256);
+      var maxTileIndex = Math.pow(2, zoomLevel);
+      var tileRequests = [];
+
+      for (var tileY = startTileY; tileY <= endTileY; tileY += 1) {
+        if (tileY < 0 || tileY >= maxTileIndex) {
+          continue;
+        }
+        for (var tileX = startTileX; tileX <= endTileX; tileX += 1) {
+          var wrappedTileX = ((tileX % maxTileIndex) + maxTileIndex) % maxTileIndex;
+          tileRequests.push({
+            tileX: tileX,
+            tileY: tileY,
+            wrappedTileX: wrappedTileX,
+            url: buildOpenStreetMapTileUrl(zoomLevel, wrappedTileX, tileY)
+          });
+        }
+      }
+
+      diagnostic.events.push({
+        type: "tile-grid",
+        timestamp: Date.now(),
+        tileCount: tileRequests.length,
+        zoom: zoomLevel
+      });
+
+      await Promise.all(tileRequests.map(async function (tileRequest) {
+        var resolvedTileUrl = resolveExportImageUrl(tileRequest.url);
+        if (!resolvedTileUrl) {
+          throw new Error("map-tile-load-failed");
+        }
+        var tileDataUri = await getExportImageDataUri(resolvedTileUrl, exportImageDataCache);
+        var tileImage = await loadImageFromDataUri(tileDataUri);
+        var drawX = Math.round((tileRequest.tileX * 256) - leftWorldX);
+        var drawY = Math.round((tileRequest.tileY * 256) - topWorldY);
+        tileContext.drawImage(tileImage, drawX, drawY, 256, 256);
+      }));
+
+      var renderedMap = {
+        canvas: tileCanvas,
+        paintStats: sampleCanvasPaintStats(tileCanvas)
+      };
+      if (!renderedMap.paintStats.painted) {
+        throw new Error("map-render-timeout");
+      }
+
+      var dataUri = buildMapSnapshotDataUri(tileCanvas, Object.assign({}, mapConfig, {
+        attribution: mapConfig.attribution || "© OpenStreetMap contributors"
+      }));
+      diagnostic.finishedAt = Date.now();
+      diagnostic.durationMs = diagnostic.finishedAt - diagnostic.startedAt;
+      diagnostic.code = "ok";
+      diagnostic.paintStats = renderedMap.paintStats;
+      pushMapDiagnostic(diagnostic);
+      return {
+        dataUri: dataUri,
+        attribution: mapConfig.attribution || "© OpenStreetMap contributors",
+        durationMs: diagnostic.durationMs
+      };
+    } catch (error) {
+      diagnostic.finishedAt = Date.now();
+      diagnostic.durationMs = diagnostic.finishedAt - diagnostic.startedAt;
+      diagnostic.code = error && error.message ? error.message : "map-render-failed";
+      if (error && error.lastPaintStats) {
+        diagnostic.paintStats = error.lastPaintStats;
+      }
+      pushMapDiagnostic(diagnostic);
+      throw error;
+    }
+  }
+
+  async function getOrCreateMapSnapshot(mapConfig, mapImageCache, exportImageDataCache) {
+    var cacheKey = getMapSnapshotCacheKey(mapConfig);
+    if (!mapImageCache.has(cacheKey)) {
+      mapImageCache.set(cacheKey, renderStaticMapSnapshot(mapConfig, exportImageDataCache));
+    }
+    return mapImageCache.get(cacheKey);
+  }
+
+  async function prepareGuideModelAssets(model, exportImageDataCache, mapImageCache) {
+    var preparedModel = deepCloneModel(model);
+    var imageDiagnostics = await prewarmImageDataCacheForModel(preparedModel, exportImageDataCache);
+    var mapStartedAt = Date.now();
+    var mapDiagnostics = {
+      propertyMap: null,
+      parkingMap: null
+    };
+
+    try {
+      if (Number.isFinite(preparedModel.map.latitude) && Number.isFinite(preparedModel.map.longitude)) {
+        mapDiagnostics.propertyMap = await getOrCreateMapSnapshot({
+          kind: "property",
+          latitude: preparedModel.map.latitude,
+          longitude: preparedModel.map.longitude,
+          zoom: preparedModel.map.zoom || 16,
+          width: 760,
+          height: 300,
+          attribution: "© OpenStreetMap contributors"
+        }, mapImageCache, exportImageDataCache);
+        preparedModel.map.imageSrc = mapDiagnostics.propertyMap.dataUri;
+        preparedModel.map.attribution = mapDiagnostics.propertyMap.attribution || preparedModel.map.attribution;
+      }
+    } catch (error) {
+      mapDiagnostics.propertyMap = {
+        code: error && error.message ? error.message : "map-render-failed"
+      };
+    }
+
+    try {
+      if (
+        preparedModel.parkingMap &&
+        preparedModel.parkingMap.linkHref &&
+        Number.isFinite(preparedModel.parkingMap.latitude) &&
+        Number.isFinite(preparedModel.parkingMap.longitude)
+      ) {
+        mapDiagnostics.parkingMap = await getOrCreateMapSnapshot({
+          kind: "parking",
+          latitude: preparedModel.parkingMap.latitude,
+          longitude: preparedModel.parkingMap.longitude,
+          zoom: preparedModel.parkingMap.zoom || 15,
+          width: 760,
+          height: 260,
+          attribution: "© OpenStreetMap contributors"
+        }, mapImageCache, exportImageDataCache);
+        preparedModel.parkingMap.imageSrc = mapDiagnostics.parkingMap.dataUri;
+        preparedModel.parkingMap.attribution = mapDiagnostics.parkingMap.attribution || preparedModel.parkingMap.attribution;
+      }
+    } catch (error) {
+      mapDiagnostics.parkingMap = {
+        code: error && error.message ? error.message : "map-render-failed"
+      };
+    }
+
+    return {
+      model: preparedModel,
+      imageDiagnostics: imageDiagnostics,
+      mapPreparationMs: Date.now() - mapStartedAt,
+      mapDiagnostics: mapDiagnostics
+    };
+  }
+
+  async function prewarmPdfLibraries() {
+    await Promise.allSettled([
+      ensurePdfLibrary()
+    ]);
+  }
+
+  async function preparePdfDependenciesForSnapshot(snapshot, downloadButton) {
+    syncTranslationLanguageState();
+    var guideIdentity = getGuideIdentity(downloadButton);
+    var languageCode = translationState.requestedLanguage || SOURCE_LANGUAGE;
+    var snapshotHash = getSnapshotHash(snapshot);
+    var preparationKey = getPreparedStateKey(guideIdentity, languageCode, translationState.generation, snapshotHash);
+
+    if (pdfPreparationState.preparedState && pdfPreparationState.preparedState.key === preparationKey) {
+      return pdfPreparationState.preparedState;
+    }
+    if (translationState.preparationPromise && translationState.preparationKey === preparationKey) {
+      return translationState.preparationPromise;
+    }
+
+    var preparationStartedAt = Date.now();
+    translationState.preparationKey = preparationKey;
+    translationState.preparationPromise = (async function () {
+      await Promise.all([
+        ensurePdfLibrary()
+      ]);
+
+      var currentSnapshot = captureSemanticSnapshot();
+      if (!snapshotsEqual(currentSnapshot, snapshot)) {
+        throw new Error("Guide translation changed before PDF rendering");
+      }
+
+      var model = extractGuideModel();
+      var preparedAssets = await prepareGuideModelAssets(
+        model,
+        pdfPreparationState.imageDataCache,
+        pdfPreparationState.mapImageCache
+      );
+
+      var preparedState = {
+        key: preparationKey,
+        guideIdentity: guideIdentity,
+        languageCode: languageCode,
+        generation: translationState.generation,
+        snapshotHash: snapshotHash,
+        model: preparedAssets.model,
+        imageDataCache: pdfPreparationState.imageDataCache,
+        preparedAt: Date.now(),
+        mapPreparationMs: preparedAssets.mapPreparationMs,
+        mapDiagnostics: preparedAssets.mapDiagnostics,
+        imageWarmDiagnostics: preparedAssets.imageDiagnostics
+      };
+      pdfPreparationState.preparedState = preparedState;
+      pdfPreparationState.preparedStatesByKey[preparationKey] = preparedState;
+      getPdfPerformanceState().translationReadyToExportPreparedMs =
+        translationState.readyAt
+          ? Math.max(0, preparedState.preparedAt - translationState.readyAt)
+          : (Date.now() - preparationStartedAt);
+      getPdfPerformanceState().mapPreparationMs = preparedAssets.mapPreparationMs;
+      return preparedState;
+    })().finally(function () {
+      if (translationState.preparationKey === preparationKey) {
+        translationState.preparationPromise = null;
+      }
+    });
+
+    return translationState.preparationPromise;
+  }
+
+  function schedulePdfPreparationWarmup(downloadButton) {
+    if (!getGuideScreen()) {
+      return;
+    }
+    if (translationState.warmupScheduled) {
+      return;
+    }
+    translationState.warmupScheduled = true;
+    translationState.warmupIdleHandle = requestIdleWork(function () {
+      var warmupButton = downloadButton || document.querySelector(".pi-pdf-download");
+      var warmupGeneration = translationState.generation;
+      var warmupLanguage = translationState.requestedLanguage || SOURCE_LANGUAGE;
+      translationState.warmupScheduled = false;
+      translationState.warmupIdleHandle = null;
+      prewarmPdfLibraries();
+      ensureSettledGuideSnapshot().then(function (snapshot) {
+        return preparePdfDependenciesForSnapshot(snapshot, warmupButton);
+      }).catch(function () {
+        if (
+          getGuideScreen() &&
+          translationState.generation === warmupGeneration &&
+          (translationState.requestedLanguage || SOURCE_LANGUAGE) === warmupLanguage &&
+          translationState.readySnapshot &&
+          !pdfPreparationState.preparedState
+        ) {
+          window.setTimeout(function () {
+            schedulePdfPreparationWarmup(warmupButton);
+          }, 600);
+        }
+        return null;
+      });
+    }, PDF_WARM_PREPARE_TIMEOUT_MS);
+  }
+
+  function cachePdfBlob(cacheKey, pdfBlob) {
+    pdfPreparationState.blobCache[cacheKey] = {
+      blob: pdfBlob,
+      cachedAt: Date.now()
+    };
+  }
+
+  function getCachedPdfBlob(cacheKey) {
+    return pdfPreparationState.blobCache[cacheKey] || null;
+  }
+
   function withTimeout(promise, timeoutMs, message) {
     return Promise.race([
       promise,
@@ -2419,6 +3370,39 @@
       linkCount: pageNode.querySelectorAll("a[href]").length,
       textLength: normalizeText(pageNode.innerText || pageNode.textContent || "").length
     };
+  }
+
+  function collectCardLayoutDiagnostics(exportRoot) {
+    return Array.prototype.slice.call(exportRoot.querySelectorAll(".pi-export-card")).map(function (cardNode) {
+      var imageNode = cardNode.querySelector("img[data-export-image-role='card']");
+      if (!imageNode) {
+        return null;
+      }
+      var textColumn = cardNode.querySelector(".pi-export-card-text");
+      var mediaColumn = cardNode.querySelector(".pi-export-card-media");
+      var pageNode = cardNode.closest("[data-pdf-page]");
+      var pageNumber = pageNode
+        ? Array.prototype.indexOf.call(pageNode.parentNode.children, pageNode) + 1
+        : 0;
+      var imageRect = imageNode.getBoundingClientRect();
+      var textRect = textColumn ? textColumn.getBoundingClientRect() : null;
+      var cardRect = cardNode.getBoundingClientRect();
+      return {
+        sourceId: String((cardNode.querySelector("[data-export-source-id]") || {}).getAttribute ? cardNode.querySelector("[data-export-source-id]").getAttribute("data-export-source-id") : "" ).trim(),
+        imageRatio: Number((imageNode.naturalWidth / imageNode.naturalHeight).toFixed(6)),
+        chosenLayout: cardNode.classList.contains("pi-export-card--portrait-side")
+          ? "portrait-side-by-side"
+          : "landscape-stacked",
+        cardWidth: Number(cardRect.width.toFixed(2)),
+        cardHeight: Number(cardRect.height.toFixed(2)),
+        textColumnWidth: textRect ? Number(textRect.width.toFixed(2)) : 0,
+        textColumnHeight: textRect ? Number(textRect.height.toFixed(2)) : 0,
+        imageWidth: Number(imageRect.width.toFixed(2)),
+        imageHeight: Number(imageRect.height.toFixed(2)),
+        mediaColumnWidth: mediaColumn ? Number(mediaColumn.getBoundingClientRect().width.toFixed(2)) : 0,
+        pageNumber: pageNumber
+      };
+    }).filter(Boolean);
   }
 
   function assertExportImageSourcesAreCapturable(exportRoot) {
@@ -2572,6 +3556,7 @@
 
   function validateImageAspectRatios(exportRoot) {
     return Array.prototype.slice.call(exportRoot.querySelectorAll("img")).map(function (img) {
+      var role = String(img.getAttribute("data-export-image-role") || "image");
       var rect = img.getBoundingClientRect();
       if (!img.naturalWidth || !img.naturalHeight || !rect.width || !rect.height) {
         throw new Error("One or more export images did not render with measurable dimensions.");
@@ -2588,10 +3573,11 @@
         renderedHeight: Number(rect.height.toFixed(2)),
         naturalRatio: Number(naturalRatio.toFixed(6)),
         renderedRatio: Number(renderedRatio.toFixed(6)),
-        difference: Number((ratioDifference * 100).toFixed(4))
+        difference: Number((ratioDifference * 100).toFixed(4)),
+        role: role
       };
 
-      if (ratioDifference > PDF_EXPORT_IMAGE_RATIO_TOLERANCE) {
+      if (role !== "map" && ratioDifference > PDF_EXPORT_IMAGE_RATIO_TOLERANCE) {
         throw new Error("Export image aspect ratio changed beyond tolerance for " + diagnostics.src);
       }
 
@@ -2955,11 +3941,14 @@
     const originalLabel = downloadButton.textContent;
     const filename = getPdfFilename(downloadButton);
     const guideTitle = getGuideTitle();
+    const guideIdentity = getGuideIdentity(downloadButton);
     var exportState = null;
     var mutationGuardState = null;
     var performanceState = startPdfPerformance();
     var exportImageDataCache = new Map();
     var liveGuideImageRestoreEntries = [];
+    var clickStartedAt = Date.now();
+    window.__propertyInstructionLastPdfError = null;
 
     downloadButton.classList.add("is-disabled");
     downloadButton.setAttribute("aria-disabled", "true");
@@ -2967,22 +3956,78 @@
     updateExportProgress(downloadButton, statusElement, null, null, "initializing");
 
     try {
-      updateExportProgress(downloadButton, statusElement, null, null, "load-libraries");
-      await ensurePdfLibrary();
       syncTranslationLanguageState();
+      var currentLanguage = translationState.requestedLanguage || SOURCE_LANGUAGE;
+      var currentGeneration = translationState.generation;
+      var immediateSnapshot = captureSemanticSnapshot();
+      var immediateSnapshotHash = getSnapshotHash(immediateSnapshot);
+      var immediateCacheKey = getPreparedStateKey(
+        guideIdentity,
+        currentLanguage,
+        currentGeneration,
+        immediateSnapshotHash
+      );
+      var immediateCachedPdf = getCachedPdfBlob(immediateCacheKey);
+      if (immediateCachedPdf && immediateCachedPdf.blob) {
+        recordPdfPerformance(performanceState, "warmRepeatedDownloadMs", clickStartedAt);
+        recordPdfPerformance(performanceState, "totalMs", performanceState.startedAt);
+        window.__propertyInstructionLastPdfBlob = immediateCachedPdf.blob;
+        window.__propertyInstructionLastPdfLanguage = currentLanguage;
+        window.__propertyInstructionPdfStep = "download-ready";
+        triggerBlobDownload(immediateCachedPdf.blob, filename);
+        if (statusElement) {
+          statusElement.textContent = originalLabel;
+        }
+        return;
+      }
       updateExportProgress(downloadButton, statusElement, null, null, "wait-translation");
       var translationStartedAt = Date.now();
-      var settledSnapshot = await waitForGuideToSettle();
+      var settledSnapshot = await ensureSettledGuideSnapshot();
       recordPdfPerformance(performanceState, "translationReadyMs", translationStartedAt);
       var exportGeneration = translationState.generation;
       var exportLanguage = translationState.requestedLanguage || SOURCE_LANGUAGE;
+      var snapshotHash = getSnapshotHash(settledSnapshot);
+      var cacheKey = getPreparedStateKey(guideIdentity, exportLanguage, exportGeneration, snapshotHash);
+      var cachedPdf = getCachedPdfBlob(cacheKey);
+      if (cachedPdf && cachedPdf.blob) {
+        recordPdfPerformance(performanceState, "warmRepeatedDownloadMs", clickStartedAt);
+        recordPdfPerformance(performanceState, "totalMs", performanceState.startedAt);
+        window.__propertyInstructionLastPdfBlob = cachedPdf.blob;
+        window.__propertyInstructionPdfStep = "download-ready";
+        triggerBlobDownload(cachedPdf.blob, filename);
+        if (statusElement) {
+          statusElement.textContent = originalLabel;
+        }
+        return;
+      }
+
+      updateExportProgress(downloadButton, statusElement, null, null, "load-libraries");
+      var prepareStartedAt = Date.now();
+      var preparedState = await preparePdfDependenciesForSnapshot(settledSnapshot, downloadButton);
+      exportImageDataCache = preparedState.imageDataCache || exportImageDataCache;
+      recordPdfPerformance(
+        performanceState,
+        "translationReadyToExportPreparedMs",
+        prepareStartedAt,
+        preparedState && translationState.readyAt ? Math.max(0, preparedState.preparedAt - translationState.readyAt) : undefined
+      );
+      recordPdfPerformance(performanceState, "mapPreparationMs", 0, preparedState.mapPreparationMs || 0);
+
       updateExportProgress(downloadButton, statusElement, null, null, "extract-model");
       syncTranslationLanguageState();
       if (translationState.generation !== exportGeneration || (translationState.requestedLanguage || SOURCE_LANGUAGE) !== exportLanguage) {
         throw new Error("Selected translation changed during PDF export");
       }
       var modelStartedAt = Date.now();
-      var guideModel = extractGuideModel();
+      var currentSnapshot = captureSemanticSnapshot();
+      if (!snapshotsEqual(settledSnapshot, currentSnapshot)) {
+        settledSnapshot = await ensureSettledGuideSnapshot();
+        snapshotHash = getSnapshotHash(settledSnapshot);
+        cacheKey = getPreparedStateKey(guideIdentity, exportLanguage, exportGeneration, snapshotHash);
+        preparedState = await preparePdfDependenciesForSnapshot(settledSnapshot, downloadButton);
+        exportImageDataCache = preparedState.imageDataCache || exportImageDataCache;
+      }
+      var guideModel = deepCloneModel(preparedState.model);
       recordPdfPerformance(performanceState, "modelExtractionMs", modelStartedAt);
       updateTranslationDiagnostics({
         selectedLanguage: guideModel.languageCode || SOURCE_LANGUAGE
@@ -2996,6 +4041,8 @@
       var buildStartedAt = Date.now();
       exportState = buildPdfExportDocument(guideModel);
       exportState.performanceState = performanceState;
+      exportState.exportImageDataCache = exportImageDataCache;
+      exportState.preparedState = preparedState;
       recordPdfPerformance(performanceState, "exportDomConstructionMs", buildStartedAt);
       validateExportDomParity(exportState.exportRoot, preMountParity.modelParityMap, "detached-build");
       mountExportRoot(exportState.exportRoot);
@@ -3020,6 +4067,7 @@
       paginateExportDocument(exportState);
       populatePageFooters(exportState, guideModel.title || guideTitle);
       recordPdfPerformance(performanceState, "paginationMs", paginationStartedAt);
+      var layoutDiagnostics = collectCardLayoutDiagnostics(exportState.exportRoot);
       validateExportDomParity(exportState.exportRoot, preMountParity.modelParityMap, "post-pagination");
       mutationGuardState = startExportMutationGuard(exportState.exportRoot);
       updateExportProgress(downloadButton, statusElement, null, null, "validate");
@@ -3064,7 +4112,9 @@
       var blobStartedAt = Date.now();
       var pdfBlob = pdf.output("blob");
       recordPdfPerformance(performanceState, "blobCreationMs", blobStartedAt);
+      recordPdfPerformance(performanceState, "buttonClickToPdfBlobMs", clickStartedAt);
       recordPdfPerformance(performanceState, "totalMs", performanceState.startedAt);
+      cachePdfBlob(cacheKey, pdfBlob);
       window.__propertyInstructionLastPdfBlob = pdfBlob;
       window.__propertyInstructionLastPdfLanguage = guideModel.languageCode || SOURCE_LANGUAGE;
       window.__propertyInstructionPdfStep = "download-ready";
@@ -3073,6 +4123,8 @@
         sizingDiagnostics: sizingDiagnostics,
         prePaginationRatioDiagnostics: prePaginationRatioDiagnostics,
         prePaginationClipDiagnostics: prePaginationClipDiagnostics,
+        layoutDiagnostics: layoutDiagnostics,
+        mapDiagnostics: preparedState.mapDiagnostics || {},
         performance: performanceState
       });
       stopExportMutationGuard(mutationGuardState);
@@ -3083,6 +4135,11 @@
         statusElement.textContent = originalLabel;
       }
     } catch (error) {
+      window.__propertyInstructionLastPdfError = {
+        message: error && error.message ? error.message : "Unable to prepare PDF",
+        name: error && error.name ? error.name : "Error",
+        capturedAt: Date.now()
+      };
       window.__propertyInstructionPdfStep = "failed";
       if (!(translationState.diagnostics || {}).abortReason) {
         setTranslationAbortReason(error && error.message ? error.message : "Unable to prepare PDF", "translation-timeout-unknown");
@@ -3155,9 +4212,28 @@
     }
   });
 
+  document.addEventListener("pointerenter", function (event) {
+    if (event.target && event.target.closest && event.target.closest(".pi-pdf-download")) {
+      schedulePdfPreparationWarmup(event.target.closest(".pi-pdf-download"));
+    }
+  }, true);
+
+  document.addEventListener("focus", function (event) {
+    if (event.target && event.target.closest && event.target.closest(".pi-pdf-download")) {
+      schedulePdfPreparationWarmup(event.target.closest(".pi-pdf-download"));
+    }
+  }, true);
+
+  document.addEventListener("touchstart", function (event) {
+    if (event.target && event.target.closest && event.target.closest(".pi-pdf-download")) {
+      schedulePdfPreparationWarmup(event.target.closest(".pi-pdf-download"));
+    }
+  }, { passive: true, capture: true });
+
   if (getGuideScreen()) {
     try {
       ensureOriginalSnapshotCaptured();
+      schedulePdfPreparationWarmup(document.querySelector(".pi-pdf-download"));
     } catch (error) {
       // Ignore early snapshot capture failures; export-time validation will handle them.
     }

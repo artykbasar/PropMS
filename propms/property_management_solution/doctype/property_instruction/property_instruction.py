@@ -40,7 +40,7 @@ MIN_MAP_ZOOM = 0
 MAX_MAP_ZOOM = 21
 GOOGLE_TRANSLATE_SCRIPT_BASE_URL = "https://translate.google.com/translate_a/element.js"
 TRUSTED_GOOGLE_MAP_HOSTS = {"www.google.com", "google.com", "maps.google.com"}
-TRUSTED_EXTERNAL_PDF_IMAGE_HOSTS = {"maps.googleapis.com"}
+TRUSTED_EXTERNAL_PDF_IMAGE_HOSTS = {"maps.googleapis.com", "tile.openstreetmap.org"}
 LANGUAGE_CODE_PATTERN = re.compile(r"^[a-z]{2,3}(?:-[a-z]{2,8})*$")
 PHONE_PATTERN = re.compile(r"(?:\+?\d[\d\s().-]{6,}\d)")
 EMAIL_PATTERN = re.compile(r"\b[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}\b")
@@ -48,6 +48,8 @@ ROAD_NAME_PATTERN = re.compile(
 	r"\b(?:Road|Street|Lane|Avenue|Close|Drive|Way|Court|Crescent|Place|Gardens|Terrace|Park|Square)\b",
 	re.IGNORECASE,
 )
+GOOGLE_MAP_AT_PATTERN = re.compile(r"@(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)")
+COORDINATE_TEXT_PATTERN = re.compile(r"(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)")
 NOINDEX_ROBOTS_CONTENT = "noindex, nofollow, noarchive, nosnippet, noimageindex"
 GUEST_GUIDE_EXCLUDED_WEB_ASSET_PREFIXES = (
 	"/assets/propms/day/assets/",
@@ -296,12 +298,94 @@ class PropertyInstruction(WebsiteGenerator):
 
 	def get_property_map(self):
 		embed_url = self.get_map_embed_url()
+		coordinates = self.get_map_coordinates()
 		return frappe._dict(
 			embed_url=embed_url,
 			external_url=self.get_map_external_url(),
 			static_image_url=self.get_static_map_image_url(),
+			latitude=coordinates.latitude if coordinates else None,
+			longitude=coordinates.longitude if coordinates else None,
+			coordinate_source=coordinates.source if coordinates else None,
+			map_zoom=self.normalize_map_zoom(self.map_zoom),
+			parking_zoom=max(14, min(15, self.normalize_map_zoom(self.map_zoom))),
 			uses_api_key=bool(embed_url and "embed/v1/place" in embed_url),
 		)
+
+	def get_map_coordinates(self):
+		property_coordinates = self.get_property_coordinates()
+		if property_coordinates:
+			return property_coordinates
+
+		return self.parse_map_coordinates_from_url(self.google_maps_url)
+
+	def get_property_coordinates(self):
+		if not self.property:
+			return None
+
+		try:
+			property_doc = frappe.get_cached_doc("Property", self.property)
+		except Exception:
+			return None
+
+		for latitude_field, longitude_field in (
+			("latitude", "longitude"),
+			("lat", "lng"),
+			("location_latitude", "location_longitude"),
+			("property_latitude", "property_longitude"),
+		):
+			latitude = self.parse_coordinate_value(property_doc.get(latitude_field))
+			longitude = self.parse_coordinate_value(property_doc.get(longitude_field))
+			if latitude is not None and longitude is not None:
+				return frappe._dict(latitude=latitude, longitude=longitude, source=f"property.{latitude_field}/{longitude_field}")
+
+		location_value = property_doc.get("location")
+		parsed_location = self.parse_map_coordinates_from_text(location_value)
+		if parsed_location:
+			parsed_location.source = "property.location"
+			return parsed_location
+
+		return None
+
+	def parse_coordinate_value(self, value):
+		if value in (None, ""):
+			return None
+		try:
+			return float(str(value).strip())
+		except (TypeError, ValueError):
+			return None
+
+	def parse_map_coordinates_from_text(self, value):
+		text = (value or "").strip()
+		if not text:
+			return None
+		match = COORDINATE_TEXT_PATTERN.search(text)
+		if not match:
+			return None
+		latitude = self.parse_coordinate_value(match.group(1))
+		longitude = self.parse_coordinate_value(match.group(2))
+		if latitude is None or longitude is None:
+			return None
+		return frappe._dict(latitude=latitude, longitude=longitude, source="text")
+
+	def parse_map_coordinates_from_url(self, url):
+		text = (url or "").strip()
+		if not text:
+			return None
+
+		match = GOOGLE_MAP_AT_PATTERN.search(text)
+		if match:
+			latitude = self.parse_coordinate_value(match.group(1))
+			longitude = self.parse_coordinate_value(match.group(2))
+			if latitude is not None and longitude is not None:
+				return frappe._dict(latitude=latitude, longitude=longitude, source="google_maps_url")
+
+		parsed = urlparse(text)
+		query_coordinates = self.parse_map_coordinates_from_text(parsed.query or "")
+		if query_coordinates:
+			query_coordinates.source = "google_maps_url_query"
+			return query_coordinates
+
+		return None
 
 	def get_guest_guide_web_assets(self, existing_assets=None, asset_type="css"):
 		assets = list(existing_assets or frappe.get_hooks(f"web_include_{asset_type}") or [])

@@ -764,6 +764,10 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 		parsed = validate_public_pdf_image_url("https://guides.example/files/block.png")
 		self.assertEqual(parsed.hostname, "guides.example")
 
+	def test_validate_public_pdf_image_url_allows_openstreetmap_tile_host(self):
+		parsed = validate_public_pdf_image_url("https://tile.openstreetmap.org/16/32722/21824.png")
+		self.assertEqual(parsed.hostname, "tile.openstreetmap.org")
+
 	def test_validate_public_pdf_image_url_rejects_arbitrary_external_host(self):
 		with self.assertRaises(frappe.ValidationError):
 			validate_public_pdf_image_url("https://evil.example/image.png")
