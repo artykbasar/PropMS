@@ -1,78 +1,74 @@
 ## Business Context
 
-The guest-facing Property Instruction guide needs to evolve from a basic published page into a production-ready guest document that supports three operational requirements:
+The guest-facing Property Instruction guide needs one translation and PDF workflow, not two competing systems.
 
-- a branded embedded map without accepting arbitrary iframe markup
-- a professional A4 print layout that works for save-to-PDF handoff
-- a secure reviewed translation architecture that keeps cloud credentials server-side
+The accepted production model is:
+
+- guests translate the page in the browser with the free Google Website Translator widget
+- the downloaded PDF is generated from that already-translated browser view
+- no reviewed translation records are stored in Frappe
 
 ## Scope
 
-- Add safe Google Maps Embed support backed by site or environment configuration
-- Rebuild print CSS for full-width A4 output and compact printed metadata
-- Add reviewed translation DocTypes and a server-side translation generation flow
-- Add a public language selector that only exposes reviewed translations
-- Extend focused automated tests for map rendering, printing, and multilingual behavior
-
-## Credentials Strategy
-
-- `google_maps_embed_api_key` may be supplied from site config or `GOOGLE_MAPS_EMBED_API_KEY`
-- the embed key is intentionally present in the iframe URL and must be restricted by HTTP referrer in production
-- Google Cloud Translation must use Application Default Credentials only
-- recommended runtime secret:
-  - `GOOGLE_APPLICATION_CREDENTIALS=/run/secrets/estaex-google-translation.json`
-- site config may store only non-secret identifiers such as project id and location
-- no service account JSON, API keys, passwords, or access codes are committed
+- retain the guest-guide `WebsiteGenerator` page
+- keep the free Google Translate widget as the only translation mechanism
+- remove the custom translation DocTypes, server-side translation service, and related Desk actions
+- replace server-generated translated PDFs with browser-generated PDFs
+- preserve existing guide hardening:
+  - noindex headers
+  - map/link safety
+  - Wi-Fi password rendering rules
+  - route-specific guest-guide layout
 
 ## Architecture
 
-- `Property Instruction` remains the public `WebsiteGenerator`
-- map embed URLs are generated server-side from structured fields only
-- translation state is stored in:
-  - `Property Instruction Translation`
-  - `Property Instruction Translation Block`
-- a Desk action generates or refreshes translations server-side and stores them as `Draft`
-- source edits mark existing translations `Stale`
-- public language selection uses `?lang=<code>` and falls back to English unless a translation is `Ready`
-- print output is driven by template-scoped CSS only, with no builder dependency
-- Google Translate changes only the rendered browser DOM, so translated PDF downloads cannot rely on the existing GET endpoint alone
-- the guide now emits stable `data-pdf-*` markers for permitted translatable fields and posts a signed, size-limited snapshot back to the server for PDF generation
-- the PDF endpoint reconstructs the document from the published source record, overlays only permitted translated text, and preserves protected operational values such as address, Wi-Fi identifiers, URLs, and block order
+- `Property Instruction` remains the single source document
+- page translation is performed only in the guest browser by the free Google widget
+- PDF generation happens client-side from the already-rendered translated DOM using explicit A4 page shells
+- the export pipeline reads clean translated text from semantic `data-guide-*` hooks, builds an isolated export DOM, paginates it into fixed A4 page shells, rasterizes each shell with `html2canvas`, and assembles the final PDF with `jsPDF`
+- no server-side translation cache, translation API, reviewed translation DocType, or translation lookup remains in the feature
+
+## Libraries
+
+- `html2canvas` 1.4.1 is bundled locally under `propms/public/js/vendor/html2canvas.min.js` (MIT)
+- `jsPDF` 2.5.1 is bundled locally under `propms/public/js/vendor/jspdf.umd.min.js` (MIT)
+- no paid translation service or backend translation SDK is used
 
 ## Migration Plan
 
-- add map-related fields to `Property Instruction`
-- add translation parent and child DocTypes
-- add the form script for translation generation
+- remove translation parent and child DocTypes from the app source
+- remove translation generation JavaScript and Python service code
+- add an idempotent migration patch to remove the obsolete DocType metadata when present
 - run `bench --site development.localhost migrate`
-- run focused tests and route checks after each slice
+- run focused Property Instruction tests
+- validate translated browser PDF output in multiple Google Translate languages
 
 ## Tests
 
-- map helper URL generation and iframe rendering
-- print CSS regressions and removal of `javascript:` links
-- translation generation behavior with mocks
-- translation visibility and fallback rules
-- source-change staleness behavior
-- existing Property test module remains part of focused validation
+- guest-guide rendering and route behavior
+- Google Translate widget enabled/disabled configuration
+- language restriction sanitization
+- Wi-Fi password rendering and omission behavior
+- browser-PDF export markup and library wiring
+- noindex headers and sitemap exclusion
+- browser validation for translated PDF output
 
 ## Acceptance Criteria
 
-- embedded maps render only when explicitly enabled and configured
-- external Google Maps navigation remains available even without an iframe
-- printed guides use full A4 width with no narrow sidebar column
-- public guides never expose Wi-Fi passwords or cloud credentials
-- only `Ready` translations are public
-- Draft or Stale translations fall back cleanly to English
-- translated output remains sanitized and ordered
-- all intended changes stay isolated to `feature/property-instructions`
+- only the Google Website Translator widget remains as the translation mechanism
+- no `Property Instruction Translation` or related translation block code remains in the app
+- the downloaded PDF reflects the language currently visible in the browser after widget translation
+- cover image, instruction images, links, map section, branding, Wi-Fi password, and pagination remain intact
+- no translation credentials or server-side translation state are required
+- all intended changes stay isolated to `develop`
 
 ## Search Engine Behaviour
 
-- guest guides return `noindex, nofollow, noarchive, nosnippet, noimageindex` in both HTML metadata and `X-Robots-Tag` response headers
-- guide PDFs return the same `X-Robots-Tag` directive because PDF responses cannot carry HTML robots metadata
-- guest-guide routes are excluded from sitemap generation to reduce discovery without blocking direct guest access
-- `noindex` is not authentication; anyone with the published URL can still open the guide
-- compliant search engines usually remove indexed URLs only after they revisit the route and observe the new directive
-- already indexed production URLs may take time to disappear after deployment
-- urgent removal from an existing search index may still require the relevant search-engine removal tool after production deployment
+- guest guides return `noindex, nofollow, noarchive, nosnippet, noimageindex` in HTML metadata
+- guest guides return `X-Robots-Tag: noindex, nofollow, noarchive, nosnippet, noimageindex`
+- guest-guide routes remain excluded from sitemap generation
+
+## Cleanup Note
+
+- the migration patch removes Frappe metadata for the deleted translation DocTypes when installed
+- physical SQL tables may remain until a later manual database cleanup; this feature does not drop tables automatically

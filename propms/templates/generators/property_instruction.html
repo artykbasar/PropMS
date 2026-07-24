@@ -45,7 +45,13 @@
     display: block;
   }
   .pi-print-layout {
-    display: none;
+    position: absolute;
+    left: -200vw;
+    top: 0;
+    width: 1080px;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
   }
   .pi-hero {
     overflow: hidden;
@@ -218,6 +224,10 @@
     background: transparent;
     color: var(--pi-accent);
     border-color: var(--pi-border);
+  }
+  .pi-btn.is-disabled {
+    opacity: .6;
+    pointer-events: none;
   }
   .pi-grid {
     display: grid;
@@ -427,6 +437,19 @@
     font-size: 20pt;
     line-height: 1.08;
   }
+  .pi-print-header-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 48mm;
+    gap: 6mm;
+    align-items: start;
+  }
+  .pi-print-cover {
+    width: 100%;
+    max-height: 42mm;
+    object-fit: cover;
+    border-radius: 3mm;
+    display: block;
+  }
   .pi-print-address {
     margin: 2mm 0 0;
     font-size: 10.5pt;
@@ -544,6 +567,294 @@
     color: inherit;
     text-decoration: underline;
   }
+  [data-property-instruction-export] .pi-pdf-export {
+    width: 794px;
+    background: #fff;
+    color: #111827;
+  }
+  [data-property-instruction-export] .pi-export-pages {
+    width: 794px;
+    background: #fff;
+  }
+  [data-property-instruction-export] .pi-export-page {
+    box-sizing: border-box;
+    position: relative;
+    background: #fff;
+    overflow: hidden;
+    page-break-after: always;
+    break-after: page;
+  }
+  [data-property-instruction-export] .pi-export-page:last-child {
+    page-break-after: auto;
+    break-after: auto;
+  }
+  [data-property-instruction-export] .pi-export-page-body {
+    overflow: hidden;
+  }
+  [data-property-instruction-export] .pi-export-document,
+  [data-property-instruction-export] .pi-export-document * {
+    box-sizing: border-box;
+  }
+  [data-property-instruction-export] .pi-export-document {
+    width: 100%;
+    background: #fff;
+    color: #111827;
+    font-family: Inter, "Helvetica Neue", Arial, sans-serif;
+    font-size: 14px;
+    line-height: 1.45;
+    direction: ltr;
+    text-align: left;
+  }
+  [data-property-instruction-export] .pi-export-document[dir="rtl"] {
+    direction: rtl;
+    text-align: right;
+  }
+  [data-property-instruction-export] .pi-export-document a {
+    color: #115e59;
+    text-decoration: underline;
+  }
+  [data-property-instruction-export] .pi-export-header {
+    margin-bottom: 18px;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+  [data-property-instruction-export] .pi-export-kicker {
+    margin: 0 0 6px;
+    color: #64748b;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+  }
+  [data-property-instruction-export] .pi-export-title {
+    margin: 0;
+    font-size: 31px;
+    line-height: 1.08;
+  }
+  [data-property-instruction-export] .pi-export-address {
+    margin: 10px 0 0;
+    font-size: 15px;
+    color: #334155;
+  }
+  [data-property-instruction-export] .pi-export-image-frame {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    background: #f8fafc;
+  }
+  [data-property-instruction-export] .pi-export-image-frame img {
+    display: block;
+    width: auto;
+    height: auto;
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    object-position: center;
+    flex: 0 0 auto;
+  }
+  [data-property-instruction-export] .pi-export-cover-frame {
+    margin: 18px 0 0;
+    border-radius: 18px;
+  }
+  [data-property-instruction-export] .pi-export-cover {
+    border-radius: 18px;
+  }
+  [data-property-instruction-export] .pi-export-meta-list {
+    margin: 18px 0 0;
+    font-size: 0;
+  }
+  [data-property-instruction-export] .pi-export-meta-item {
+    display: inline-block;
+    width: calc(50% - 8px);
+    margin: 0 16px 12px 0;
+    vertical-align: top;
+    font-size: 14px;
+  }
+  [data-property-instruction-export] .pi-export-document[dir="rtl"] .pi-export-meta-item {
+    margin: 0 0 12px 16px;
+  }
+  [data-property-instruction-export] .pi-export-meta-item:nth-child(2n) {
+    margin-right: 0;
+  }
+  [data-property-instruction-export] .pi-export-document[dir="rtl"] .pi-export-meta-item:nth-child(2n) {
+    margin-left: 0;
+  }
+  [data-property-instruction-export] .pi-export-label {
+    display: block;
+    margin: 0 0 4px;
+    color: #64748b;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+  }
+  [data-property-instruction-export] .pi-export-value {
+    display: block;
+    font-size: 16px;
+    font-weight: 600;
+    overflow-wrap: anywhere;
+  }
+  [data-property-instruction-export] .pi-export-map {
+    margin: 18px 0 16px;
+    padding: 16px;
+    border: 1px solid #d7dee5;
+    border-radius: 18px;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+  [data-property-instruction-export] .pi-export-map-title {
+    margin: 0 0 8px;
+    font-size: 18px;
+  }
+  [data-property-instruction-export] .pi-export-map-image-frame {
+    margin: 10px 0 0;
+    border-radius: 14px;
+  }
+  [data-property-instruction-export] .pi-export-map-image {
+    border-radius: 14px;
+  }
+  [data-property-instruction-export] .pi-export-map-note {
+    margin: 10px 0 0;
+    color: #475569;
+    font-size: 13px;
+    line-height: 1.4;
+  }
+  [data-property-instruction-export] .pi-export-map-placeholder,
+  [data-property-instruction-export] .pi-export-image-placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 96px;
+    padding: 14px;
+    border: 1px dashed #cbd5e1;
+    border-radius: 14px;
+    color: #64748b;
+    font-size: 13px;
+    text-align: center;
+    background: #f8fafc;
+  }
+  [data-property-instruction-export] .pi-export-section {
+    margin: 0 0 18px;
+    page-break-inside: auto;
+    break-inside: auto;
+  }
+  [data-property-instruction-export] .pi-export-section-cards {
+    display: block;
+  }
+  [data-property-instruction-export] .pi-export-section-title {
+    margin: 0 0 10px;
+    padding-bottom: 7px;
+    border-bottom: 1px solid #d7dee5;
+    font-size: 22px;
+    line-height: 1.2;
+    page-break-after: avoid;
+    break-after: avoid;
+  }
+  [data-property-instruction-export] .pi-export-card {
+    margin: 0 0 12px;
+    padding: 14px 16px;
+    border: 1px solid #d7dee5;
+    border-radius: 18px;
+    background: #fff;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+  [data-property-instruction-export] .pi-export-card--warning {
+    border-color: #f0d48c;
+    background: #fff7e7;
+  }
+  [data-property-instruction-export] .pi-export-card--step {
+    border-color: #cde7e4;
+    background: #f7fffd;
+  }
+  [data-property-instruction-export] .pi-export-card-head {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    margin: 0 0 10px;
+    page-break-after: avoid;
+    break-after: avoid;
+  }
+  [data-property-instruction-export] .pi-export-document[dir="rtl"] .pi-export-card-head {
+    flex-direction: row-reverse;
+  }
+  [data-property-instruction-export] .pi-export-step-badge {
+    width: 28px;
+    height: 28px;
+    min-width: 28px;
+    border-radius: 999px;
+    background: #115e59;
+    color: #fff;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    font-weight: 700;
+    line-height: 1;
+  }
+  [data-property-instruction-export] .pi-export-card-title {
+    margin: 0;
+    font-size: 17px;
+    line-height: 1.3;
+  }
+  [data-property-instruction-export] .pi-export-card-body {
+    page-break-before: avoid;
+    break-before: avoid;
+  }
+  [data-property-instruction-export] .pi-export-card-body p {
+    margin: 0 0 10px;
+  }
+  [data-property-instruction-export] .pi-export-card-body p:last-child {
+    margin-bottom: 0;
+  }
+  [data-property-instruction-export] .pi-export-card-image-frame {
+    margin: 12px 0 0;
+    border-radius: 14px;
+  }
+  [data-property-instruction-export] .pi-export-card-image {
+    border-radius: 14px;
+  }
+  [data-property-instruction-export] .pi-export-card-caption {
+    margin: 8px 0 0;
+    color: #475569;
+    font-size: 13px;
+  }
+  [data-property-instruction-export] .pi-export-card-link {
+    margin: 10px 0 0;
+    font-size: 14px;
+    font-weight: 600;
+  }
+  [data-property-instruction-export] .pi-export-empty {
+    margin: 0;
+    color: #64748b;
+  }
+  [data-property-instruction-export] .pi-export-footer {
+    position: absolute;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    color: #5a6876;
+    font-size: 11px;
+    line-height: 1.3;
+  }
+  [data-property-instruction-export] .pi-export-page[dir="rtl"] .pi-export-footer {
+    direction: rtl;
+    text-align: right;
+  }
+  [data-property-instruction-export] .pi-export-footer-left,
+  [data-property-instruction-export] .pi-export-footer-right {
+    display: inline-block;
+    max-width: calc(50% - 6px);
+  }
+  [data-property-instruction-export] .pi-export-page[dir="rtl"] .pi-export-footer-left {
+    text-align: right;
+  }
+  [data-property-instruction-export] .pi-export-page[dir="rtl"] .pi-export-footer-right {
+    text-align: left;
+  }
   @media (max-width: 860px) {
     .pi-grid {
       grid-template-columns: 1fr;
@@ -582,6 +893,12 @@
     }
     .pi-print-layout {
       display: block !important;
+      position: static !important;
+      left: auto !important;
+      top: auto !important;
+      opacity: 1 !important;
+      visibility: visible !important;
+      pointer-events: auto !important;
     }
     .pi-print-layout,
     .pi-print-section,
@@ -623,13 +940,14 @@
 </style>
 {% endblock %}
 
-{% macro render_copy_row(label, value, button_label, aria_label, target_id, protect_value=False) %}
+{% macro render_copy_row(label, value, button_label, aria_label, target_id, protect_value=False, guide_field=None) %}
   <div class="pi-copy-row">
     <div class="pi-copy-text">
       <span class="pi-label">{{ label }}</span>
       <span
         id="{{ target_id }}"
         class="pi-copy-value{% if protect_value %} notranslate{% endif %}"
+        {% if guide_field %}data-guide-field="{{ guide_field }}"{% endif %}
         {% if protect_value %}translate="no"{% endif %}>{{ value }}</span>
     </div>
     <button
@@ -653,31 +971,36 @@
 {% endmacro %}
 
 {% macro render_screen_block(block) %}
-  <div class="pi-block pi-block-{{ block.block_type | lower | replace(' ', '-') }}" data-pdf-block="{{ block.name }}">
+  <div
+    class="pi-block pi-block-{{ block.block_type | lower | replace(' ', '-') }}"
+    data-pdf-block="{{ block.name }}"
+    data-guide-block
+    data-guide-block-id="{{ block.name }}"
+    data-guide-block-type="{{ block.block_type }}">
     {% if block.block_type == "Step" %}
     <div class="pi-step-head">
-      <span class="pi-step-badge">{{ block.display_step_number }}</span>
-      {% if block.title %}<h3 data-pdf-block-field="title"{% if block.title_translation_protected %} class="notranslate" translate="no"{% endif %}>{{ block.title }}</h3>{% endif %}
+      <span class="pi-step-badge" data-guide-step-number>{{ block.display_step_number }}</span>
+      {% if block.title %}<h3 data-pdf-block-field="title" data-guide-block-title data-guide-signature{% if block.title_translation_protected %} class="notranslate" translate="no"{% endif %}>{{ block.title }}</h3>{% endif %}
     </div>
     {% elif block.title %}
-    <h3 data-pdf-block-field="title"{% if block.title_translation_protected %} class="notranslate" translate="no"{% endif %}>{{ block.title }}</h3>
+    <h3 data-pdf-block-field="title" data-guide-block-title data-guide-signature{% if block.title_translation_protected %} class="notranslate" translate="no"{% endif %}>{{ block.title }}</h3>
     {% endif %}
 
     {% if block.safe_body %}
-    <div class="pi-body" data-pdf-block-field="body">{{ block.safe_body }}</div>
+    <div class="pi-body" data-pdf-block-field="body" data-guide-block-body data-guide-signature>{{ block.safe_body }}</div>
     {% endif %}
 
     {% if block.image %}
-    <img class="pi-image" src="{{ block.image }}" alt="{{ block.image_alt }}">
+    <img class="pi-image" src="{{ block.image }}" alt="{{ block.image_alt }}" data-guide-block-image>
     {% endif %}
 
     {% if block.caption %}
-    <div class="pi-caption{% if block.caption_translation_protected %} notranslate{% endif %}" data-pdf-block-field="caption"{% if block.caption_translation_protected %} translate="no"{% endif %}>{{ block.caption }}</div>
+    <div class="pi-caption{% if block.caption_translation_protected %} notranslate{% endif %}" data-pdf-block-field="caption" data-guide-block-caption data-guide-signature{% if block.caption_translation_protected %} translate="no"{% endif %}>{{ block.caption }}</div>
     {% endif %}
 
     {% if block.link_url %}
     <div class="pi-link">
-      <a href="{{ block.link_url }}" target="_blank" rel="noopener noreferrer nofollow" data-pdf-block-field="link_label"{% if block.display_link_label_translation_protected %} class="notranslate" translate="no"{% endif %}>{{ block.display_link_label }}</a>
+      <a href="{{ block.link_url }}" target="_blank" rel="noopener noreferrer nofollow" data-pdf-block-field="link_label" data-guide-block-link data-guide-signature{% if block.display_link_label_translation_protected %} class="notranslate" translate="no"{% endif %}>{{ block.display_link_label }}</a>
     </div>
     {% endif %}
   </div>
@@ -702,8 +1025,7 @@
         {% endif %}
         {% if block.link_url %}
         <div class="pi-print-link">
-          <strong>{{ block.display_link_label }}</strong>
-          <div class="pi-print-link-url">{{ block.link_url }}</div>
+          <a href="{{ block.link_url }}" target="_blank" rel="noopener noreferrer nofollow">{{ block.display_link_label }}</a>
         </div>
         {% endif %}
       </div>
@@ -731,8 +1053,7 @@
 
     {% if block.link_url %}
     <div class="pi-print-link">
-      <strong>{{ block.display_link_label }}</strong>
-      <div class="pi-print-link-url">{{ block.link_url }}</div>
+      <a href="{{ block.link_url }}" target="_blank" rel="noopener noreferrer nofollow">{{ block.display_link_label }}</a>
     </div>
     {% endif %}
   </div>
@@ -740,9 +1061,9 @@
 {% endmacro %}
 
 {% block page_content %}
-<div class="pi-page" lang="{{ selected_language_code or 'en' }}">
+<div class="pi-page" lang="{{ selected_language_code or 'en' }}" data-guide-root>
   <div class="pi-shell">
-    <div class="pi-screen-layout">
+    <div class="pi-screen-layout" data-guide-screen>
       {% if google_translate and google_translate.enabled %}
       <section class="pi-translate-shell" aria-label="Instant translation">
         <p class="pi-translate-copy">Translate this guide instantly</p>
@@ -750,29 +1071,16 @@
       </section>
       {% endif %}
 
-      {% if reviewed_language_selector_enabled %}
-      <nav class="pi-language-switcher" aria-label="Language selector">
-        <p class="pi-language-label">Language</p>
-        {% for language in available_languages %}
-        <a
-          class="pi-language-option{% if language.language_code == selected_language_code %} is-active{% endif %}"
-          href="{{ language.url }}">
-          {{ language.language_name }}
-        </a>
-        {% endfor %}
-      </nav>
-      {% endif %}
-
       <article class="pi-hero">
         {% if cover_image %}
-        <img class="pi-cover" src="{{ cover_image }}" alt="{{ title }} cover image">
+        <img class="pi-cover" src="{{ cover_image }}" alt="{{ title }} cover image" data-guide-cover>
         {% endif %}
         <div class="pi-hero-body">
           <div class="pi-eyebrow">Guest Instructions</div>
-          <h1 class="pi-title" data-pdf-field="title">{{ title }}</h1>
+          <h1 class="pi-title" data-pdf-field="title" data-guide-field="title" data-guide-signature>{{ title }}</h1>
           {% if address %}
           <div class="pi-address-row">
-            {{ render_copy_row("Address", address, "Copy address", "Copy property address", "property-address", True) }}
+            {{ render_copy_row("Address", address, "Copy address", "Copy property address", "property-address", True, "address") }}
           </div>
           {% endif %}
 
@@ -780,35 +1088,35 @@
             {% if check_in_time %}
             <div class="pi-meta-item">
               <span class="pi-label">Check-In</span>
-              <span class="pi-value">{{ check_in_time }}</span>
+              <span class="pi-value" data-guide-field="check_in" data-guide-signature>{{ check_in_time }}</span>
             </div>
             {% endif %}
             {% if check_out_time %}
             <div class="pi-meta-item">
               <span class="pi-label">Check-Out</span>
-              <span class="pi-value">{{ check_out_time }}</span>
+              <span class="pi-value" data-guide-field="check_out" data-guide-signature>{{ check_out_time }}</span>
             </div>
             {% endif %}
             {% if wifi_name %}
             <div class="pi-meta-item">
-              {{ render_copy_row("Wi-Fi Name", wifi_name, "Copy network", "Copy Wi-Fi network name", "wifi-network-name", True) }}
+              {{ render_copy_row("Wi-Fi Name", wifi_name, "Copy network", "Copy Wi-Fi network name", "wifi-network-name", True, "wifi_name") }}
             </div>
             {% endif %}
             {% if wifi_password_public %}
             <div class="pi-meta-item">
-              {{ render_copy_row("Wi-Fi Password", wifi_password_public, "Copy password", "Copy Wi-Fi password", "wifi-password-public", True) }}
+              {{ render_copy_row("Wi-Fi Password", wifi_password_public, "Copy password", "Copy Wi-Fi password", "wifi-password-public", True, "wifi_password") }}
             </div>
             {% endif %}
             {% if emergency_contact %}
             <div class="pi-meta-item">
               <span class="pi-label">Emergency Contact</span>
-              <span class="pi-value{% if emergency_contact_translation_protected %} notranslate{% endif %}" data-pdf-field="emergency_contact"{% if emergency_contact_translation_protected %} translate="no"{% endif %}>{{ emergency_contact }}</span>
+              <span class="pi-value{% if emergency_contact_translation_protected %} notranslate{% endif %}" data-pdf-field="emergency_contact" data-guide-field="emergency_contact" data-guide-signature{% if emergency_contact_translation_protected %} translate="no"{% endif %}>{{ emergency_contact }}</span>
             </div>
             {% endif %}
             {% if last_reviewed_on %}
             <div class="pi-meta-item">
               <span class="pi-label">Last Reviewed</span>
-              <span class="pi-value">{{ last_reviewed_on_display or last_reviewed_on }}</span>
+              <span class="pi-value" data-guide-field="last_reviewed">{{ last_reviewed_on_display or last_reviewed_on }}</span>
             </div>
             {% endif %}
           </div>
@@ -817,17 +1125,11 @@
             {% if screen_map_external_url %}
             <a class="pi-btn pi-btn-primary" href="{{ screen_map_external_url }}" target="_blank" rel="noopener noreferrer nofollow">Open in Google Maps</a>
             {% endif %}
-            {% if pdf_download_url %}
-            <a
+            <button
+              type="button"
               class="pi-btn pi-btn-secondary pi-pdf-download"
-              href="{{ pdf_download_url }}"
-              data-pdf-download-url="{{ pdf_download_url }}"
-              data-pdf-token="{{ pdf_snapshot_token }}"
-              data-pdf-slug="{{ doc.slug }}"
-              data-reviewed-language="{{ selected_language_code or 'en' }}"
-              data-pdf-filename="{{ doc.slug }}-guest-guide.pdf"
-              >Download PDF</a>
-            {% endif %}
+              data-pdf-filename="{{ pdf_download_filename }}"
+              >Download PDF</button>
             <button type="button" class="pi-btn pi-btn-secondary property-instruction-print">Print guide</button>
             <p class="pi-action-status sr-only" aria-live="polite"></p>
           </div>
@@ -835,7 +1137,7 @@
       </article>
 
       {% if screen_map_embed_url %}
-      <section class="pi-card pi-map-card" aria-label="Property map">
+      <section class="pi-card pi-map-card" aria-label="Property map" data-guide-map-card data-guide-map-image="{{ map_static_image_url or '' }}">
         <div class="pi-map-shell">
           <iframe
             class="pi-map"
@@ -848,7 +1150,7 @@
         </div>
         {% if screen_map_external_url %}
         <div class="pi-actions">
-          <a class="pi-btn pi-btn-secondary" href="{{ screen_map_external_url }}" target="_blank" rel="noopener noreferrer nofollow">Open in Google Maps</a>
+          <a class="pi-btn pi-btn-secondary" href="{{ screen_map_external_url }}" target="_blank" rel="noopener noreferrer nofollow" data-guide-map-link>Open in Google Maps</a>
         </div>
         {% endif %}
       </section>
@@ -867,8 +1169,8 @@
 
         <div class="pi-sections">
           {% for section in sections %}
-          <section id="{{ section.anchor }}" class="pi-card">
-            <h2 class="pi-section-title" data-pdf-section="{{ section.anchor }}">{{ section.section }}</h2>
+          <section id="{{ section.anchor }}" class="pi-card" data-guide-section data-guide-section-anchor="{{ section.anchor }}">
+            <h2 class="pi-section-title" data-pdf-section="{{ section.anchor }}" data-guide-section-title data-guide-signature>{{ section.section }}</h2>
             <div class="pi-blocks">
               {% for block in section.blocks %}
               {{ render_screen_block(block) }}
@@ -884,14 +1186,22 @@
       </div>
       {% endif %}
     </div>
-
     <div class="pi-print-layout" aria-hidden="true">
       <header class="pi-print-header">
-        <p class="pi-print-kicker">Estaex Guest Guide</p>
-        <h1 class="pi-print-title">{{ title }}</h1>
-        {% if address %}
-        <p class="pi-print-address">{{ address }}</p>
-        {% endif %}
+        <div class="pi-print-header-grid">
+          <div>
+            <p class="pi-print-kicker">Estaex Guest Guide</p>
+            <h1 class="pi-print-title">{{ title }}</h1>
+            {% if address %}
+            <p class="pi-print-address">{{ address }}</p>
+            {% endif %}
+          </div>
+          {% if cover_image %}
+          <div>
+            <img class="pi-print-cover" src="{{ cover_image }}" alt="{{ title }} cover image">
+          </div>
+          {% endif %}
+        </div>
         <div class="pi-print-meta-grid">
           {% if check_in_time %}
           <div class="pi-print-meta-item"><span class="pi-label">Check-In</span><span class="pi-value">{{ check_in_time }}</span></div>
@@ -900,7 +1210,10 @@
           <div class="pi-print-meta-item"><span class="pi-label">Check-Out</span><span class="pi-value">{{ check_out_time }}</span></div>
           {% endif %}
           {% if wifi_name %}
-          <div class="pi-print-meta-item"><span class="pi-label">Wi-Fi Name</span><span class="pi-value">{{ wifi_name }}</span></div>
+          <div class="pi-print-meta-item"><span class="pi-label">Wi-Fi Name</span><span class="pi-value notranslate" translate="no">{{ wifi_name }}</span></div>
+          {% endif %}
+          {% if wifi_password_public %}
+          <div class="pi-print-meta-item"><span class="pi-label">Wi-Fi Password</span><span class="pi-value notranslate" translate="no">{{ wifi_password_public }}</span></div>
           {% endif %}
           {% if emergency_contact %}
           <div class="pi-print-meta-item"><span class="pi-label">Emergency Contact</span><span class="pi-value">{{ emergency_contact }}</span></div>
@@ -909,7 +1222,7 @@
           <div class="pi-print-meta-item"><span class="pi-label">Last Reviewed</span><span class="pi-value">{{ last_reviewed_on }}</span></div>
           {% endif %}
           {% if screen_map_external_url %}
-          <div class="pi-print-meta-item pi-print-map-url"><span class="pi-label">Property Location</span><span class="pi-value">{{ screen_map_external_url }}</span></div>
+          <div class="pi-print-meta-item pi-print-map-url"><span class="pi-label">Property Location</span><a class="pi-value" href="{{ screen_map_external_url }}" target="_blank" rel="noopener noreferrer nofollow">Open in Google Maps</a></div>
           {% endif %}
         </div>
       </header>
@@ -963,210 +1276,5 @@
 </script>
 <script id="{{ google_translate.script_id }}" async src="{{ google_translate.script_url }}"></script>
 {% endif %}
-<script>
-  (function () {
-    if (window.__propertyInstructionUiBound) {
-      return;
-    }
-    window.__propertyInstructionUiBound = true;
-
-    async function copyValue(value) {
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        await navigator.clipboard.writeText(value);
-        return;
-      }
-
-      const fallback = document.createElement("textarea");
-      fallback.value = value;
-      fallback.setAttribute("readonly", "readonly");
-      fallback.style.position = "absolute";
-      fallback.style.left = "-9999px";
-      document.body.appendChild(fallback);
-      fallback.select();
-      document.execCommand("copy");
-      document.body.removeChild(fallback);
-    }
-
-    function getWidgetLanguage() {
-      const widgetSelect = document.querySelector(".goog-te-combo");
-      if (!widgetSelect || !widgetSelect.value) {
-        return "";
-      }
-      return String(widgetSelect.value).trim().toLowerCase();
-    }
-
-    function getReviewedLanguage(downloadLink) {
-      return String(downloadLink.getAttribute("data-reviewed-language") || "en").trim().toLowerCase();
-    }
-
-    function getPdfSnapshotPayload(downloadLink) {
-      const fields = {};
-      const sections = {};
-      const blocks = {};
-
-      document.querySelectorAll("[data-pdf-field]").forEach(function (element) {
-        const fieldName = element.getAttribute("data-pdf-field");
-        if (!fieldName) {
-          return;
-        }
-        const value = fieldName === "emergency_contact" ? element.textContent.trim() : element.textContent.trim();
-        if (value) {
-          fields[fieldName] = value;
-        }
-      });
-
-      document.querySelectorAll("[data-pdf-section]").forEach(function (element) {
-        const sectionKey = element.getAttribute("data-pdf-section");
-        const value = element.textContent.trim();
-        if (sectionKey && value) {
-          sections[sectionKey] = value;
-        }
-      });
-
-      document.querySelectorAll("[data-pdf-block]").forEach(function (blockElement) {
-        const blockName = blockElement.getAttribute("data-pdf-block");
-        if (!blockName) {
-          return;
-        }
-        const blockPayload = {};
-        blockElement.querySelectorAll("[data-pdf-block-field]").forEach(function (fieldElement) {
-          const fieldName = fieldElement.getAttribute("data-pdf-block-field");
-          if (!fieldName) {
-            return;
-          }
-          const value = fieldName === "body"
-            ? fieldElement.innerHTML.trim()
-            : fieldElement.textContent.trim();
-          if (value) {
-            blockPayload[fieldName] = value;
-          }
-        });
-        if (Object.keys(blockPayload).length) {
-          blocks[blockName] = blockPayload;
-        }
-      });
-
-      return {
-        slug: downloadLink.getAttribute("data-pdf-slug") || "",
-        token: downloadLink.getAttribute("data-pdf-token") || "",
-        display_language: getReviewedLanguage(downloadLink),
-        reviewed_language: getReviewedLanguage(downloadLink),
-        widget_language: getWidgetLanguage(),
-        fields: fields,
-        sections: sections,
-        blocks: blocks
-      };
-    }
-
-    function getDownloadFilename(response, downloadLink) {
-      const contentDisposition = response.headers.get("Content-Disposition") || "";
-      const match = contentDisposition.match(/filename=\"?([^\";]+)\"?/i);
-      if (match && match[1]) {
-        return match[1];
-      }
-      return downloadLink.getAttribute("data-pdf-filename") || "guest-guide.pdf";
-    }
-
-    async function downloadTranslatedPdf(downloadLink) {
-      const statusElement = document.querySelector(".pi-action-status");
-      const originalLabel = downloadLink.textContent;
-      const payload = getPdfSnapshotPayload(downloadLink);
-
-      downloadLink.classList.add("is-disabled");
-      downloadLink.setAttribute("aria-disabled", "true");
-      downloadLink.textContent = "Preparing PDF";
-      if (statusElement) {
-        statusElement.classList.remove("sr-only");
-        statusElement.textContent = "Preparing PDF";
-      }
-
-      try {
-        const response = await window.fetch(downloadLink.getAttribute("data-pdf-download-url"), {
-          method: "POST",
-          credentials: "same-origin",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify(payload)
-        });
-
-        if (!response.ok) {
-          throw new Error("Unable to generate PDF");
-        }
-
-        const pdfBlob = await response.blob();
-        const objectUrl = window.URL.createObjectURL(pdfBlob);
-        const temporaryLink = document.createElement("a");
-        temporaryLink.href = objectUrl;
-        temporaryLink.download = getDownloadFilename(response, downloadLink);
-        document.body.appendChild(temporaryLink);
-        temporaryLink.click();
-        temporaryLink.remove();
-        window.URL.revokeObjectURL(objectUrl);
-        if (statusElement) {
-          statusElement.textContent = "PDF downloaded";
-        }
-      } catch (error) {
-        if (statusElement) {
-          statusElement.textContent = "Unable to prepare PDF";
-        }
-        window.location.href = downloadLink.getAttribute("href");
-      } finally {
-        downloadLink.classList.remove("is-disabled");
-        downloadLink.removeAttribute("aria-disabled");
-        downloadLink.textContent = originalLabel;
-      }
-    }
-
-    document.addEventListener("click", async function (event) {
-      const copyButton = event.target.closest(".pi-copy-button");
-      if (copyButton) {
-        const copyTarget = copyButton.getAttribute("data-copy-target");
-        const defaultLabel = copyButton.getAttribute("data-default-label") || "Copy";
-        const statusElement = copyButton.parentElement
-          ? copyButton.parentElement.querySelector(".pi-copy-status")
-          : null;
-        const targetElement = copyTarget ? document.getElementById(copyTarget) : null;
-        const value = targetElement ? targetElement.textContent.trim() : "";
-        if (!value) {
-          return;
-        }
-        try {
-          await copyValue(value);
-          copyButton.classList.add("is-copied");
-          copyButton.setAttribute("aria-label", "Copied");
-          copyButton.setAttribute("title", "Copied");
-          if (statusElement) {
-            statusElement.textContent = "Copied";
-          }
-        } catch (error) {
-          if (statusElement) {
-            statusElement.textContent = "Unable to copy";
-          }
-        }
-        window.setTimeout(function () {
-          copyButton.classList.remove("is-copied");
-          copyButton.setAttribute("aria-label", defaultLabel);
-          copyButton.setAttribute("title", defaultLabel);
-          if (statusElement) {
-            statusElement.textContent = "";
-          }
-        }, 2000);
-        return;
-      }
-
-      const downloadLink = event.target.closest(".pi-pdf-download");
-      if (downloadLink && window.fetch && window.URL && window.URL.createObjectURL) {
-        event.preventDefault();
-        await downloadTranslatedPdf(downloadLink);
-        return;
-      }
-
-      const printButton = event.target.closest(".property-instruction-print");
-      if (printButton) {
-        window.print();
-      }
-    });
-  })();
-</script>
+<script src="/assets/propms/js/property_instruction_export.js?ver={{ build_version }}"></script>
 {% endblock %}

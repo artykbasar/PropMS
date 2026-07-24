@@ -68,14 +68,28 @@ Console findings:
 
 ## Architecture Decision
 
-- keep reviewed `?lang=<code>` translations as the controlled translation path
-- add the production-style Google Translate widget as an optional instant-translate layer
+- use the production-style Google Translate widget as the only translation path
 - keep Google Translate widget configuration in `Property Management Settings`
+- remove the stored reviewed-translation architecture from `propms`
 - use a safe generated iframe URL for dynamic records:
   - API-key mode when `google_maps_embed_api_key` exists
   - no-key Google Maps embed fallback on a trusted Google hostname when only address or map query is available
 - preserve the external Google Maps button in all cases
-- rebuild print using a dedicated print-only DOM instead of reusing the interactive hero layout
+- generate guest-guide PDFs in the browser from the already translated DOM rather than from a server-side translated template
+- use semantic export DOM generation plus explicit A4 page shells instead of full-document automatic pagination
+
+## PDF Runtime
+
+- local browser PDF assets:
+  - `propms/public/js/vendor/html2canvas.min.js` 1.4.1 (MIT)
+  - `propms/public/js/vendor/jspdf.umd.min.js` 2.5.1 (MIT)
+- current export design:
+  - read translated text from semantic guide hooks
+  - rebuild a PDF-only DOM with isolated styles
+  - paginate into measured A4 shells before capture
+  - render each shell independently with `html2canvas`
+  - assemble one rasterized shell per `jsPDF` page
+  - add clickable link annotations from measured DOM rectangles
 
 ## Credentials Strategy
 
@@ -86,8 +100,7 @@ Console findings:
 - development can additionally allow:
   - `http://development.localhost:8000/*`
   - `http://localhost:8000/*`
-- do not commit Google Cloud Translation credentials
-- keep Google Cloud Translation on Application Default Credentials only
+- no backend translation credentials are required for the current guest-guide architecture
 
 ## Validation Plan
 
@@ -95,4 +108,4 @@ Console findings:
 - run the focused Property Instruction tests
 - verify rendered HTML contains an iframe without an API key when only address data exists
 - verify the Google Translate widget can be enabled and disabled from settings
-- regenerate a host-side PDF after the dedicated print layout is implemented
+- validate that browser-generated PDFs reflect the currently translated DOM
