@@ -5,6 +5,7 @@ import os
 import unittest
 import uuid
 from unittest.mock import patch
+from urllib.parse import urlparse
 
 import frappe
 from frappe.tests.utils import FrappeTestCase
@@ -216,6 +217,18 @@ class PropertyInstructionTestMixin:
 			site_file.write(content)
 		self.temp_files.append(file_path)
 		return file_path
+
+	def make_external_file_record(self, url):
+		doc = frappe.get_doc(
+			{
+				"doctype": "File",
+				"file_name": os.path.basename(urlparse(url).path) or "external-guide-image",
+				"file_url": url,
+				"is_private": 0,
+			}
+		).insert(ignore_permissions=True)
+		self.to_delete.append(("File", doc.name))
+		return doc
 
 
 class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
@@ -438,9 +451,58 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 		self.assertIn('data-guide-section', html)
 		self.assertIn('data-guide-block', html)
 		self.assertIn('data-guide-map-card', html)
+		self.assertIn('data-guide-kicker', html)
+		self.assertIn('data-guide-map-title', html)
+		self.assertIn('data-guide-translation-kind="translatable"', html)
+		self.assertIn('data-guide-translation-kind="proper_name_or_identifier"', html)
+		self.assertIn('data-guide-translation-kind="protected"', html)
+		self.assertIn('data-guide-translation-kind="numeric_or_time"', html)
 		self.assertNotIn("download_pdf?", html)
 		self.assertNotIn("Property Instruction Translation", html)
 		self.assertNotIn("Google Cloud Translation", html)
+
+	def test_template_includes_empty_state_hook_when_no_sections(self):
+		doc = self.make_instruction(instruction_blocks=[])
+		html = self.render_instruction(doc)
+		self.assertIn('data-guide-empty-state', html)
+
+	def test_parking_heading_remains_translatable_while_road_list_is_protected(self):
+		doc = self.make_instruction(
+			instruction_blocks=[
+				{
+					"section": "Parking",
+					"block_type": "Text",
+					"title": "Nearby roads",
+					"body": "<p>• Beverley Road</p><p>• Blagdon Road</p><p>• Onslow Road</p>",
+				},
+			],
+		)
+		html = self.render_instruction(doc)
+		self.assertIn(
+			'data-pdf-section="parking" data-guide-section-title data-guide-signature data-guide-translation-kind="translatable" data-guide-allow-identical-languages="fr">Parking</h2>',
+			html,
+		)
+		self.assertNotIn(
+			'data-pdf-section="parking" data-guide-section-title data-guide-signature data-guide-translation-kind="translatable" data-guide-allow-identical="1"',
+			html,
+		)
+		self.assertIn(
+			'Nearby roads',
+			html,
+		)
+		self.assertIn(
+			'data-guide-block-body data-guide-signature data-guide-translation-kind="proper_name_or_identifier" data-guide-allow-identical="1" translate="no"',
+			html,
+		)
+
+	def test_template_loads_export_script_before_google_translate_script(self):
+		self.set_property_management_setting("enable_guest_guide_google_translate", 1)
+		doc = self.make_instruction()
+		html = self.render_instruction(doc)
+		export_index = html.index("/assets/propms/js/property_instruction_export.js")
+		google_index = html.index("translate.google.com/translate_a/element.js")
+		self.assertLess(export_index, google_index)
+		self.assertIn("__propertyInstructionGoogleScriptRequestedAt = Date.now()", html)
 
 	def test_export_script_uses_per_page_html2canvas_and_direct_jspdf(self):
 		source = self.get_export_script_source()
@@ -454,15 +516,121 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 		self.assertIn("anchor.getClientRects()", source)
 		self.assertIn("img.decode", source)
 		self.assertIn("populatePageFooters", source)
-		self.assertIn('guideScreen.querySelectorAll("[data-guide-section]")', source)
+		self.assertIn('guideScreen.querySelectorAll("[data-guide-section], [data-guide-block]")', source)
+		self.assertIn("captureSemanticSnapshot", source)
+		self.assertIn("waitForGuideTranslationReadiness", source)
+		self.assertIn("compareSnapshotToModel", source)
+		self.assertIn("translationState.generation += 1", source)
+		self.assertIn("translationState.requestedLanguage", source)
+		self.assertIn("translationState.readySnapshot = null", source)
+		self.assertIn("redactSnapshot", source)
+		self.assertIn("syncTranslationLanguageState", source)
+		self.assertIn("analyzeSnapshotState(currentSnapshot, translationState.originalSnapshot, expectedLanguage)", source)
+		self.assertIn("data-guide-translation-kind", self.render_instruction(self.make_instruction()))
+		self.assertIn("snapshotsEqual(settledSnapshot, finalSnapshot)", source)
 		self.assertNotIn("download_pdf?", source)
 		self.assertNotIn("Property Instruction Translation", source)
+
+	def test_export_script_supports_language_specific_identical_translations(self):
+		source = self.get_export_script_source()
+		html = self.render_instruction(self.make_instruction())
+		self.assertIn('data-guide-allow-identical-languages="fr"', html)
+		self.assertIn("allowIdenticalLanguages", source)
+		self.assertIn("allowsIdenticalForLanguage", source)
+		self.assertIn('reason: "language-specific-identical"', source)
+		self.assertIn("allowIdenticalLanguages.indexOf(expectedLanguage) !== -1", source)
+		self.assertIn('nodeId: nodeId,', source)
+		self.assertNotIn('data-guide-allow-identical="1">Parking', html)
+
+	def test_export_script_keeps_unchanged_parking_valid_only_for_french(self):
+		source = self.get_export_script_source()
+		html = self.render_instruction(self.make_instruction())
+		self.assertIn('data-guide-allow-identical-languages="fr"', html)
+		self.assertIn('expectedLanguage', source)
+		self.assertIn("language-specific-identical", source)
+		self.assertIn("unexpectedUnchangedTranslatableNodeIds.push(nodeId)", source)
+		self.assertIn("meta.allowIdentical", source)
+		self.assertIn("allowIdenticalLanguages.indexOf(expectedLanguage) !== -1", source)
+		self.assertNotIn('data-guide-allow-identical-languages="de"', html)
+		self.assertNotIn('data-guide-allow-identical-languages="tr"', html)
 
 	def test_export_script_does_not_use_legacy_cloned_print_layout(self):
 		source = self.get_export_script_source()
 		self.assertNotIn(".pi-print-layout", source)
 		self.assertNotIn("html2" + "pdf__overlay", source)
 		self.assertNotIn("data-pdf-token", source)
+
+	def test_export_script_uses_full_snapshots_instead_of_truncated_signature(self):
+		source = self.get_export_script_source()
+		self.assertNotIn(".slice(0, 240)", source)
+		self.assertIn("nodeCount", source)
+		self.assertIn("orderedNodeIds", source)
+		self.assertIn("duplicateNodeIds", source)
+		self.assertIn("unexpectedUnchangedTranslatableNodeIds", source)
+		self.assertIn("missingRequiredNodeIds", source)
+		self.assertIn("GUIDE_SETTLE_QUIET_MS = 2500", source)
+		self.assertIn("GUIDE_SETTLE_STABLE_INTERVAL_MS = 1500", source)
+
+	def test_export_script_does_not_inject_post_translation_english_pdf_copy(self):
+		source = self.get_export_script_source()
+		self.assertNotIn("Property Location", source)
+		self.assertNotIn("Map preview unavailable", source)
+		self.assertNotIn("Image unavailable", source)
+		self.assertNotIn("No published instruction content is available for this property yet.", source)
+		self.assertNotIn('"Page " + (index + 1) + " of " + pageNodes.length', source)
+
+	def test_export_script_uses_language_neutral_footer_numbering(self):
+		source = self.get_export_script_source()
+		self.assertIn('right.textContent = (index + 1) + " / " + pageNodes.length;', source)
+
+	def test_export_script_contains_translation_diagnostics_and_abort_paths(self):
+		source = self.get_export_script_source()
+		self.assertIn("__propertyInstructionTranslationDiagnostics", source)
+		self.assertIn("__propertyInstructionLastExportParityMap", source)
+		self.assertIn("parityMismatches", source)
+		self.assertIn("baselineCapturedAt", source)
+		self.assertIn("widgetScriptRequestedAt", source)
+		self.assertIn("firstTranslationMutationAt", source)
+		self.assertIn("changedTranslatableNodeIds", source)
+		self.assertIn("unexpectedUnchangedTranslatableNodeIds", source)
+		self.assertIn("redactNodeMap", source)
+		self.assertIn("intentionallyUnchangedNodes", source)
+		self.assertIn("lastSemanticProgressAt", source)
+		self.assertIn("getSnapshotProgressFingerprint", source)
+		self.assertIn('throw new Error("Guide translation changed before PDF rendering")', source)
+		self.assertIn('throw new Error("Selected translation changed during PDF export")', source)
+		self.assertIn('throw new Error("PDF export content does not match the visible guide")', source)
+		self.assertIn('throw new Error("Guide translation changed before PDF download")', source)
+
+	def test_export_script_resolves_images_through_same_origin_proxy_and_validates_painting(self):
+		source = self.get_export_script_source()
+		self.assertIn("function resolveExportImageUrl(sourceUrl)", source)
+		self.assertIn("PUBLIC_PDF_IMAGE_ENDPOINT", source)
+		self.assertIn("assertExportImageSourcesAreCapturable", source)
+		self.assertIn("validateExportImagesCanPaintToCanvas", source)
+		self.assertIn("validateCanvasPaintedImages(pageNode, canvas, index)", source)
+		self.assertIn('throw new Error("image-not-painted")', source)
+
+	def test_export_script_uses_language_sync_without_relying_only_on_change_event(self):
+		source = self.get_export_script_source()
+		self.assertIn("function syncTranslationLanguageState()", source)
+		self.assertIn("currentLanguage !== translationState.requestedLanguage", source)
+		self.assertIn("widgetObserver.observe(document.body", source)
+		self.assertIn("syncTranslationLanguageState();", source)
+
+	def test_export_script_redacts_protected_fields_in_diagnostics(self):
+		source = self.get_export_script_source()
+		self.assertIn("PROTECTED_GUIDE_FIELDS", source)
+		self.assertIn('return "[redacted]";', source)
+		self.assertIn("window.__propertyInstructionLastExportParityMap = redactNodeMap", source)
+
+	def test_export_script_uses_language_neutral_progress_copy(self):
+		source = self.get_export_script_source()
+		self.assertNotIn("Preparing PDF", source)
+		self.assertNotIn("Waiting for translation", source)
+		self.assertNotIn("Rendering PDF", source)
+		self.assertIn('downloadButton.textContent = currentLabel + "…";', source)
+		self.assertIn('statusElement.textContent = statusMessage || "…";', source)
 
 	def test_noindex_present_when_google_translate_disabled(self):
 		self.set_property_management_setting("enable_guest_guide_google_translate", 0)
@@ -506,6 +674,27 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 		self.assertEqual(image_response["content_type"], "image/png")
 		self.assertEqual(image_response["filename"], "test-guide-image.png")
 		self.assertEqual(image_response["content"], PNG_BYTES)
+
+	def test_validate_public_pdf_image_url_allows_registered_external_file_url(self):
+		url = "https://estaex.co.uk/files/test-guide-image.png"
+		self.make_external_file_record(url)
+		parsed = validate_public_pdf_image_url(url)
+		self.assertEqual(parsed.hostname, "estaex.co.uk")
+
+	def test_validate_public_pdf_image_url_allows_property_instruction_image_host(self):
+		self.make_instruction(
+			cover_image="https://guides.example/files/cover.png",
+			instruction_blocks=[
+				{
+					"section": "Check-In",
+					"block_type": "Image",
+					"title": "Guide image",
+					"image": "https://guides.example/files/block.png",
+				},
+			],
+		)
+		parsed = validate_public_pdf_image_url("https://guides.example/files/block.png")
+		self.assertEqual(parsed.hostname, "guides.example")
 
 	def test_validate_public_pdf_image_url_rejects_arbitrary_external_host(self):
 		with self.assertRaises(frappe.ValidationError):

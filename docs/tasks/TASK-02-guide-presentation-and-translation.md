@@ -62,6 +62,11 @@ The accepted production model is:
 - no translation credentials or server-side translation state are required
 - all intended changes stay isolated to `develop`
 
+## Related Tasks
+
+- `TASK-03-live-page-parity.md`
+- `TASK-04-google-widget-pdf-translation-parity.md`
+
 ## Search Engine Behaviour
 
 - guest guides return `noindex, nofollow, noarchive, nosnippet, noimageindex` in HTML metadata

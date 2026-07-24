@@ -109,3 +109,8 @@ Console findings:
 - verify rendered HTML contains an iframe without an API key when only address data exists
 - verify the Google Translate widget can be enabled and disabled from settings
 - validate that browser-generated PDFs reflect the currently translated DOM
+
+## Related Tasks
+
+- `TASK-02-guide-presentation-and-translation.md`
+- `TASK-04-google-widget-pdf-translation-parity.md`

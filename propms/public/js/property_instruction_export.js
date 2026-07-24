@@ -6,6 +6,7 @@
 
   var HTML2CANVAS_LIBRARY_URL = "/assets/propms/js/vendor/html2canvas.min.js";
   var JSPDF_LIBRARY_URL = "/assets/propms/js/vendor/jspdf.umd.min.js";
+  var PUBLIC_PDF_IMAGE_ENDPOINT = "/api/method/propms.property_management_solution.doctype.property_instruction.property_instruction.public_pdf_image";
   var PDF_EXPORT_WIDTH = 794;
   var PDF_EXPORT_PAGE_HEIGHT = 1122;
   var PDF_EXPORT_PAGE_PADDING_TOP = 34;
@@ -17,10 +18,39 @@
   var PDF_EXPORT_PAGE_BODY_HEIGHT = PDF_EXPORT_PAGE_HEIGHT - PDF_EXPORT_PAGE_PADDING_TOP - PDF_EXPORT_PAGE_PADDING_BOTTOM - PDF_EXPORT_FOOTER_HEIGHT - PDF_EXPORT_FOOTER_GAP;
   var PDF_EXPORT_TIMEOUT_MS = 240000;
   var PDF_EXPORT_IMAGE_RATIO_TOLERANCE = 0.02;
-  var GUIDE_SETTLE_TIMEOUT_MS = 12000;
-  var GUIDE_SETTLE_QUIET_MS = 700;
+  var GUIDE_SETTLE_TIMEOUT_MS = 45000;
+  var GUIDE_SETTLE_QUIET_MS = 2500;
+  var GUIDE_SETTLE_STABLE_INTERVAL_MS = 1500;
   var GUIDE_SETTLE_STABLE_PASSES = 2;
+  var SOURCE_LANGUAGE = "en";
   var RTL_LANGUAGE_PREFIXES = ["ar", "fa", "he", "ku", "ps", "ur", "yi"];
+  var PROTECTED_GUIDE_FIELDS = {
+    address: true,
+    wifi_name: true,
+    wifi_password: true
+  };
+  var translationState = {
+    generation: 0,
+    requestedLanguage: "",
+    readyLanguage: "",
+    readySnapshot: null,
+    originalSnapshot: null,
+    lastMutationAt: Date.now(),
+    baselineCapturedAt: 0,
+    firstMutationAt: 0,
+    widgetScriptRequestedAt: 0,
+    stablePassTimestamps: [],
+    mutationTimestamps: [],
+    sectionReadiness: {},
+    stableGeneration: 0,
+    progressObservations: [],
+    diagnostics: {}
+  };
+
+  function getGoogleWidgetState() {
+    window.__propertyInstructionGoogleWidgetState = window.__propertyInstructionGoogleWidgetState || {};
+    return window.__propertyInstructionGoogleWidgetState;
+  }
 
   async function copyValue(value) {
     if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -68,7 +98,7 @@
   }
 
   function getGuideTitle() {
-    return getVisibleText(document.querySelector("[data-guide-field='title']")) || "Estaex Guest Guide";
+    return getVisibleText(document.querySelector("[data-guide-field='title']"));
   }
 
   function getPdfFilename(downloadButton) {
@@ -86,7 +116,7 @@
   function getGuideLanguage() {
     return (
       getWidgetLanguage() ||
-      String((getGuideRoot() && getGuideRoot().getAttribute("lang")) || document.documentElement.lang || "en")
+      String((getGuideRoot() && getGuideRoot().getAttribute("lang")) || document.documentElement.lang || SOURCE_LANGUAGE)
         .trim()
         .toLowerCase()
     );
@@ -101,8 +131,12 @@
   function getGuideDirection(languageCode) {
     var guideRoot = getGuideRoot();
     if (guideRoot) {
+      var explicitDirection = String(guideRoot.getAttribute("dir") || "").trim().toLowerCase();
+      if (explicitDirection === "rtl" || explicitDirection === "ltr") {
+        return explicitDirection;
+      }
       var computedDirection = window.getComputedStyle(guideRoot).direction;
-      if (computedDirection === "rtl" || computedDirection === "ltr") {
+      if (computedDirection === "rtl") {
         return computedDirection;
       }
     }
@@ -143,105 +177,953 @@
     return "";
   }
 
-  function computeGuideSignature() {
+  function isDataUrl(value) {
+    return String(value || "").trim().toLowerCase().indexOf("data:") === 0;
+  }
+
+  function isSameOriginUrl(rawUrl) {
+    if (!rawUrl) {
+      return false;
+    }
+    try {
+      return new URL(rawUrl, window.location.origin).origin === window.location.origin;
+    } catch (error) {
+      return false;
+    }
+  }
+
+  function resolveExportImageUrl(sourceUrl) {
+    var rawUrl = String(sourceUrl || "").trim();
+    if (!rawUrl) {
+      return "";
+    }
+    if (isDataUrl(rawUrl)) {
+      return rawUrl;
+    }
+
+    var absoluteUrl = new URL(rawUrl, window.location.origin);
+    if (
+      absoluteUrl.origin === window.location.origin &&
+      absoluteUrl.pathname === PUBLIC_PDF_IMAGE_ENDPOINT
+    ) {
+      return absoluteUrl.toString();
+    }
+
+    var proxyUrl = new URL(PUBLIC_PDF_IMAGE_ENDPOINT, window.location.origin);
+    proxyUrl.searchParams.set("url", absoluteUrl.toString());
+    return proxyUrl.toString();
+  }
+
+  function getSemanticNodeId(element) {
+    if (!element) {
+      return "";
+    }
+    if (element.hasAttribute("data-guide-kicker")) {
+      return "guide:kicker";
+    }
+    if (element.hasAttribute("data-guide-empty-state")) {
+      return "guide:empty";
+    }
+    if (element.hasAttribute("data-guide-label")) {
+      return "label:" + element.getAttribute("data-guide-label");
+    }
+    if (element.hasAttribute("data-guide-field")) {
+      return "field:" + element.getAttribute("data-guide-field");
+    }
+    if (element.hasAttribute("data-guide-map-title")) {
+      return "map:title";
+    }
+    if (element.hasAttribute("data-guide-map-link")) {
+      return "map:link_label";
+    }
+    if (element.hasAttribute("data-guide-section-title")) {
+      var section = element.closest("[data-guide-section]");
+      return "section:" + (section ? section.getAttribute("data-guide-section-anchor") || "" : "") + ":title";
+    }
+    if (element.hasAttribute("data-guide-block-title")) {
+      var blockForTitle = element.closest("[data-guide-block]");
+      return "block:" + (blockForTitle ? blockForTitle.getAttribute("data-guide-block-id") || "" : "") + ":title";
+    }
+    if (element.hasAttribute("data-guide-block-body")) {
+      var blockForBody = element.closest("[data-guide-block]");
+      return "block:" + (blockForBody ? blockForBody.getAttribute("data-guide-block-id") || "" : "") + ":body";
+    }
+    if (element.hasAttribute("data-guide-block-caption")) {
+      var blockForCaption = element.closest("[data-guide-block]");
+      return "block:" + (blockForCaption ? blockForCaption.getAttribute("data-guide-block-id") || "" : "") + ":caption";
+    }
+    if (element.hasAttribute("data-guide-block-link")) {
+      var blockForLink = element.closest("[data-guide-block]");
+      return "block:" + (blockForLink ? blockForLink.getAttribute("data-guide-block-id") || "" : "") + ":link_label";
+    }
+    return "";
+  }
+
+  function getSemanticSourceNodes() {
     var guideScreen = getGuideScreen();
     if (!guideScreen) {
+      return [];
+    }
+    return Array.prototype.slice.call(guideScreen.querySelectorAll("[data-guide-signature]")).filter(function (element) {
+      return !!getSemanticNodeId(element);
+    });
+  }
+
+  function getTranslationKind(element) {
+    if (!element) {
+      return "translatable";
+    }
+    return String(element.getAttribute("data-guide-translation-kind") || "translatable").trim().toLowerCase() || "translatable";
+  }
+
+  function getSemanticNodeMeta(element) {
+    var allowIdenticalLanguages = [];
+    if (element) {
+      allowIdenticalLanguages = String(element.getAttribute("data-guide-allow-identical-languages") || "")
+        .split(",")
+        .map(function (languageCode) {
+          return String(languageCode || "").trim().toLowerCase();
+        })
+        .filter(function (languageCode) {
+          return !!languageCode;
+        });
+    }
+    return {
+      kind: getTranslationKind(element),
+      allowIdentical: element ? element.getAttribute("data-guide-allow-identical") === "1" : false,
+      allowIdenticalLanguages: allowIdenticalLanguages
+    };
+  }
+
+  function redactSensitiveValue(nodeId, value) {
+    if (!nodeId) {
+      return value;
+    }
+    if (nodeId.indexOf("field:") === 0) {
+      var fieldName = nodeId.slice(6);
+      if (PROTECTED_GUIDE_FIELDS[fieldName]) {
+        return "[redacted]";
+      }
+    }
+    return value;
+  }
+
+  function getSnapshotValueForNode(element) {
+    if (!element) {
+      return "";
+    }
+    if (element.hasAttribute("data-guide-block-body")) {
+      return flattenStructuredContent(extractStructuredContent(element));
+    }
+    return getVisibleText(element);
+  }
+
+  function captureSemanticSnapshot(options) {
+    var settings = options || {};
+    var guideScreen = getGuideScreen();
+    if (!guideScreen) {
+      throw new Error("Guide content unavailable");
+    }
+
+    var nodeMap = {};
+    var nodeMeta = {};
+    var orderedNodeIds = [];
+    var duplicateNodeIds = [];
+    getSemanticSourceNodes().forEach(function (element) {
+      var nodeId = getSemanticNodeId(element);
+      var value = getSnapshotValueForNode(element);
+      var meta = getSemanticNodeMeta(element);
+      if (!value && meta.kind === "translatable") {
+        meta.kind = "optional_empty";
+      }
+      if (nodeMap.hasOwnProperty(nodeId)) {
+        duplicateNodeIds.push(nodeId);
+      }
+      nodeMap[nodeId] = settings.redactProtectedValues ? redactSensitiveValue(nodeId, value) : value;
+      nodeMeta[nodeId] = meta;
+      orderedNodeIds.push(nodeId);
+    });
+
+    return {
+      languageCode: getGuideLanguage(),
+      direction: getGuideDirection(getGuideLanguage()),
+      sections: guideScreen.querySelectorAll("[data-guide-section]").length,
+      blocks: guideScreen.querySelectorAll("[data-guide-block]").length,
+      nodeCount: orderedNodeIds.length,
+      orderedNodeIds: orderedNodeIds,
+      nodeMap: nodeMap,
+      nodeMeta: nodeMeta,
+      duplicateNodeIds: duplicateNodeIds
+    };
+  }
+
+  function snapshotsEqual(leftSnapshot, rightSnapshot) {
+    if (!leftSnapshot || !rightSnapshot) {
+      return false;
+    }
+    if (
+      leftSnapshot.languageCode !== rightSnapshot.languageCode ||
+      leftSnapshot.direction !== rightSnapshot.direction ||
+      leftSnapshot.sections !== rightSnapshot.sections ||
+      leftSnapshot.blocks !== rightSnapshot.blocks ||
+      leftSnapshot.nodeCount !== rightSnapshot.nodeCount
+    ) {
+      return false;
+    }
+    for (var index = 0; index < leftSnapshot.orderedNodeIds.length; index += 1) {
+      var nodeId = leftSnapshot.orderedNodeIds[index];
+      if (nodeId !== rightSnapshot.orderedNodeIds[index]) {
+        return false;
+      }
+      if ((leftSnapshot.nodeMap[nodeId] || "") !== (rightSnapshot.nodeMap[nodeId] || "")) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  function countMeaningfulSnapshotChanges(currentSnapshot, originalSnapshot) {
+    if (!currentSnapshot || !originalSnapshot) {
+      return 0;
+    }
+    var changedNodes = 0;
+    currentSnapshot.orderedNodeIds.forEach(function (nodeId) {
+      var meta = currentSnapshot.nodeMeta[nodeId] || originalSnapshot.nodeMeta[nodeId] || {};
+      if (meta.kind !== "translatable") {
+        return;
+      }
+      if ((currentSnapshot.nodeMap[nodeId] || "") !== (originalSnapshot.nodeMap[nodeId] || "")) {
+        changedNodes += 1;
+      }
+    });
+    return changedNodes;
+  }
+
+  function redactSnapshot(snapshot) {
+    if (!snapshot) {
+      return null;
+    }
+    var redactedMap = {};
+    var redactedMeta = {};
+    snapshot.orderedNodeIds.forEach(function (nodeId) {
+      redactedMap[nodeId] = redactSensitiveValue(nodeId, snapshot.nodeMap[nodeId] || "");
+      redactedMeta[nodeId] = Object.assign({}, snapshot.nodeMeta[nodeId] || {});
+    });
+    return {
+      languageCode: snapshot.languageCode,
+      direction: snapshot.direction,
+      sections: snapshot.sections,
+      blocks: snapshot.blocks,
+      nodeCount: snapshot.nodeCount,
+      orderedNodeIds: snapshot.orderedNodeIds.slice(),
+      nodeMap: redactedMap,
+      nodeMeta: redactedMeta,
+      duplicateNodeIds: (snapshot.duplicateNodeIds || []).slice()
+    };
+  }
+
+  function redactNodeMap(nodeMap) {
+    var redactedMap = {};
+    Object.keys(nodeMap || {}).forEach(function (nodeId) {
+      redactedMap[nodeId] = redactSensitiveValue(nodeId, nodeMap[nodeId] || "");
+    });
+    return redactedMap;
+  }
+
+  function getSnapshotProgressFingerprint(snapshot, snapshotAnalysis) {
+    if (!snapshot || !snapshotAnalysis) {
       return "";
     }
 
-    var parts = [];
-    guideScreen.querySelectorAll("[data-guide-signature]").forEach(function (element) {
-      parts.push(getVisibleText(element).slice(0, 240));
+    var changedValues = snapshotAnalysis.changedTranslatableNodeIds.map(function (nodeId) {
+      return nodeId + "=" + String(snapshot.nodeMap[nodeId] || "");
     });
-    parts.push("sections:" + guideScreen.querySelectorAll("[data-guide-section]").length);
-    parts.push("blocks:" + guideScreen.querySelectorAll("[data-guide-block]").length);
-    return parts.join("|");
+
+    return JSON.stringify({
+      changedValues: changedValues,
+      unexpectedUnchangedNodeIds: snapshotAnalysis.unexpectedUnchangedTranslatableNodeIds.slice(),
+      missingRequiredNodeIds: snapshotAnalysis.missingRequiredNodeIds.slice()
+    });
+  }
+
+  function updateTranslationDiagnostics(patch) {
+    translationState.diagnostics = Object.assign({}, translationState.diagnostics || {}, patch || {});
+    window.__propertyInstructionTranslationDiagnostics = translationState.diagnostics;
+  }
+
+  function initializeTranslationDiagnostics() {
+    translationState.diagnostics = {
+      generation: translationState.generation,
+      selectedLanguage: translationState.requestedLanguage || getGuideLanguage() || SOURCE_LANGUAGE,
+      originalSnapshot: translationState.originalSnapshot ? redactSnapshot(translationState.originalSnapshot) : null,
+      settledSnapshot: null,
+      finalSnapshot: null,
+      baselineCapturedAt: translationState.baselineCapturedAt,
+      widgetScriptRequestedAt: translationState.widgetScriptRequestedAt || Number(window.__propertyInstructionGoogleScriptRequestedAt || 0) || 0,
+      firstTranslationMutationAt: translationState.firstMutationAt,
+      totalSemanticNodes: 0,
+      expectedTranslatableNodeCount: 0,
+      changedTranslatableNodeCount: 0,
+      intentionallyUnchangedNodeCount: 0,
+      unexpectedUnchangedTranslatableNodeCount: 0,
+      missingRequiredNodeCount: 0,
+      changedTranslatableNodeIds: [],
+      intentionallyUnchangedNodeIds: [],
+      unexpectedUnchangedTranslatableNodeIds: [],
+      missingRequiredNodeIds: [],
+      duplicateNodeIds: [],
+      unexpectedNodeIds: [],
+      orderMismatchNodeIds: [],
+      mutationTimestamps: [],
+      stablePassTimestamps: [],
+      progressObservations: [],
+      sectionReadiness: {},
+      parityMismatches: [],
+      exportParityMap: {},
+      abortReason: "",
+      abortCode: "",
+      googleWidget: {
+        scriptRequestedAt: translationState.widgetScriptRequestedAt || Number(window.__propertyInstructionGoogleScriptRequestedAt || 0) || 0,
+        scriptLoadedAt: 0,
+        scriptErrorAt: 0,
+        callbackInvokedAt: 0,
+        elementConstructedAt: 0,
+        containerPopulatedAt: 0,
+        selectAppearedAt: 0,
+        optionCount: 0,
+        requestedLanguageAvailable: false,
+        selectedValue: "",
+        firstTranslationMutationAt: translationState.firstMutationAt,
+        firstChangedNodeAt: 0,
+        lastSemanticProgressAt: 0
+      }
+    };
+    window.__propertyInstructionTranslationDiagnostics = translationState.diagnostics;
+  }
+
+  function setTranslationAbortReason(reason, code) {
+    updateTranslationDiagnostics({
+      abortReason: reason,
+      abortCode: code || ""
+    });
+  }
+
+  function clearTranslationReadyState() {
+    translationState.readyLanguage = "";
+    translationState.readySnapshot = null;
+    translationState.sectionReadiness = {};
+    translationState.stablePassTimestamps = [];
+    translationState.stableGeneration = 0;
+  }
+
+  function resetTranslationGeneration(nextLanguage) {
+    translationState.generation += 1;
+    translationState.requestedLanguage = nextLanguage || SOURCE_LANGUAGE;
+    clearTranslationReadyState();
+    translationState.lastMutationAt = Date.now();
+    initializeTranslationDiagnostics();
+  }
+
+  function syncTranslationLanguageState() {
+    var widgetLanguage = getWidgetLanguage();
+    var currentLanguage = widgetLanguage || SOURCE_LANGUAGE;
+    var widgetState = getGoogleWidgetState();
+    var widgetSelect = document.querySelector(".goog-te-combo");
+    var widgetOptions = widgetSelect ? Array.prototype.slice.call(widgetSelect.options || []) : [];
+    var selectAppearedAt = widgetSelect ? (translationState.selectAppearedAt || Date.now()) : 0;
+    if (widgetSelect && !translationState.selectAppearedAt) {
+      translationState.selectAppearedAt = selectAppearedAt;
+    }
+    var container = document.querySelector(".pi-translate-widget");
+    if (container && container.children.length && !translationState.widgetContainerPopulatedAt) {
+      translationState.widgetContainerPopulatedAt = Date.now();
+    }
+    if (!translationState.requestedLanguage) {
+      translationState.requestedLanguage = SOURCE_LANGUAGE;
+    }
+    if (currentLanguage !== translationState.requestedLanguage) {
+      resetTranslationGeneration(currentLanguage);
+    }
+    updateTranslationDiagnostics({
+      selectedLanguage: translationState.requestedLanguage || SOURCE_LANGUAGE,
+      widgetScriptRequestedAt: translationState.widgetScriptRequestedAt || Number(window.__propertyInstructionGoogleScriptRequestedAt || 0) || 0,
+      firstTranslationMutationAt: translationState.firstMutationAt,
+      googleWidget: {
+        scriptRequestedAt: translationState.widgetScriptRequestedAt || Number(window.__propertyInstructionGoogleScriptRequestedAt || 0) || 0,
+        scriptLoadedAt: Number(widgetState.scriptLoadedAt || 0) || 0,
+        scriptErrorAt: Number(widgetState.scriptErrorAt || 0) || 0,
+        callbackInvokedAt: Number(widgetState.callbackInvokedAt || 0) || 0,
+        elementConstructedAt: Number(widgetState.elementConstructedAt || 0) || 0,
+        containerPopulatedAt: Number(translationState.widgetContainerPopulatedAt || 0) || 0,
+        selectAppearedAt: Number(translationState.selectAppearedAt || 0) || 0,
+        optionCount: widgetOptions.length,
+        requestedLanguageAvailable: !translationState.requestedLanguage || translationState.requestedLanguage === SOURCE_LANGUAGE || widgetOptions.some(function (option) {
+          return String(option.value || "").trim().toLowerCase() === translationState.requestedLanguage;
+        }),
+        selectedValue: widgetLanguage,
+        firstTranslationMutationAt: translationState.firstMutationAt,
+        firstChangedNodeAt: Number(translationState.firstChangedNodeAt || 0) || 0,
+        lastSemanticProgressAt: Number(translationState.lastSemanticProgressAt || 0) || 0
+      }
+    });
+    return translationState.requestedLanguage || SOURCE_LANGUAGE;
+  }
+
+  function ensureTranslationObservers() {
+    if (translationState.guideObserverBound) {
+      return;
+    }
+    var guideScreen = getGuideScreen();
+    if (!guideScreen) {
+      return;
+    }
+
+    var mutationObserver = new MutationObserver(function () {
+      var timestamp = Date.now();
+      translationState.lastMutationAt = timestamp;
+      if (!translationState.firstMutationAt) {
+        translationState.firstMutationAt = timestamp;
+      }
+      translationState.mutationTimestamps.push(timestamp);
+      translationState.mutationTimestamps = translationState.mutationTimestamps.slice(-120);
+      translationState.readySnapshot = null;
+      translationState.readyLanguage = "";
+      syncTranslationLanguageState();
+      updateTranslationDiagnostics({
+        firstTranslationMutationAt: translationState.firstMutationAt,
+        mutationTimestamps: translationState.mutationTimestamps.slice(-60)
+      });
+    });
+
+    mutationObserver.observe(guideScreen, {
+      subtree: true,
+      childList: true,
+      characterData: true,
+      attributes: true,
+      attributeFilter: ["class", "style", "dir", "lang"]
+    });
+
+    document.addEventListener("change", function (event) {
+      var widgetSelect = event.target.closest(".goog-te-combo");
+      if (!widgetSelect) {
+        return;
+      }
+      var requestedLanguage = String(widgetSelect.value || "").trim().toLowerCase() || SOURCE_LANGUAGE;
+      if (requestedLanguage !== (translationState.requestedLanguage || SOURCE_LANGUAGE)) {
+        resetTranslationGeneration(requestedLanguage);
+      }
+    });
+
+    var widgetObserver = new MutationObserver(function () {
+      syncTranslationLanguageState();
+    });
+    widgetObserver.observe(document.body, {
+      subtree: true,
+      childList: true,
+      attributes: true,
+      attributeFilter: ["value", "lang", "dir", "class"]
+    });
+
+    translationState.guideObserverBound = true;
+  }
+
+  function ensureOriginalSnapshotCaptured() {
+    ensureTranslationObservers();
+    if (!translationState.originalSnapshot) {
+      translationState.widgetScriptRequestedAt = Number(window.__propertyInstructionGoogleScriptRequestedAt || 0) || 0;
+      translationState.originalSnapshot = captureSemanticSnapshot();
+      translationState.baselineCapturedAt = Date.now();
+      translationState.requestedLanguage = SOURCE_LANGUAGE;
+      initializeTranslationDiagnostics();
+      updateTranslationDiagnostics({
+        originalSnapshot: redactSnapshot(translationState.originalSnapshot),
+        baselineCapturedAt: translationState.baselineCapturedAt,
+        widgetScriptRequestedAt: translationState.widgetScriptRequestedAt
+      });
+    }
+  }
+
+  function sleep(durationMs) {
+    return new Promise(function (resolve) {
+      window.setTimeout(resolve, durationMs);
+    });
+  }
+
+  function getScrollTargetTop(element) {
+    var rect = element.getBoundingClientRect();
+    return Math.max(window.scrollY + rect.top - 40, 0);
+  }
+
+  async function exposeGuideSectionsForTranslation() {
+    var guideScreen = getGuideScreen();
+    if (!guideScreen) {
+      throw new Error("Guide content unavailable");
+    }
+    var sections = Array.prototype.slice.call(guideScreen.querySelectorAll("[data-guide-section], [data-guide-block]"));
+    var originalScrollY = window.scrollY;
+
+    for (var index = 0; index < sections.length; index += 1) {
+      var sectionNode = sections[index];
+      window.scrollTo(0, getScrollTargetTop(sectionNode));
+      await waitForTwoAnimationFrames();
+      await sleep(180);
+
+      var sectionStartedAt = Date.now();
+      while (Date.now() - sectionStartedAt < 5000) {
+        if (
+          normalizeText(sectionNode.innerText || sectionNode.textContent || "").length &&
+          Date.now() - translationState.lastMutationAt >= 900
+        ) {
+          break;
+        }
+        await sleep(220);
+      }
+
+      var readinessKey = sectionNode.getAttribute("data-guide-section-anchor") ||
+        sectionNode.getAttribute("data-guide-block-id") ||
+        "node-" + index;
+      translationState.sectionReadiness[readinessKey] = {
+        exposedAt: Date.now(),
+        textLength: normalizeText(sectionNode.innerText || sectionNode.textContent || "").length
+      };
+      translationState.diagnostics.sectionReadiness = translationState.sectionReadiness;
+    }
+
+    window.scrollTo(0, originalScrollY);
+    await waitForTwoAnimationFrames();
+  }
+
+  function analyzeSnapshotState(currentSnapshot, originalSnapshot, expectedLanguage) {
+    var analysis = {
+      changedTranslatableNodeIds: [],
+      intentionallyUnchangedNodes: [],
+      unexpectedUnchangedTranslatableNodeIds: [],
+      missingRequiredNodeIds: [],
+      unexpectedNodeIds: [],
+      duplicateNodeIds: (currentSnapshot.duplicateNodeIds || []).slice(),
+      orderMismatchNodeIds: [],
+      expectedTranslatableNodeIds: [],
+      structureOk: true
+    };
+
+    if (!currentSnapshot || !originalSnapshot) {
+      analysis.structureOk = false;
+      return analysis;
+    }
+
+    var currentNodeSet = {};
+    currentSnapshot.orderedNodeIds.forEach(function (nodeId) {
+      currentNodeSet[nodeId] = true;
+    });
+
+    var originalOrder = originalSnapshot.orderedNodeIds;
+    originalOrder.forEach(function (nodeId, index) {
+      var meta = originalSnapshot.nodeMeta[nodeId] || {};
+      var kind = meta.kind || "translatable";
+      var originalValue = originalSnapshot.nodeMap[nodeId] || "";
+      var currentValue = currentSnapshot.nodeMap[nodeId] || "";
+      var currentIndex = currentSnapshot.orderedNodeIds.indexOf(nodeId);
+      var allowIdenticalLanguages = Array.isArray(meta.allowIdenticalLanguages) ? meta.allowIdenticalLanguages : [];
+      var allowsIdenticalForLanguage = expectedLanguage && allowIdenticalLanguages.indexOf(expectedLanguage) !== -1;
+
+      if (currentIndex === -1) {
+        analysis.missingRequiredNodeIds.push(nodeId);
+        return;
+      }
+      if (currentIndex !== index) {
+        analysis.orderMismatchNodeIds.push(nodeId);
+      }
+      if (kind === "translatable") {
+        analysis.expectedTranslatableNodeIds.push(nodeId);
+        if (currentValue !== originalValue) {
+          analysis.changedTranslatableNodeIds.push(nodeId);
+        } else if (meta.allowIdentical) {
+          analysis.intentionallyUnchangedNodes.push({
+            nodeId: nodeId,
+            reason: "global-allow-identical"
+          });
+        } else if (allowsIdenticalForLanguage) {
+          analysis.intentionallyUnchangedNodes.push({
+            nodeId: nodeId,
+            reason: "language-specific-identical",
+            language: expectedLanguage
+          });
+        } else {
+          analysis.unexpectedUnchangedTranslatableNodeIds.push(nodeId);
+        }
+      } else {
+        analysis.intentionallyUnchangedNodes.push({
+          nodeId: nodeId,
+          reason: "non-translatable-kind",
+          kind: kind
+        });
+      }
+      if (originalValue && !currentValue) {
+        analysis.missingRequiredNodeIds.push(nodeId);
+      }
+    });
+
+    currentSnapshot.orderedNodeIds.forEach(function (nodeId) {
+      if (!originalSnapshot.nodeMeta[nodeId]) {
+        analysis.unexpectedNodeIds.push(nodeId);
+      }
+    });
+
+    analysis.structureOk = !(
+      analysis.duplicateNodeIds.length ||
+      analysis.orderMismatchNodeIds.length ||
+      analysis.missingRequiredNodeIds.length ||
+      analysis.unexpectedNodeIds.length
+    );
+
+    return analysis;
+  }
+
+  function recordTranslationProgress(snapshotAnalysis, quietFor) {
+    translationState.progressObservations.push({
+      observedAt: Date.now(),
+      elapsedMs: Date.now() - (translationState.translationWaitStartedAt || Date.now()),
+      selectedLanguage: translationState.requestedLanguage || SOURCE_LANGUAGE,
+      generation: translationState.generation,
+      changedTranslatableCount: snapshotAnalysis.changedTranslatableNodeIds.length,
+      unexpectedUnchangedCount: snapshotAnalysis.unexpectedUnchangedTranslatableNodeIds.length,
+      missingRequiredCount: snapshotAnalysis.missingRequiredNodeIds.length,
+      lastMutationAgeMs: quietFor,
+      stablePassCount: translationState.stablePassTimestamps.length
+    });
+    translationState.progressObservations = translationState.progressObservations.slice(-30);
+    updateTranslationDiagnostics({
+      progressObservations: translationState.progressObservations.slice()
+    });
+  }
+
+  function classifyTranslationTimeout(expectedLanguage, snapshotAnalysis) {
+    var diagnostics = translationState.diagnostics || {};
+    var googleWidget = diagnostics.googleWidget || {};
+    if (googleWidget.scriptErrorAt) {
+      return "widget-script-load-failed";
+    }
+    if (googleWidget.scriptRequestedAt && !googleWidget.scriptLoadedAt && !googleWidget.scriptErrorAt) {
+      return "widget-script-load-failed";
+    }
+    if (googleWidget.scriptLoadedAt && !googleWidget.callbackInvokedAt) {
+      return "widget-callback-not-invoked";
+    }
+    if (googleWidget.callbackInvokedAt && !googleWidget.elementConstructedAt) {
+      return "widget-callback-not-invoked";
+    }
+    if (expectedLanguage !== SOURCE_LANGUAGE && !googleWidget.selectAppearedAt) {
+      return "widget-select-not-created";
+    }
+    if (expectedLanguage !== SOURCE_LANGUAGE && !googleWidget.requestedLanguageAvailable) {
+      return "requested-language-not-available";
+    }
+    if (expectedLanguage !== SOURCE_LANGUAGE && googleWidget.selectedValue !== expectedLanguage) {
+      return "language-selection-not-applied";
+    }
+    if (!snapshotAnalysis.structureOk) {
+      return "translation-structure-invalid";
+    }
+    if (expectedLanguage !== SOURCE_LANGUAGE && snapshotAnalysis.changedTranslatableNodeIds.length <= 0) {
+      return "translation-never-started";
+    }
+    if (expectedLanguage !== SOURCE_LANGUAGE && snapshotAnalysis.unexpectedUnchangedTranslatableNodeIds.length > 0) {
+      return snapshotAnalysis.changedTranslatableNodeIds.length > 0 ? "translation-partial" : "unexpected-unchanged-translatable-nodes";
+    }
+    if (translationState.firstChangedNodeAt && translationState.lastSemanticProgressAt && (Date.now() - translationState.lastSemanticProgressAt) > Math.max(GUIDE_SETTLE_QUIET_MS * 4, 10000)) {
+      return "translation-stalled";
+    }
+    return "translation-timeout-unknown";
+  }
+
+  async function waitForGuideTranslationReadiness() {
+    ensureOriginalSnapshotCaptured();
+    syncTranslationLanguageState();
+    var expectedLanguage = translationState.requestedLanguage || SOURCE_LANGUAGE;
+    var readinessGeneration = translationState.generation;
+    var startedAt = Date.now();
+    translationState.translationWaitStartedAt = startedAt;
+    translationState.progressObservations = [];
+    translationState.lastSnapshotProgressFingerprint = "";
+    translationState.lastSemanticProgressAt = 0;
+    var lastStableSnapshot = null;
+    translationState.stablePassTimestamps = [];
+    translationState.stableGeneration = readinessGeneration;
+
+    await exposeGuideSectionsForTranslation();
+
+    while (Date.now() - startedAt < GUIDE_SETTLE_TIMEOUT_MS) {
+      var syncedLanguage = syncTranslationLanguageState();
+      var currentLanguage = syncedLanguage || getGuideLanguage() || SOURCE_LANGUAGE;
+      var quietFor = Date.now() - translationState.lastMutationAt;
+      var currentSnapshot = captureSemanticSnapshot();
+      var snapshotAnalysis = analyzeSnapshotState(currentSnapshot, translationState.originalSnapshot, expectedLanguage);
+      var progressFingerprint = getSnapshotProgressFingerprint(currentSnapshot, snapshotAnalysis);
+      if (snapshotAnalysis.changedTranslatableNodeIds.length) {
+        if (!translationState.firstChangedNodeAt) {
+          translationState.firstChangedNodeAt = Date.now();
+        }
+      }
+      if (progressFingerprint !== translationState.lastSnapshotProgressFingerprint) {
+        translationState.lastSnapshotProgressFingerprint = progressFingerprint;
+        translationState.lastSemanticProgressAt = Date.now();
+      }
+      updateTranslationDiagnostics({
+        mutationTimestamps: translationState.mutationTimestamps.slice(-60),
+        totalSemanticNodes: currentSnapshot.nodeCount,
+        expectedTranslatableNodeCount: snapshotAnalysis.expectedTranslatableNodeIds.length,
+        changedTranslatableNodeCount: snapshotAnalysis.changedTranslatableNodeIds.length,
+        intentionallyUnchangedNodeCount: snapshotAnalysis.intentionallyUnchangedNodes.length,
+        unexpectedUnchangedTranslatableNodeCount: snapshotAnalysis.unexpectedUnchangedTranslatableNodeIds.length,
+        missingRequiredNodeCount: snapshotAnalysis.missingRequiredNodeIds.length,
+        changedTranslatableNodeIds: snapshotAnalysis.changedTranslatableNodeIds.slice(),
+        intentionallyUnchangedNodeIds: snapshotAnalysis.intentionallyUnchangedNodes.map(function (node) { return node.nodeId; }),
+        intentionallyUnchangedNodes: snapshotAnalysis.intentionallyUnchangedNodes.slice(),
+        unexpectedUnchangedTranslatableNodeIds: snapshotAnalysis.unexpectedUnchangedTranslatableNodeIds.slice(),
+        missingRequiredNodeIds: snapshotAnalysis.missingRequiredNodeIds.slice(),
+        duplicateNodeIds: snapshotAnalysis.duplicateNodeIds.slice(),
+        unexpectedNodeIds: snapshotAnalysis.unexpectedNodeIds.slice(),
+        orderMismatchNodeIds: snapshotAnalysis.orderMismatchNodeIds.slice(),
+        sectionReadiness: translationState.sectionReadiness
+      });
+      recordTranslationProgress(snapshotAnalysis, quietFor);
+
+      if (
+        translationState.generation !== readinessGeneration ||
+        currentLanguage !== expectedLanguage ||
+        !snapshotAnalysis.structureOk ||
+        (expectedLanguage !== SOURCE_LANGUAGE && snapshotAnalysis.unexpectedUnchangedTranslatableNodeIds.length > 0) ||
+        (expectedLanguage !== SOURCE_LANGUAGE && snapshotAnalysis.changedTranslatableNodeIds.length <= 0) ||
+        quietFor < GUIDE_SETTLE_QUIET_MS
+      ) {
+        lastStableSnapshot = null;
+        translationState.stablePassTimestamps = [];
+        if (translationState.generation !== readinessGeneration) {
+          setTranslationAbortReason("Selected translation changed while the guide was preparing", "language-selection-not-applied");
+          throw new Error("Selected translation changed while the guide was preparing");
+        }
+        await sleep(420);
+        continue;
+      }
+
+      if (lastStableSnapshot && snapshotsEqual(lastStableSnapshot, currentSnapshot)) {
+        if (
+          !translationState.stablePassTimestamps.length ||
+          Date.now() - translationState.stablePassTimestamps[translationState.stablePassTimestamps.length - 1] >= GUIDE_SETTLE_STABLE_INTERVAL_MS
+        ) {
+          translationState.stablePassTimestamps.push(Date.now());
+        }
+      } else {
+        lastStableSnapshot = currentSnapshot;
+        translationState.stablePassTimestamps = [Date.now()];
+      }
+
+      translationState.diagnostics.stablePassTimestamps = translationState.stablePassTimestamps.slice();
+
+      if (translationState.stablePassTimestamps.length >= GUIDE_SETTLE_STABLE_PASSES) {
+        translationState.readyLanguage = expectedLanguage;
+        translationState.readySnapshot = currentSnapshot;
+        updateTranslationDiagnostics({
+          settledSnapshot: captureSemanticSnapshot({ redactProtectedValues: true })
+        });
+        return currentSnapshot;
+      }
+
+      await sleep(420);
+    }
+
+    var timeoutSnapshot = captureSemanticSnapshot();
+    var timeoutAnalysis = analyzeSnapshotState(timeoutSnapshot, translationState.originalSnapshot, expectedLanguage);
+    var timeoutCode = classifyTranslationTimeout(expectedLanguage, timeoutAnalysis);
+    setTranslationAbortReason("Translation did not settle in time", timeoutCode);
+    throw new Error("Translation did not settle in time");
   }
 
   function waitForGuideToSettle() {
-    var guideScreen = getGuideScreen();
-    if (!guideScreen) {
-      return Promise.reject(new Error("Guide content unavailable"));
-    }
-
-    return new Promise(function (resolve, reject) {
-      var lastMutationAt = Date.now();
-      var startedAt = Date.now();
-      var previousSignature = computeGuideSignature();
-      var stablePasses = 0;
-
-      var observer = new MutationObserver(function () {
-        lastMutationAt = Date.now();
-        stablePasses = 0;
-      });
-
-      observer.observe(guideScreen, {
-        subtree: true,
-        childList: true,
-        characterData: true,
-        attributes: true,
-        attributeFilter: ["class", "style", "dir", "lang"]
-      });
-
-      function finish(error) {
-        observer.disconnect();
-        if (error) {
-          reject(error);
-          return;
-        }
-        resolve();
+    return waitForGuideTranslationReadiness().catch(function (error) {
+      if (!(translationState.diagnostics || {}).abortReason) {
+        setTranslationAbortReason(error && error.message ? error.message : "Translation did not settle", "translation-timeout-unknown");
       }
-
-      function check() {
-        var signature = computeGuideSignature();
-        var quietFor = Date.now() - lastMutationAt;
-
-        if (signature === previousSignature && quietFor >= GUIDE_SETTLE_QUIET_MS) {
-          stablePasses += 1;
-        } else {
-          stablePasses = 0;
-        }
-
-        previousSignature = signature;
-
-        if (stablePasses >= GUIDE_SETTLE_STABLE_PASSES) {
-          finish();
-          return;
-        }
-
-        if (Date.now() - startedAt >= GUIDE_SETTLE_TIMEOUT_MS) {
-          finish(new Error("Translation did not settle in time"));
-          return;
-        }
-
-        window.setTimeout(check, 320);
-      }
-
-      window.setTimeout(check, 360);
+      throw error;
     });
   }
 
-  function textToParagraphs(documentNode, text) {
-    var fragment = documentNode.createDocumentFragment();
-    var paragraphs = normalizeText(text).split(/\n{2,}/).filter(Boolean);
-
-    if (!paragraphs.length && normalizeText(text)) {
-      paragraphs = [normalizeText(text)];
+  function extractStructuredInlineContent(node) {
+    if (!node) {
+      return [];
     }
 
-    paragraphs.forEach(function (paragraphText) {
-      var paragraph = documentNode.createElement("p");
-      var lines = paragraphText.split("\n").filter(Boolean);
-      lines.forEach(function (line, index) {
-        if (index) {
-          paragraph.appendChild(documentNode.createElement("br"));
+    if (node.nodeType === Node.TEXT_NODE) {
+      var textValue = String(node.textContent || "");
+      if (!normalizeText(textValue)) {
+        return [];
+      }
+      return [{ type: "text", value: textValue }];
+    }
+
+    if (node.nodeType !== Node.ELEMENT_NODE) {
+      return [];
+    }
+
+    var tagName = node.tagName.toLowerCase();
+    if (tagName === "br") {
+      return [{ type: "br" }];
+    }
+
+    if (tagName === "a") {
+      var href = normalizeHref(node.getAttribute("href"));
+      return [{
+        type: "link",
+        href: href,
+        content: extractStructuredInlineContentFromChildren(node)
+      }];
+    }
+
+    if (tagName === "strong" || tagName === "b" || tagName === "em" || tagName === "i") {
+      return [{
+        type: tagName === "b" ? "strong" : tagName === "i" ? "em" : tagName,
+        content: extractStructuredInlineContentFromChildren(node)
+      }];
+    }
+
+    return extractStructuredInlineContentFromChildren(node);
+  }
+
+  function extractStructuredInlineContentFromChildren(node) {
+    var content = [];
+    Array.prototype.slice.call(node.childNodes).forEach(function (childNode) {
+      content = content.concat(extractStructuredInlineContent(childNode));
+    });
+    return content;
+  }
+
+  function extractStructuredContent(node) {
+    if (!node) {
+      return [];
+    }
+    var content = [];
+    var blockTags = { p: true, ul: true, ol: true, li: true, br: true, a: true };
+
+    Array.prototype.slice.call(node.childNodes).forEach(function (childNode) {
+      if (childNode.nodeType === Node.TEXT_NODE) {
+        if (normalizeText(childNode.textContent || "")) {
+          content.push({
+            type: "paragraph",
+            content: [{ type: "text", value: childNode.textContent || "" }]
+          });
         }
-        paragraph.appendChild(documentNode.createTextNode(line));
+        return;
+      }
+
+      if (childNode.nodeType !== Node.ELEMENT_NODE) {
+        return;
+      }
+
+      var tagName = childNode.tagName.toLowerCase();
+      if (tagName === "p") {
+        content.push({ type: "paragraph", content: extractStructuredInlineContentFromChildren(childNode) });
+        return;
+      }
+      if (tagName === "ul" || tagName === "ol") {
+        content.push({
+          type: "list",
+          ordered: tagName === "ol",
+          items: Array.prototype.slice.call(childNode.children).filter(function (listChild) {
+            return listChild.tagName && listChild.tagName.toLowerCase() === "li";
+          }).map(function (listItem) {
+            return extractStructuredInlineContentFromChildren(listItem);
+          })
+        });
+        return;
+      }
+      if (blockTags[tagName]) {
+        content.push({ type: "paragraph", content: extractStructuredInlineContent(childNode) });
+        return;
+      }
+      var nestedContent = extractStructuredContent(childNode);
+      nestedContent.forEach(function (item) {
+        content.push(item);
       });
-      fragment.appendChild(paragraph);
     });
 
-    return fragment;
+    return content;
+  }
+
+  function flattenStructuredInlineContent(inlineContent) {
+    return inlineContent.map(function (part) {
+      if (part.type === "text") {
+        return part.value || "";
+      }
+      if (part.type === "br") {
+        return "\n";
+      }
+      if (part.content) {
+        return flattenStructuredInlineContent(part.content);
+      }
+      return "";
+    }).join("");
+  }
+
+  function flattenStructuredContent(structuredContent) {
+    return normalizeText(structuredContent.map(function (item) {
+      if (item.type === "paragraph") {
+        return flattenStructuredInlineContent(item.content || []);
+      }
+      if (item.type === "list") {
+        return (item.items || []).map(function (listItem) {
+          return flattenStructuredInlineContent(listItem || []);
+        }).join("\n");
+      }
+      return "";
+    }).join("\n\n"));
+  }
+
+  function appendStructuredInlineContent(documentNode, parentNode, inlineContent) {
+    inlineContent.forEach(function (part) {
+      if (part.type === "text") {
+        parentNode.appendChild(documentNode.createTextNode(part.value || ""));
+        return;
+      }
+      if (part.type === "br") {
+        parentNode.appendChild(documentNode.createElement("br"));
+        return;
+      }
+      if (part.type === "link") {
+        var link = documentNode.createElement("a");
+        link.href = part.href || "";
+        link.target = "_blank";
+        link.rel = "noopener noreferrer nofollow";
+        appendStructuredInlineContent(documentNode, link, part.content || []);
+        parentNode.appendChild(link);
+        return;
+      }
+      if (part.type === "strong" || part.type === "em") {
+        var inlineElement = documentNode.createElement(part.type);
+        appendStructuredInlineContent(documentNode, inlineElement, part.content || []);
+        parentNode.appendChild(inlineElement);
+        return;
+      }
+    });
+  }
+
+  function appendStructuredContent(documentNode, parentNode, structuredContent) {
+    structuredContent.forEach(function (item) {
+      if (item.type === "paragraph") {
+        var paragraph = documentNode.createElement("p");
+        appendStructuredInlineContent(documentNode, paragraph, item.content || []);
+        parentNode.appendChild(paragraph);
+        return;
+      }
+      if (item.type === "list") {
+        var list = documentNode.createElement(item.ordered ? "ol" : "ul");
+        (item.items || []).forEach(function (listItemContent) {
+          var listItem = documentNode.createElement("li");
+          appendStructuredInlineContent(documentNode, listItem, listItemContent || []);
+          list.appendChild(listItem);
+        });
+        parentNode.appendChild(list);
+      }
+    });
   }
 
   function createManagedImage(documentNode, options, pendingImages) {
@@ -255,13 +1137,17 @@
       frame.style.maxHeight = options.frameMaxHeight;
     }
 
+    var resolvedSourceUrl = resolveExportImageUrl(options.src);
     var img = documentNode.createElement("img");
     img.className = options.className;
-    img.src = options.src;
+    img.src = resolvedSourceUrl;
     img.alt = options.alt || "";
     img.loading = "eager";
     img.decoding = "sync";
     img.referrerPolicy = "strict-origin-when-cross-origin";
+    img.setAttribute("data-export-image-role", options.imageRole || "image");
+    img.setAttribute("data-export-image-original-src", String(options.src || ""));
+    img.setAttribute("data-export-image-resolved-src", resolvedSourceUrl);
     img.removeAttribute("width");
     img.removeAttribute("height");
     img.style.width = "auto";
@@ -278,7 +1164,9 @@
         function replaceWithPlaceholder() {
           var placeholder = documentNode.createElement("div");
           placeholder.className = options.placeholderClass || "pi-export-image-placeholder";
-          placeholder.textContent = options.placeholderText || "Image unavailable";
+          if (options.placeholderText) {
+            placeholder.textContent = options.placeholderText;
+          }
           while (frame.firstChild) {
             frame.removeChild(frame.firstChild);
           }
@@ -322,7 +1210,8 @@
     var sections = Array.prototype.slice.call(guideScreen.querySelectorAll("[data-guide-section]")).map(function (sectionNode) {
       var blocks = Array.prototype.slice.call(sectionNode.querySelectorAll("[data-guide-block]")).map(function (blockNode) {
         var title = getVisibleText(blockNode.querySelector("[data-guide-block-title]"));
-        var body = getVisibleText(blockNode.querySelector("[data-guide-block-body]"));
+        var bodyNode = blockNode.querySelector("[data-guide-block-body]");
+        var bodyContent = extractStructuredContent(bodyNode);
         var caption = getVisibleText(blockNode.querySelector("[data-guide-block-caption]"));
         var linkNode = blockNode.querySelector("[data-guide-block-link]");
         var imageNode = blockNode.querySelector("[data-guide-block-image]");
@@ -331,7 +1220,8 @@
           type: blockNode.getAttribute("data-guide-block-type") || "Text",
           stepNumber: getVisibleText(blockNode.querySelector("[data-guide-step-number]")),
           title: title,
-          body: body,
+          body: flattenStructuredContent(bodyContent),
+          bodyContent: bodyContent,
           caption: caption,
           linkLabel: getVisibleText(linkNode),
           linkHref: normalizeHref(linkNode && linkNode.getAttribute("href")),
@@ -365,11 +1255,15 @@
     var mapLink = document.querySelector("[data-guide-map-link]") || document.querySelector(".pi-hero .pi-btn-primary");
     var coverNode = document.querySelector("[data-guide-cover]");
     var languageCode = getGuideLanguage();
+    var emptyNode = document.querySelector("[data-guide-empty-state]");
+    var guideKicker = document.querySelector("[data-guide-kicker]");
 
     return {
       languageCode: languageCode,
       direction: getGuideDirection(languageCode),
       title: getGuideTitle(),
+      kicker: getVisibleText(guideKicker),
+      emptyMessage: getVisibleText(emptyNode),
       coverImage: coverNode ? {
         src: String(coverNode.getAttribute("src") || "").trim(),
         alt: String(coverNode.getAttribute("alt") || "").trim()
@@ -382,10 +1276,10 @@
       emergencyContact: getFieldWithLabel("emergency_contact"),
       lastReviewed: getFieldWithLabel("last_reviewed"),
       map: {
-        title: mapCard ? getVisibleText(mapCard.querySelector(".pi-label")) : "",
+        title: getVisibleText(document.querySelector("[data-guide-map-title]")),
         imageSrc: mapCard ? String(mapCard.getAttribute("data-guide-map-image") || "").trim() : "",
         linkHref: normalizeHref(mapLink && mapLink.getAttribute("href")),
-        linkLabel: getVisibleText(mapLink) || "Open in Google Maps"
+        linkLabel: getVisibleText(mapLink)
       },
       sections: sections,
       counts: {
@@ -461,11 +1355,6 @@
     var header = document.createElement("header");
     header.className = "pi-export-header";
 
-    var kicker = document.createElement("p");
-    kicker.className = "pi-export-kicker";
-    kicker.textContent = "Estaex Guest Guide";
-    header.appendChild(kicker);
-
     var title = document.createElement("h1");
     title.className = "pi-export-title";
     title.textContent = model.title;
@@ -488,8 +1377,7 @@
           frameMinHeight: "140px",
           frameMaxHeight: "240px",
           imageRole: "cover",
-          placeholderClass: "pi-export-image-placeholder",
-          placeholderText: "Cover image unavailable"
+          placeholderClass: "pi-export-image-placeholder"
         }, pendingImages)
       );
     }
@@ -515,10 +1403,12 @@
     if (model.map.linkHref || model.map.imageSrc) {
       var mapSection = document.createElement("section");
       mapSection.className = "pi-export-map";
-      var mapTitle = document.createElement("h2");
-      mapTitle.className = "pi-export-map-title";
-      mapTitle.textContent = model.map.title || "Property Location";
-      mapSection.appendChild(mapTitle);
+      if (model.map.title) {
+        var mapTitle = document.createElement("h2");
+        mapTitle.className = "pi-export-map-title";
+        mapTitle.textContent = model.map.title;
+        mapSection.appendChild(mapTitle);
+      }
 
       if (model.map.linkHref) {
         var mapLink = document.createElement("a");
@@ -539,15 +1429,9 @@
             frameMinHeight: "120px",
             frameMaxHeight: "220px",
             imageRole: "map",
-            placeholderClass: "pi-export-map-placeholder",
-            placeholderText: "Map preview unavailable"
+            placeholderClass: "pi-export-map-placeholder"
           }, pendingImages)
         );
-      } else if (model.map.linkHref) {
-        var mapFallback = document.createElement("p");
-        mapFallback.className = "pi-export-map-note";
-        mapFallback.textContent = "Map preview unavailable in this PDF. Use the Google Maps link above.";
-        mapSection.appendChild(mapFallback);
       }
 
       exportDocument.appendChild(mapSection);
@@ -597,7 +1481,7 @@
         if (blockModel.body) {
           var body = document.createElement("div");
           body.className = "pi-export-card-body";
-          body.appendChild(textToParagraphs(document, blockModel.body));
+          appendStructuredContent(document, body, blockModel.bodyContent || []);
           card.appendChild(body);
         }
 
@@ -611,8 +1495,7 @@
               frameMinHeight: "120px",
               frameMaxHeight: "270px",
               imageRole: "card",
-              placeholderClass: "pi-export-image-placeholder",
-              placeholderText: "Instruction image unavailable"
+              placeholderClass: "pi-export-image-placeholder"
             }, pendingImages)
           );
         }
@@ -645,7 +1528,7 @@
     if (!model.sections.length) {
       var empty = document.createElement("p");
       empty.className = "pi-export-empty";
-      empty.textContent = "No published instruction content is available for this property yet.";
+      empty.textContent = model.emptyMessage || "";
       exportDocument.appendChild(empty);
     }
 
@@ -813,18 +1696,95 @@
 
       var right = document.createElement("span");
       right.className = "pi-export-footer-right";
-      right.textContent = "Page " + (index + 1) + " of " + pageNodes.length;
+      right.textContent = (index + 1) + " / " + pageNodes.length;
 
       footer.appendChild(left);
       footer.appendChild(right);
     });
   }
 
-  function validateExportParity(model, exportState) {
+  function buildModelParityMap(model) {
+    var nodeMap = {};
+    function setNodeValue(nodeId, value) {
+      if (!nodeId) {
+        return;
+      }
+      nodeMap[nodeId] = normalizeText(value || "");
+    }
+
+    setNodeValue("guide:kicker", model.kicker);
+    setNodeValue("field:title", model.title);
+    setNodeValue("field:address", model.address && model.address.value);
+    setNodeValue("field:check_in", model.checkIn && model.checkIn.value);
+    setNodeValue("field:check_out", model.checkOut && model.checkOut.value);
+    setNodeValue("field:wifi_name", model.wifiName && model.wifiName.value);
+    setNodeValue("field:wifi_password", model.wifiPassword && model.wifiPassword.value);
+    setNodeValue("field:emergency_contact", model.emergencyContact && model.emergencyContact.value);
+    setNodeValue("field:last_reviewed", model.lastReviewed && model.lastReviewed.value);
+    setNodeValue("label:address", model.address && model.address.label);
+    setNodeValue("label:check_in", model.checkIn && model.checkIn.label);
+    setNodeValue("label:check_out", model.checkOut && model.checkOut.label);
+    setNodeValue("label:wifi_name", model.wifiName && model.wifiName.label);
+    setNodeValue("label:wifi_password", model.wifiPassword && model.wifiPassword.label);
+    setNodeValue("label:emergency_contact", model.emergencyContact && model.emergencyContact.label);
+    setNodeValue("label:last_reviewed", model.lastReviewed && model.lastReviewed.label);
+    setNodeValue("map:title", model.map && model.map.title);
+    setNodeValue("map:link_label", model.map && model.map.linkLabel);
+    setNodeValue("guide:empty", model.emptyMessage);
+
+    (model.sections || []).forEach(function (sectionModel) {
+      setNodeValue("section:" + sectionModel.anchor + ":title", sectionModel.title);
+      (sectionModel.blocks || []).forEach(function (blockModel) {
+        setNodeValue("block:" + blockModel.id + ":title", blockModel.title);
+        setNodeValue("block:" + blockModel.id + ":body", flattenStructuredContent(blockModel.bodyContent || []));
+        setNodeValue("block:" + blockModel.id + ":caption", blockModel.caption);
+        setNodeValue("block:" + blockModel.id + ":link_label", blockModel.linkLabel);
+      });
+    });
+
+    return nodeMap;
+  }
+
+  function compareSnapshotToModel(snapshot, model) {
+    var modelParityMap = buildModelParityMap(model);
+    var mismatches = [];
+
+    snapshot.orderedNodeIds.forEach(function (nodeId) {
+      if (!(nodeId in modelParityMap)) {
+        mismatches.push({ nodeId: nodeId, reason: "missing-in-model" });
+        return;
+      }
+      if ((snapshot.nodeMap[nodeId] || "") !== (modelParityMap[nodeId] || "")) {
+        mismatches.push({
+          nodeId: nodeId,
+          reason: "value-mismatch",
+          sourceLength: (snapshot.nodeMap[nodeId] || "").length,
+          modelLength: (modelParityMap[nodeId] || "").length
+        });
+      }
+    });
+
+    return {
+      modelParityMap: modelParityMap,
+      mismatches: mismatches
+    };
+  }
+
+  function validateExportParity(model, exportState, sourceSnapshot) {
     var exportCardCount = exportState.exportPage.querySelectorAll(".pi-export-card").length;
     if (exportCardCount !== model.counts.blocks) {
       throw new Error("PDF export content does not match the visible guide");
     }
+    var parity = compareSnapshotToModel(sourceSnapshot, model);
+    window.__propertyInstructionLastExportParityMap = redactNodeMap(parity.modelParityMap);
+    updateTranslationDiagnostics({
+      parityMismatches: parity.mismatches.slice(),
+      exportParityMap: redactNodeMap(parity.modelParityMap)
+    });
+    if (parity.mismatches.length) {
+      throw new Error("Guide translation changed before PDF rendering");
+    }
+    return parity;
   }
 
   function loadScriptOnce(scriptId, sourceUrl, readyCheck) {
@@ -898,12 +1858,17 @@
   }
 
   function updateExportProgress(downloadButton, statusElement, buttonLabel, statusMessage, stepName) {
-    if (downloadButton && buttonLabel) {
-      downloadButton.textContent = buttonLabel;
+    var currentLabel = downloadButton ? String(downloadButton.getAttribute("data-progress-label") || downloadButton.textContent || "").trim() : "";
+    if (downloadButton) {
+      if (buttonLabel) {
+        downloadButton.textContent = buttonLabel;
+      } else if (currentLabel) {
+        downloadButton.textContent = currentLabel + "…";
+      }
     }
-    if (statusElement && statusMessage) {
+    if (statusElement) {
       statusElement.classList.remove("sr-only");
-      statusElement.textContent = statusMessage;
+      statusElement.textContent = statusMessage || "…";
     }
     window.__propertyInstructionPdfStep = stepName || "";
   }
@@ -1006,6 +1971,155 @@
     };
   }
 
+  function assertExportImageSourcesAreCapturable(exportRoot) {
+    return Array.prototype.slice.call(exportRoot.querySelectorAll("img")).map(function (img) {
+      var resolvedSource = String(img.getAttribute("data-export-image-resolved-src") || img.currentSrc || img.src || "").trim();
+      var diagnostics = {
+        role: String(img.getAttribute("data-export-image-role") || "image"),
+        originalSrc: String(img.getAttribute("data-export-image-original-src") || "").trim(),
+        resolvedSrc: resolvedSource
+      };
+
+      if (!resolvedSource) {
+        throw new Error("One or more export images are missing a resolved source.");
+      }
+
+      if (!isDataUrl(resolvedSource) && !isSameOriginUrl(resolvedSource)) {
+        throw new Error("One or more export images still use a cross-origin source.");
+      }
+
+      return diagnostics;
+    });
+  }
+
+  function verifyImageCanPaintToCanvas(img) {
+    var source = String(img.getAttribute("data-export-image-resolved-src") || img.currentSrc || img.src || "").trim();
+    var testCanvas = document.createElement("canvas");
+    testCanvas.width = 4;
+    testCanvas.height = 4;
+    var context = testCanvas.getContext("2d", { willReadFrequently: true });
+
+    try {
+      context.drawImage(img, 0, 0, 4, 4);
+      var imageData = context.getImageData(0, 0, 4, 4);
+      var values = Array.prototype.slice.call(imageData.data || []);
+      var alphaPixels = 0;
+      var samples = [];
+      for (var index = 0; index < values.length; index += 4) {
+        var alpha = values[index + 3] || 0;
+        if (alpha > 0) {
+          alphaPixels += 1;
+        }
+        samples.push((values[index] || 0) + (values[index + 1] || 0) + (values[index + 2] || 0));
+      }
+      var mean = samples.reduce(function (sum, value) {
+        return sum + value;
+      }, 0) / Math.max(samples.length, 1);
+      var variance = samples.reduce(function (sum, value) {
+        var delta = value - mean;
+        return sum + (delta * delta);
+      }, 0) / Math.max(samples.length, 1);
+      return {
+        role: String(img.getAttribute("data-export-image-role") || "image"),
+        originalSrc: String(img.getAttribute("data-export-image-original-src") || "").trim(),
+        resolvedSrc: source,
+        paintable: alphaPixels > 0 && variance > 0.5,
+        alphaPixels: alphaPixels,
+        sampleVariance: Number(variance.toFixed(4))
+      };
+    } catch (error) {
+      throw new Error("Export image could not be painted to canvas: " + source);
+    }
+  }
+
+  function validateExportImagesCanPaintToCanvas(exportRoot) {
+    return Array.prototype.slice.call(exportRoot.querySelectorAll("img")).map(function (img) {
+      var diagnostics = verifyImageCanPaintToCanvas(img);
+      if (!diagnostics.paintable) {
+        throw new Error("Export image could not be painted to canvas: " + diagnostics.resolvedSrc);
+      }
+      return diagnostics;
+    });
+  }
+
+  function analyzeCanvasRegion(canvasContext, sourceCanvas, left, top, width, height) {
+    var pixels = canvasContext.getImageData(left, top, width, height).data;
+    var brightnessValues = [];
+    var nonWhitePixels = 0;
+    for (var index = 0; index < pixels.length; index += 4) {
+      var red = pixels[index] || 0;
+      var green = pixels[index + 1] || 0;
+      var blue = pixels[index + 2] || 0;
+      var alpha = pixels[index + 3] || 0;
+      if (!alpha) {
+        continue;
+      }
+      var brightness = (red + green + blue) / 3;
+      brightnessValues.push(brightness);
+      if (brightness < 248) {
+        nonWhitePixels += 1;
+      }
+    }
+
+    var mean = brightnessValues.reduce(function (sum, value) {
+      return sum + value;
+    }, 0) / Math.max(brightnessValues.length, 1);
+    var variance = brightnessValues.reduce(function (sum, value) {
+      var delta = value - mean;
+      return sum + (delta * delta);
+    }, 0) / Math.max(brightnessValues.length, 1);
+
+    return {
+      width: width,
+      height: height,
+      variance: Number(variance.toFixed(4)),
+      nonWhiteCoverage: Number((nonWhitePixels / Math.max(brightnessValues.length, 1)).toFixed(4))
+    };
+  }
+
+  function validateCanvasPaintedImages(pageNode, canvas, pageIndex) {
+    var pageRect = pageNode.getBoundingClientRect();
+    var canvasContext = canvas.getContext("2d", { willReadFrequently: true });
+    var diagnostics = [];
+
+    Array.prototype.slice.call(pageNode.querySelectorAll("img")).forEach(function (img) {
+      var imageRect = img.getBoundingClientRect();
+      if (imageRect.width <= 0 || imageRect.height <= 0) {
+        return;
+      }
+
+      var left = Math.max(0, Math.round(((imageRect.left - pageRect.left) / pageRect.width) * canvas.width));
+      var top = Math.max(0, Math.round(((imageRect.top - pageRect.top) / pageRect.height) * canvas.height));
+      var width = Math.max(1, Math.round((imageRect.width / pageRect.width) * canvas.width));
+      var height = Math.max(1, Math.round((imageRect.height / pageRect.height) * canvas.height));
+      var clampedWidth = Math.min(width, canvas.width - left);
+      var clampedHeight = Math.min(height, canvas.height - top);
+      var region = analyzeCanvasRegion(canvasContext, canvas, left, top, clampedWidth, clampedHeight);
+      var painted = region.variance > 12 && region.nonWhiteCoverage > 0.05;
+      diagnostics.push({
+        role: String(img.getAttribute("data-export-image-role") || "image"),
+        originalSrc: String(img.getAttribute("data-export-image-original-src") || "").trim(),
+        resolvedSrc: String(img.getAttribute("data-export-image-resolved-src") || img.currentSrc || img.src || "").trim(),
+        page: pageIndex + 1,
+        canvasRegion: {
+          left: left,
+          top: top,
+          width: clampedWidth,
+          height: clampedHeight
+        },
+        variance: region.variance,
+        nonWhiteCoverage: region.nonWhiteCoverage,
+        painted: painted
+      });
+
+      if (!painted) {
+        throw new Error("image-not-painted");
+      }
+    });
+
+    return diagnostics;
+  }
+
   function validateImageAspectRatios(exportRoot) {
     return Array.prototype.slice.call(exportRoot.querySelectorAll("img")).map(function (img) {
       var rect = img.getBoundingClientRect();
@@ -1076,7 +2190,9 @@
     }
 
     await waitForFonts();
+    var imageSourceDiagnostics = assertExportImageSourcesAreCapturable(exportState.exportRoot);
     var imageDiagnostics = await waitForImages(exportState.exportRoot);
+    var canvasPaintabilityDiagnostics = validateExportImagesCanPaintToCanvas(exportState.exportRoot);
     await waitForTwoAnimationFrames();
     var imageRatioDiagnostics = validateImageAspectRatios(exportState.exportRoot);
 
@@ -1091,6 +2207,7 @@
     var pdfWidth = pdf.internal.pageSize.getWidth();
     var pdfHeight = pdf.internal.pageSize.getHeight();
     var pageDiagnostics = [];
+    var paintedImageDiagnostics = [];
     window.__propertyInstructionPdfRenderer = "html2canvas+jspdf";
 
     var isRtlExport = (exportState.exportRoot.getAttribute("dir") || "").toLowerCase() === "rtl";
@@ -1102,9 +2219,25 @@
       window.__propertyInstructionPdfStep = "render-page-" + (index + 1);
 
       if (diagnostics.viewportScrollHeight > diagnostics.viewportHeight + 2) {
+        window.__propertyInstructionLastPdfDiagnostics = {
+          shellCount: pageNodes.length,
+          failingPage: index + 1,
+          failingDiagnostics: diagnostics,
+          imageDiagnostics: imageDiagnostics,
+          imageRatioDiagnostics: imageRatioDiagnostics,
+          pageDiagnostics: pageDiagnostics
+        };
         throw new Error("PDF page " + (index + 1) + " overflowed its shell");
       }
       if (!diagnostics.textLength) {
+        window.__propertyInstructionLastPdfDiagnostics = {
+          shellCount: pageNodes.length,
+          failingPage: index + 1,
+          failingDiagnostics: diagnostics,
+          imageDiagnostics: imageDiagnostics,
+          imageRatioDiagnostics: imageRatioDiagnostics,
+          pageDiagnostics: pageDiagnostics
+        };
         throw new Error("PDF page " + (index + 1) + " is empty");
       }
 
@@ -1127,8 +2260,19 @@
       diagnostics.canvasHeight = canvas.height;
 
       if (!canvas.width || !canvas.height) {
+        window.__propertyInstructionLastPdfDiagnostics = {
+          shellCount: pageNodes.length,
+          failingPage: index + 1,
+          failingDiagnostics: diagnostics,
+          imageDiagnostics: imageDiagnostics,
+          imageRatioDiagnostics: imageRatioDiagnostics,
+          pageDiagnostics: pageDiagnostics
+        };
         throw new Error("Page " + (index + 1) + " produced an empty canvas.");
       }
+
+      var pagePaintedImages = validateCanvasPaintedImages(pageNode, canvas, index);
+      paintedImageDiagnostics = paintedImageDiagnostics.concat(pagePaintedImages);
 
       if (index > 0) {
         pdf.addPage("a4", "portrait");
@@ -1153,8 +2297,11 @@
     }
 
     window.__propertyInstructionLastPdfDiagnostics = {
+      imageSourceDiagnostics: imageSourceDiagnostics,
       imageDiagnostics: imageDiagnostics,
+      canvasPaintabilityDiagnostics: canvasPaintabilityDiagnostics,
       imageRatioDiagnostics: imageRatioDiagnostics,
+      paintedImageDiagnostics: paintedImageDiagnostics,
       pageDiagnostics: pageDiagnostics,
       shellCount: pageNodes.length
     };
@@ -1171,54 +2318,101 @@
 
     downloadButton.classList.add("is-disabled");
     downloadButton.setAttribute("aria-disabled", "true");
-    updateExportProgress(downloadButton, statusElement, "Preparing PDF", "Preparing PDF", "initializing");
+    downloadButton.setAttribute("data-progress-label", originalLabel);
+    updateExportProgress(downloadButton, statusElement, null, null, "initializing");
 
     try {
-      updateExportProgress(downloadButton, statusElement, "Loading PDF tools", "Loading PDF tools", "load-libraries");
+      updateExportProgress(downloadButton, statusElement, null, null, "load-libraries");
       await ensurePdfLibrary();
-      updateExportProgress(downloadButton, statusElement, "Waiting for translation", "Waiting for translation", "wait-translation");
-      await waitForGuideToSettle();
-      updateExportProgress(downloadButton, statusElement, "Reading translated guide", "Reading translated guide", "extract-model");
+      syncTranslationLanguageState();
+      updateExportProgress(downloadButton, statusElement, null, null, "wait-translation");
+      var settledSnapshot = await waitForGuideToSettle();
+      var exportGeneration = translationState.generation;
+      var exportLanguage = translationState.requestedLanguage || SOURCE_LANGUAGE;
+      updateExportProgress(downloadButton, statusElement, null, null, "extract-model");
+      syncTranslationLanguageState();
+      if (translationState.generation !== exportGeneration || (translationState.requestedLanguage || SOURCE_LANGUAGE) !== exportLanguage) {
+        throw new Error("Selected translation changed during PDF export");
+      }
       var guideModel = extractGuideModel();
-      updateExportProgress(downloadButton, statusElement, "Building export pages", "Building export pages", "build-export");
+      updateTranslationDiagnostics({
+        selectedLanguage: guideModel.languageCode || SOURCE_LANGUAGE
+      });
+      updateExportProgress(downloadButton, statusElement, null, null, "build-export");
       exportState = buildPdfExportDocument(guideModel);
-      updateExportProgress(downloadButton, statusElement, "Loading export images", "Loading export images", "wait-images");
+      updateExportProgress(downloadButton, statusElement, null, null, "wait-images");
       await Promise.all(exportState.pendingImages);
-      updateExportProgress(downloadButton, statusElement, "Paginating PDF", "Paginating PDF", "paginate");
+      updateExportProgress(downloadButton, statusElement, null, null, "prepare-layout");
+      await waitForFonts();
+      await waitForTwoAnimationFrames();
+      updateExportProgress(downloadButton, statusElement, null, null, "paginate");
       paginateExportDocument(exportState);
       populatePageFooters(exportState, guideModel.title || guideTitle);
-      updateExportProgress(downloadButton, statusElement, "Validating PDF pages", "Validating PDF pages", "validate");
-      validateExportParity(guideModel, exportState);
+      updateExportProgress(downloadButton, statusElement, null, null, "validate");
+      validateExportParity(guideModel, exportState, settledSnapshot);
+      var finalSnapshot = captureSemanticSnapshot();
+      updateTranslationDiagnostics({
+        finalSnapshot: captureSemanticSnapshot({ redactProtectedValues: true })
+      });
+      if (!snapshotsEqual(settledSnapshot, finalSnapshot)) {
+        throw new Error("Guide translation changed before PDF rendering");
+      }
+      syncTranslationLanguageState();
+      if (translationState.generation !== exportGeneration || (translationState.requestedLanguage || SOURCE_LANGUAGE) !== exportLanguage) {
+        throw new Error("Selected translation changed during PDF export");
+      }
 
-      updateExportProgress(downloadButton, statusElement, "Rendering PDF", "Rendering PDF", "render-pdf");
+      updateExportProgress(downloadButton, statusElement, null, null, "render-pdf");
       var pdf = await withTimeout(
         renderExportPagesToPdf(exportState, filename),
         PDF_EXPORT_TIMEOUT_MS,
         "PDF export timed out"
       );
-      updateExportProgress(downloadButton, statusElement, "Finalizing PDF", "Finalizing PDF", "finalize-pdf");
+      updateExportProgress(downloadButton, statusElement, null, null, "finalize-pdf");
+      syncTranslationLanguageState();
+      if (translationState.generation !== exportGeneration || (translationState.requestedLanguage || SOURCE_LANGUAGE) !== exportLanguage) {
+        throw new Error("Selected translation changed during PDF export");
+      }
+      var postRenderSnapshot = captureSemanticSnapshot();
+      if (!snapshotsEqual(settledSnapshot, postRenderSnapshot)) {
+        throw new Error("Guide translation changed before PDF download");
+      }
+      var postRenderParity = compareSnapshotToModel(postRenderSnapshot, guideModel);
+      updateTranslationDiagnostics({
+        finalSnapshot: captureSemanticSnapshot({ redactProtectedValues: true }),
+        parityMismatches: postRenderParity.mismatches.slice(),
+        exportParityMap: redactNodeMap(postRenderParity.modelParityMap)
+      });
+      window.__propertyInstructionLastExportParityMap = redactNodeMap(postRenderParity.modelParityMap);
+      if (postRenderParity.mismatches.length) {
+        throw new Error("PDF export content does not match the visible guide");
+      }
       var pdfBlob = pdf.output("blob");
       window.__propertyInstructionLastPdfBlob = pdfBlob;
-      window.__propertyInstructionLastPdfLanguage = guideModel.languageCode || "en";
+      window.__propertyInstructionLastPdfLanguage = guideModel.languageCode || SOURCE_LANGUAGE;
       window.__propertyInstructionPdfStep = "download-ready";
       triggerBlobDownload(pdfBlob, filename);
       destroyExportRoot(exportState.exportRoot);
 
       if (statusElement) {
-        statusElement.textContent = "PDF downloaded";
+        statusElement.textContent = originalLabel;
       }
     } catch (error) {
       window.__propertyInstructionPdfStep = "failed";
+      if (!(translationState.diagnostics || {}).abortReason) {
+        setTranslationAbortReason(error && error.message ? error.message : "Unable to prepare PDF", "translation-timeout-unknown");
+      }
       if (typeof exportState !== "undefined" && exportState && exportState.exportRoot) {
         destroyExportRoot(exportState.exportRoot);
       }
       if (statusElement) {
-        statusElement.textContent = error && error.message ? error.message : "Unable to prepare PDF";
+        statusElement.textContent = "Translation is temporarily unavailable. Please wait and try again.";
       }
     } finally {
       downloadButton.classList.remove("is-disabled");
       downloadButton.removeAttribute("aria-disabled");
       downloadButton.textContent = originalLabel;
+      downloadButton.removeAttribute("data-progress-label");
     }
   }
 
@@ -1271,4 +2465,12 @@
       window.print();
     }
   });
+
+  if (getGuideScreen()) {
+    try {
+      ensureOriginalSnapshotCaptured();
+    } catch (error) {
+      // Ignore early snapshot capture failures; export-time validation will handle them.
+    }
+  }
 })();

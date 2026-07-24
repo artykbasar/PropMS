@@ -44,6 +44,10 @@ TRUSTED_EXTERNAL_PDF_IMAGE_HOSTS = {"maps.googleapis.com"}
 LANGUAGE_CODE_PATTERN = re.compile(r"^[a-z]{2,3}(?:-[a-z]{2,8})*$")
 PHONE_PATTERN = re.compile(r"(?:\+?\d[\d\s().-]{6,}\d)")
 EMAIL_PATTERN = re.compile(r"\b[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}\b")
+ROAD_NAME_PATTERN = re.compile(
+	r"\b(?:Road|Street|Lane|Avenue|Close|Drive|Way|Court|Crescent|Place|Gardens|Terrace|Park|Square)\b",
+	re.IGNORECASE,
+)
 NOINDEX_ROBOTS_CONTENT = "noindex, nofollow, noarchive, nosnippet, noimageindex"
 GUEST_GUIDE_EXCLUDED_WEB_ASSET_PREFIXES = (
 	"/assets/propms/day/assets/",
@@ -239,6 +243,7 @@ class PropertyInstruction(WebsiteGenerator):
 					frappe._dict(
 						row.as_dict(),
 						title_translation_protected=self.should_protect_identifier_value(row.title),
+						body_translation_protected=self.should_protect_body_value(row.body),
 						caption_translation_protected=self.should_protect_identifier_value(row.caption),
 						display_section=section,
 						safe_body=self.get_safe_body(row.body),
@@ -471,6 +476,15 @@ class PropertyInstruction(WebsiteGenerator):
 			return True
 		return False
 
+	def should_protect_body_value(self, value):
+		text = re.sub(r"<[^>]+>", "\n", value or "")
+		lines = [re.sub(r"^[\s•*.-]+", "", line).strip() for line in text.splitlines() if line.strip()]
+		if not lines:
+			return False
+		if all(self.should_protect_identifier_value(line) for line in lines):
+			return True
+		return all(ROAD_NAME_PATTERN.search(line) and len(line.split()) <= 4 for line in lines)
+
 	def get_pdf_filename(self):
 		filename_stem = (
 			self.slug
@@ -561,6 +575,7 @@ def get_allowed_guest_image_hosts():
 				if normalized:
 					hosts.add(normalized)
 
+	hosts.update(get_property_instruction_public_image_hosts())
 	return {host for host in hosts if host}
 
 
@@ -573,12 +588,52 @@ def normalize_host_name(value):
 	return host or None
 
 
+def get_property_instruction_public_image_hosts():
+	hosts = set()
+	for doctype, fieldname in (
+		("Property Instruction", "cover_image"),
+		("Property Instruction Block", "image"),
+	):
+		for row in frappe.get_all(
+			doctype,
+			filters={fieldname: ["is", "set"]},
+			fields=[fieldname],
+			limit_page_length=0,
+		):
+			value = (row.get(fieldname) or "").strip()
+			if not value or "://" not in value:
+				continue
+			parsed = urlparse(value)
+			if (parsed.scheme or "").lower() not in {"http", "https"}:
+				continue
+			if not (parsed.path or "").startswith(PUBLIC_SITE_IMAGE_PREFIXES):
+				continue
+			normalized = normalize_host_name(parsed.hostname or "")
+			if normalized:
+				hosts.add(normalized)
+	return hosts
+
+
+def normalize_registered_public_file_url(url):
+	parsed = urlparse((url or "").strip())
+	if not parsed.scheme or not parsed.hostname:
+		return ""
+	return urlunparse((parsed.scheme.lower(), parsed.netloc.lower(), parsed.path or "", "", "", ""))
+
+
+def has_registered_public_file_url(url):
+	normalized = normalize_registered_public_file_url(url)
+	if not normalized:
+		return False
+	return bool(frappe.db.exists("File", {"file_url": normalized}))
+
+
 def should_proxy_public_pdf_image(url):
 	try:
 		validate_public_pdf_image_url(url)
 		return True
 	except Exception:
-		return False
+		return has_registered_public_file_url(url)
 
 
 def is_local_development_image_host(hostname):
@@ -614,18 +669,22 @@ def validate_public_pdf_image_url(url):
 	parsed = urlparse((url or "").strip())
 	hostname = (parsed.hostname or "").lower()
 	allowed_hosts = get_allowed_guest_image_hosts()
+	normalized_url = normalize_registered_public_file_url(url)
 
 	if parsed.scheme.lower() not in {"https", "http"}:
 		frappe.throw(_("Only HTTP and HTTPS image URLs are supported."))
 	if parsed.username or parsed.password:
 		frappe.throw(_("Image URLs cannot contain embedded credentials."))
-	if not hostname or hostname not in allowed_hosts:
+	if not hostname:
 		frappe.throw(_("Image host is not allowed."))
 	if parsed.scheme.lower() == "http" and not is_local_development_image_host(hostname):
 		frappe.throw(_("HTTP image URLs are allowed only for local development hosts."))
 
 	path = parsed.path or ""
 	is_site_file_path = path.startswith(PUBLIC_SITE_IMAGE_PREFIXES)
+	is_registered_public_file = is_site_file_path and has_registered_public_file_url(normalized_url)
+	if hostname not in allowed_hosts and not is_registered_public_file:
+		frappe.throw(_("Image host is not allowed."))
 	if hostname not in TRUSTED_EXTERNAL_PDF_IMAGE_HOSTS and not is_site_file_path:
 		frappe.throw(_("Only Frappe file paths are allowed for site-hosted images."))
 	if hostname in TRUSTED_EXTERNAL_PDF_IMAGE_HOSTS and hostname == "maps.googleapis.com":

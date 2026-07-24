@@ -940,14 +940,21 @@
 </style>
 {% endblock %}
 
-{% macro render_copy_row(label, value, button_label, aria_label, target_id, protect_value=False, guide_field=None) %}
+{% macro render_copy_row(label, value, button_label, aria_label, target_id, protect_value=False, guide_field=None, guide_label=None) %}
   <div class="pi-copy-row">
     <div class="pi-copy-text">
-      <span class="pi-label">{{ label }}</span>
+      <span
+        class="pi-label"
+        {% if guide_label %}
+        data-guide-label="{{ guide_label }}"
+        data-guide-signature
+        data-guide-translation-kind="translatable"
+        {% endif %}>{{ label }}</span>
       <span
         id="{{ target_id }}"
         class="pi-copy-value{% if protect_value %} notranslate{% endif %}"
         {% if guide_field %}data-guide-field="{{ guide_field }}"{% endif %}
+        {% if guide_field %}data-guide-signature data-guide-translation-kind="{% if protect_value %}protected{% else %}translatable{% endif %}"{% endif %}
         {% if protect_value %}translate="no"{% endif %}>{{ value }}</span>
     </div>
     <button
@@ -980,14 +987,14 @@
     {% if block.block_type == "Step" %}
     <div class="pi-step-head">
       <span class="pi-step-badge" data-guide-step-number>{{ block.display_step_number }}</span>
-      {% if block.title %}<h3 data-pdf-block-field="title" data-guide-block-title data-guide-signature{% if block.title_translation_protected %} class="notranslate" translate="no"{% endif %}>{{ block.title }}</h3>{% endif %}
+      {% if block.title %}<h3 data-pdf-block-field="title" data-guide-block-title data-guide-signature data-guide-translation-kind="{% if block.title_translation_protected %}proper_name_or_identifier{% else %}translatable{% endif %}"{% if block.title_translation_protected %} class="notranslate" translate="no"{% endif %}>{{ block.title }}</h3>{% endif %}
     </div>
     {% elif block.title %}
-    <h3 data-pdf-block-field="title" data-guide-block-title data-guide-signature{% if block.title_translation_protected %} class="notranslate" translate="no"{% endif %}>{{ block.title }}</h3>
+    <h3 data-pdf-block-field="title" data-guide-block-title data-guide-signature data-guide-translation-kind="{% if block.title_translation_protected %}proper_name_or_identifier{% else %}translatable{% endif %}"{% if block.title_translation_protected %} class="notranslate" translate="no"{% endif %}>{{ block.title }}</h3>
     {% endif %}
 
     {% if block.safe_body %}
-    <div class="pi-body" data-pdf-block-field="body" data-guide-block-body data-guide-signature>{{ block.safe_body }}</div>
+    <div class="pi-body{% if block.body_translation_protected %} notranslate{% endif %}" data-pdf-block-field="body" data-guide-block-body data-guide-signature data-guide-translation-kind="{% if block.body_translation_protected %}proper_name_or_identifier{% else %}translatable{% endif %}"{% if block.body_translation_protected %} data-guide-allow-identical="1" translate="no"{% endif %}>{{ block.safe_body }}</div>
     {% endif %}
 
     {% if block.image %}
@@ -995,12 +1002,12 @@
     {% endif %}
 
     {% if block.caption %}
-    <div class="pi-caption{% if block.caption_translation_protected %} notranslate{% endif %}" data-pdf-block-field="caption" data-guide-block-caption data-guide-signature{% if block.caption_translation_protected %} translate="no"{% endif %}>{{ block.caption }}</div>
+    <div class="pi-caption{% if block.caption_translation_protected %} notranslate{% endif %}" data-pdf-block-field="caption" data-guide-block-caption data-guide-signature data-guide-translation-kind="{% if block.caption_translation_protected %}proper_name_or_identifier{% else %}translatable{% endif %}"{% if block.caption_translation_protected %} translate="no"{% endif %}>{{ block.caption }}</div>
     {% endif %}
 
     {% if block.link_url %}
     <div class="pi-link">
-      <a href="{{ block.link_url }}" target="_blank" rel="noopener noreferrer nofollow" data-pdf-block-field="link_label" data-guide-block-link data-guide-signature{% if block.display_link_label_translation_protected %} class="notranslate" translate="no"{% endif %}>{{ block.display_link_label }}</a>
+      <a href="{{ block.link_url }}" target="_blank" rel="noopener noreferrer nofollow" data-pdf-block-field="link_label" data-guide-block-link data-guide-signature data-guide-translation-kind="{% if block.display_link_label_translation_protected %}proper_name_or_identifier{% else %}translatable{% endif %}"{% if block.display_link_label_translation_protected %} class="notranslate" translate="no"{% endif %}>{{ block.display_link_label }}</a>
     </div>
     {% endif %}
   </div>
@@ -1076,47 +1083,47 @@
         <img class="pi-cover" src="{{ cover_image }}" alt="{{ title }} cover image" data-guide-cover>
         {% endif %}
         <div class="pi-hero-body">
-          <div class="pi-eyebrow">Guest Instructions</div>
-          <h1 class="pi-title" data-pdf-field="title" data-guide-field="title" data-guide-signature>{{ title }}</h1>
+          <div class="pi-eyebrow" data-guide-kicker data-guide-signature data-guide-translation-kind="translatable">Guest Instructions</div>
+          <h1 class="pi-title" data-pdf-field="title" data-guide-field="title" data-guide-signature data-guide-translation-kind="proper_name_or_identifier">{{ title }}</h1>
           {% if address %}
           <div class="pi-address-row">
-            {{ render_copy_row("Address", address, "Copy address", "Copy property address", "property-address", True, "address") }}
+            {{ render_copy_row("Address", address, "Copy address", "Copy property address", "property-address", True, "address", "address") }}
           </div>
           {% endif %}
 
           <div class="pi-meta">
             {% if check_in_time %}
             <div class="pi-meta-item">
-              <span class="pi-label">Check-In</span>
-              <span class="pi-value" data-guide-field="check_in" data-guide-signature>{{ check_in_time }}</span>
+              <span class="pi-label" data-guide-label="check_in" data-guide-signature data-guide-translation-kind="translatable">Check-In</span>
+              <span class="pi-value" data-guide-field="check_in" data-guide-signature data-guide-translation-kind="numeric_or_time">{{ check_in_time }}</span>
             </div>
             {% endif %}
             {% if check_out_time %}
             <div class="pi-meta-item">
-              <span class="pi-label">Check-Out</span>
-              <span class="pi-value" data-guide-field="check_out" data-guide-signature>{{ check_out_time }}</span>
+              <span class="pi-label" data-guide-label="check_out" data-guide-signature data-guide-translation-kind="translatable">Check-Out</span>
+              <span class="pi-value" data-guide-field="check_out" data-guide-signature data-guide-translation-kind="numeric_or_time">{{ check_out_time }}</span>
             </div>
             {% endif %}
             {% if wifi_name %}
             <div class="pi-meta-item">
-              {{ render_copy_row("Wi-Fi Name", wifi_name, "Copy network", "Copy Wi-Fi network name", "wifi-network-name", True, "wifi_name") }}
+              {{ render_copy_row("Wi-Fi Name", wifi_name, "Copy network", "Copy Wi-Fi network name", "wifi-network-name", True, "wifi_name", "wifi_name") }}
             </div>
             {% endif %}
             {% if wifi_password_public %}
             <div class="pi-meta-item">
-              {{ render_copy_row("Wi-Fi Password", wifi_password_public, "Copy password", "Copy Wi-Fi password", "wifi-password-public", True, "wifi_password") }}
+              {{ render_copy_row("Wi-Fi Password", wifi_password_public, "Copy password", "Copy Wi-Fi password", "wifi-password-public", True, "wifi_password", "wifi_password") }}
             </div>
             {% endif %}
             {% if emergency_contact %}
             <div class="pi-meta-item">
-              <span class="pi-label">Emergency Contact</span>
-              <span class="pi-value{% if emergency_contact_translation_protected %} notranslate{% endif %}" data-pdf-field="emergency_contact" data-guide-field="emergency_contact" data-guide-signature{% if emergency_contact_translation_protected %} translate="no"{% endif %}>{{ emergency_contact }}</span>
+              <span class="pi-label" data-guide-label="emergency_contact" data-guide-signature data-guide-translation-kind="translatable">Emergency Contact</span>
+              <span class="pi-value{% if emergency_contact_translation_protected %} notranslate{% endif %}" data-pdf-field="emergency_contact" data-guide-field="emergency_contact" data-guide-signature data-guide-translation-kind="{% if emergency_contact_translation_protected %}protected{% else %}translatable{% endif %}"{% if emergency_contact_translation_protected %} translate="no"{% endif %}>{{ emergency_contact }}</span>
             </div>
             {% endif %}
             {% if last_reviewed_on %}
             <div class="pi-meta-item">
-              <span class="pi-label">Last Reviewed</span>
-              <span class="pi-value" data-guide-field="last_reviewed">{{ last_reviewed_on_display or last_reviewed_on }}</span>
+              <span class="pi-label" data-guide-label="last_reviewed" data-guide-signature data-guide-translation-kind="translatable">Last Reviewed</span>
+              <span class="pi-value" data-guide-field="last_reviewed" data-guide-signature data-guide-translation-kind="numeric_or_time">{{ last_reviewed_on_display or last_reviewed_on }}</span>
             </div>
             {% endif %}
           </div>
@@ -1138,6 +1145,7 @@
 
       {% if screen_map_embed_url %}
       <section class="pi-card pi-map-card" aria-label="Property map" data-guide-map-card data-guide-map-image="{{ map_static_image_url or '' }}">
+        <span class="pi-label" data-guide-map-title data-guide-signature data-guide-translation-kind="translatable">Property Location</span>
         <div class="pi-map-shell">
           <iframe
             class="pi-map"
@@ -1150,7 +1158,7 @@
         </div>
         {% if screen_map_external_url %}
         <div class="pi-actions">
-          <a class="pi-btn pi-btn-secondary" href="{{ screen_map_external_url }}" target="_blank" rel="noopener noreferrer nofollow" data-guide-map-link>Open in Google Maps</a>
+          <a class="pi-btn pi-btn-secondary" href="{{ screen_map_external_url }}" target="_blank" rel="noopener noreferrer nofollow" data-guide-map-link data-guide-signature data-guide-translation-kind="translatable">Open in Google Maps</a>
         </div>
         {% endif %}
       </section>
@@ -1170,7 +1178,7 @@
         <div class="pi-sections">
           {% for section in sections %}
           <section id="{{ section.anchor }}" class="pi-card" data-guide-section data-guide-section-anchor="{{ section.anchor }}">
-            <h2 class="pi-section-title" data-pdf-section="{{ section.anchor }}" data-guide-section-title data-guide-signature>{{ section.section }}</h2>
+            <h2 class="pi-section-title" data-pdf-section="{{ section.anchor }}" data-guide-section-title data-guide-signature data-guide-translation-kind="translatable"{% if section.anchor == "parking" %} data-guide-allow-identical-languages="fr"{% endif %}>{{ section.section }}</h2>
             <div class="pi-blocks">
               {% for block in section.blocks %}
               {{ render_screen_block(block) }}
@@ -1182,7 +1190,7 @@
       </div>
       {% else %}
       <div class="pi-card pi-empty">
-        <p>No published instruction content is available for this property yet.</p>
+        <p data-guide-empty-state data-guide-signature data-guide-translation-kind="translatable">No published instruction content is available for this property yet.</p>
       </div>
       {% endif %}
     </div>
@@ -1248,14 +1256,17 @@
     </div>
   </div>
 </div>
+<script src="/assets/propms/js/property_instruction_export.js?ver={{ build_version }}"></script>
 {% if google_translate and google_translate.enabled %}
 <script>
   (function () {
     var callbackName = {{ google_translate.callback_name | tojson }};
     var containerId = {{ google_translate.container_id | tojson }};
     var initializedFlag = "__" + callbackName + "_initialized";
+    var widgetState = window.__propertyInstructionGoogleWidgetState = window.__propertyInstructionGoogleWidgetState || {};
 
     window[callbackName] = function () {
+      widgetState.callbackInvokedAt = Date.now();
       if (window[initializedFlag]) {
         return;
       }
@@ -1266,6 +1277,7 @@
         return;
       }
       window[initializedFlag] = true;
+      widgetState.elementConstructedAt = Date.now();
       new google.translate.TranslateElement({{ google_translate.config_json | safe }}, containerId);
     };
 
@@ -1274,7 +1286,15 @@
     }
   })();
 </script>
-<script id="{{ google_translate.script_id }}" async src="{{ google_translate.script_url }}"></script>
+<script>
+  window.__propertyInstructionGoogleScriptRequestedAt = Date.now();
+</script>
+<script
+  id="{{ google_translate.script_id }}"
+  async
+  src="{{ google_translate.script_url }}"
+  onload="window.__propertyInstructionGoogleWidgetState = window.__propertyInstructionGoogleWidgetState || {}; window.__propertyInstructionGoogleWidgetState.scriptLoadedAt = Date.now();"
+  onerror="window.__propertyInstructionGoogleWidgetState = window.__propertyInstructionGoogleWidgetState || {}; window.__propertyInstructionGoogleWidgetState.scriptErrorAt = Date.now();"
+></script>
 {% endif %}
-<script src="/assets/propms/js/property_instruction_export.js?ver={{ build_version }}"></script>
 {% endblock %}
