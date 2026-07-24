@@ -11,6 +11,7 @@
   var PDF_LAYOUT_VERSION = "2026-07-24-adaptive-osm-raster-v1";
   var PDF_EXPORT_WIDTH = 794;
   var PDF_EXPORT_PAGE_HEIGHT = 1122;
+  var PDF_EXPORT_OFFSCREEN_LEFT = -20000;
   var PDF_EXPORT_PAGE_PADDING_TOP = 34;
   var PDF_EXPORT_PAGE_PADDING_RIGHT = 38;
   var PDF_EXPORT_PAGE_PADDING_BOTTOM = 40;
@@ -86,6 +87,10 @@
       mapPreparationMs: 0,
       paginationMs: 0,
       fontReadinessMs: 0,
+      frameCreatedAt: 0,
+      frameStylesReadyMs: 0,
+      frameFontsReadyMs: 0,
+      pageDomReplacementMs: [],
       pageCaptureMs: [],
       encodingMs: 0,
       jsPdfAssemblyMs: 0,
@@ -106,6 +111,26 @@
       return;
     }
     performanceState[key] = typeof value === "number" ? value : (Date.now() - startedAt);
+  }
+
+  function getPdfExportStylesheetText() {
+    var styleNode = document.getElementById("property-instruction-pdf-export-css");
+    return styleNode ? String(styleNode.textContent || "") : "";
+  }
+
+  function schedulePdfLibraryWarmup() {
+    if (pdfPreparationState.warmupPromise) {
+      return pdfPreparationState.warmupPromise;
+    }
+    pdfPreparationState.warmupPromise = new Promise(function (resolve) {
+      requestIdleWork(function () {
+        prewarmPdfLibraries().finally(function () {
+          pdfPreparationState.warmupPromise = null;
+          resolve();
+        });
+      }, PDF_WARM_PREPARE_TIMEOUT_MS);
+    });
+    return pdfPreparationState.warmupPromise;
   }
 
   function requestIdleWork(callback, timeoutMs) {
@@ -844,7 +869,7 @@
         baselineCapturedAt: translationState.baselineCapturedAt,
         widgetScriptRequestedAt: translationState.widgetScriptRequestedAt
       });
-      schedulePdfPreparationWarmup(document.querySelector(".pi-pdf-download"));
+      schedulePdfLibraryWarmup();
     }
   }
 
@@ -854,24 +879,68 @@
     });
   }
 
-  function getScrollTargetTop(element) {
-    var rect = element.getBoundingClientRect();
-    return Math.max(window.scrollY + rect.top - 40, 0);
-  }
-
   async function exposeGuideSectionsForTranslation() {
     var guideScreen = getGuideScreen();
     if (!guideScreen) {
-      throw new Error("Guide content unavailable");
+      return Promise.resolve();
     }
     var sections = Array.prototype.slice.call(guideScreen.querySelectorAll("[data-guide-section], [data-guide-block]"));
+    var originalScrollX = window.scrollX;
     var originalScrollY = window.scrollY;
+    var originalActiveElement = document.activeElement;
+
+    async function restoreFocus() {
+      if (originalActiveElement && typeof originalActiveElement.focus === "function") {
+        try {
+          originalActiveElement.focus({ preventScroll: true });
+        } catch (error) {
+          try {
+            originalActiveElement.focus();
+          } catch (focusError) {
+            return null;
+          }
+        }
+      }
+      return null;
+    }
 
     for (var index = 0; index < sections.length; index += 1) {
       var sectionNode = sections[index];
-      window.scrollTo(0, getScrollTargetTop(sectionNode));
+      var parentNode = sectionNode.parentNode;
+      if (!parentNode) {
+        continue;
+      }
+      var rect = sectionNode.getBoundingClientRect();
+      if (!rect.width || !rect.height) {
+        continue;
+      }
+      var placeholder = document.createElement("div");
+      placeholder.setAttribute("aria-hidden", "true");
+      placeholder.style.width = rect.width + "px";
+      placeholder.style.height = rect.height + "px";
+      placeholder.style.margin = "0";
+      placeholder.style.padding = "0";
+      placeholder.style.border = "0";
+      placeholder.style.visibility = "hidden";
+      placeholder.style.pointerEvents = "none";
+      parentNode.insertBefore(placeholder, sectionNode);
+
+      var previousCssText = sectionNode.style.cssText;
+      sectionNode.style.position = "fixed";
+      sectionNode.style.left = "0";
+      sectionNode.style.top = "0";
+      sectionNode.style.width = rect.width + "px";
+      sectionNode.style.maxWidth = rect.width + "px";
+      sectionNode.style.maxHeight = Math.max(rect.height, 240) + "px";
+      sectionNode.style.overflow = "visible";
+      sectionNode.style.margin = "0";
+      sectionNode.style.zIndex = "-1";
+      sectionNode.style.opacity = "0.01";
+      sectionNode.style.pointerEvents = "none";
+      sectionNode.style.background = "#ffffff";
+
       await waitForTwoAnimationFrames();
-      await sleep(180);
+      await sleep(240);
 
       var sectionStartedAt = Date.now();
       while (Date.now() - sectionStartedAt < 5000) {
@@ -884,18 +953,30 @@
         await sleep(220);
       }
 
+      sectionNode.style.cssText = previousCssText;
+      if (placeholder.parentNode) {
+        placeholder.parentNode.removeChild(placeholder);
+      }
+
       var readinessKey = sectionNode.getAttribute("data-guide-section-anchor") ||
         sectionNode.getAttribute("data-guide-block-id") ||
         "node-" + index;
       translationState.sectionReadiness[readinessKey] = {
         exposedAt: Date.now(),
-        textLength: normalizeText(sectionNode.innerText || sectionNode.textContent || "").length
+        textLength: normalizeText(sectionNode.innerText || sectionNode.textContent || "").length,
+        primedWithoutScroll: true
       };
       translationState.diagnostics.sectionReadiness = translationState.sectionReadiness;
+      await restoreFocus();
+      await waitForTwoAnimationFrames();
     }
 
-    window.scrollTo(0, originalScrollY);
-    await waitForTwoAnimationFrames();
+    if (Math.abs(window.scrollX - originalScrollX) > 1 || Math.abs(window.scrollY - originalScrollY) > 1) {
+      throw new Error("Guide translation priming changed the viewport");
+    }
+
+    await restoreFocus();
+    return Promise.resolve();
   }
 
   function analyzeSnapshotState(currentSnapshot, originalSnapshot, expectedLanguage) {
@@ -1052,10 +1133,32 @@
     translationState.lastSnapshotProgressFingerprint = "";
     translationState.lastSemanticProgressAt = 0;
     var lastStableSnapshot = null;
+    var primedSections = false;
     translationState.stablePassTimestamps = [];
     translationState.stableGeneration = readinessGeneration;
-
-    await exposeGuideSectionsForTranslation();
+    if (expectedLanguage === SOURCE_LANGUAGE) {
+      var englishSnapshot = captureSemanticSnapshot();
+      var englishAnalysis = analyzeSnapshotState(englishSnapshot, translationState.originalSnapshot, expectedLanguage);
+      if (!englishAnalysis.structureOk) {
+        setTranslationAbortReason("Guide structure changed before PDF rendering", "translation-structure-invalid");
+        throw new Error("Guide structure changed before PDF rendering");
+      }
+      translationState.readyLanguage = expectedLanguage;
+      translationState.readySnapshot = englishSnapshot;
+      translationState.readyAt = Date.now();
+      translationState.stablePassTimestamps = [Date.now()];
+      updateTranslationDiagnostics({
+        settledSnapshot: captureSemanticSnapshot({ redactProtectedValues: true }),
+        selectedLanguage: SOURCE_LANGUAGE,
+        stablePassTimestamps: translationState.stablePassTimestamps.slice()
+      });
+      getPdfPerformanceState().languageSelectedToTranslationReadyMs =
+        translationState.lastLanguageSelectedAt
+          ? Math.max(0, translationState.readyAt - translationState.lastLanguageSelectedAt)
+          : 0;
+      schedulePdfPreparationWarmup(document.querySelector(".pi-pdf-download"));
+      return englishSnapshot;
+    }
 
     while (Date.now() - startedAt < GUIDE_SETTLE_TIMEOUT_MS) {
       var syncedLanguage = syncTranslationLanguageState();
@@ -1092,6 +1195,20 @@
         sectionReadiness: translationState.sectionReadiness
       });
       recordTranslationProgress(snapshotAnalysis, quietFor);
+
+      if (
+        !primedSections &&
+        expectedLanguage !== SOURCE_LANGUAGE &&
+        Date.now() - startedAt >= 8000 &&
+        snapshotAnalysis.unexpectedUnchangedTranslatableNodeIds.length > 0
+      ) {
+        primedSections = true;
+        await exposeGuideSectionsForTranslation();
+        lastStableSnapshot = null;
+        translationState.stablePassTimestamps = [];
+        await sleep(420);
+        continue;
+      }
 
       if (
         translationState.generation !== readinessGeneration ||
@@ -1181,6 +1298,44 @@
     var readySnapshot = getCurrentSnapshotIfReady(expectedLanguage, expectedGeneration);
     if (readySnapshot) {
       return Promise.resolve(readySnapshot);
+    }
+
+    var currentSnapshot = captureSemanticSnapshot();
+    var currentLanguage = getGuideLanguage() || SOURCE_LANGUAGE;
+    var quietFor = Date.now() - translationState.lastMutationAt;
+    var snapshotAnalysis = analyzeSnapshotState(currentSnapshot, translationState.originalSnapshot, expectedLanguage);
+    if (
+      currentLanguage === expectedLanguage &&
+      snapshotAnalysis.structureOk &&
+      (expectedLanguage === SOURCE_LANGUAGE || snapshotAnalysis.changedTranslatableNodeIds.length > 0) &&
+      snapshotAnalysis.unexpectedUnchangedTranslatableNodeIds.length === 0 &&
+      quietFor >= GUIDE_SETTLE_QUIET_MS
+    ) {
+      return sleep(320).then(function () {
+        var confirmationSnapshot = captureSemanticSnapshot();
+        var confirmationAnalysis = analyzeSnapshotState(confirmationSnapshot, translationState.originalSnapshot, expectedLanguage);
+        if (
+          getGuideLanguage() === expectedLanguage &&
+          snapshotsEqual(currentSnapshot, confirmationSnapshot) &&
+          confirmationAnalysis.structureOk &&
+          (expectedLanguage === SOURCE_LANGUAGE || confirmationAnalysis.changedTranslatableNodeIds.length > 0) &&
+          confirmationAnalysis.unexpectedUnchangedTranslatableNodeIds.length === 0 &&
+          (Date.now() - translationState.lastMutationAt) >= 250
+        ) {
+          translationState.readyLanguage = expectedLanguage;
+          translationState.readySnapshot = confirmationSnapshot;
+          translationState.readyAt = Date.now();
+          translationState.stableGeneration = expectedGeneration;
+          translationState.stablePassTimestamps = [Date.now() - 320, Date.now()];
+          updateTranslationDiagnostics({
+            settledSnapshot: captureSemanticSnapshot({ redactProtectedValues: true }),
+            stablePassTimestamps: translationState.stablePassTimestamps.slice(),
+            readySnapshotInvalidationReason: "non-semantic-change-ignored"
+          });
+          return confirmationSnapshot;
+        }
+        return waitForGuideToSettle();
+      });
     }
 
     if (
@@ -1484,87 +1639,6 @@
       uniqueFetchCount: uniqueFetchUrls.length,
       uniqueFetchUrls: uniqueFetchUrls
     };
-  }
-
-  async function temporarilyInlineDocumentProxyImages(exportRoot, exportImageDataCache) {
-    var documentImages = Array.prototype.slice.call(document.querySelectorAll("img")).filter(function (img) {
-      if (exportRoot && exportRoot.contains && exportRoot.contains(img)) {
-        return false;
-      }
-      var src = String(img.getAttribute("src") || img.currentSrc || "").trim();
-      return !!src && src.indexOf(PUBLIC_PDF_IMAGE_ENDPOINT) !== -1;
-    });
-    var restoreEntries = [];
-    await Promise.all(documentImages.map(async function (img) {
-      var originalSrc = String(img.getAttribute("src") || "").trim();
-      var fetchUrl = resolveExportImageUrl(originalSrc || img.currentSrc || "");
-      if (!fetchUrl) {
-        return;
-      }
-      var dataUri = await getExportImageDataUri(fetchUrl, exportImageDataCache);
-      restoreEntries.push({
-        img: img,
-        src: originalSrc,
-        proxySrc: fetchUrl,
-        dataUri: dataUri
-      });
-      img.setAttribute("data-export-inline-proxy-src", fetchUrl);
-      img.setAttribute("src", dataUri);
-      if (img.complete && img.naturalWidth && img.naturalHeight) {
-        if (typeof img.decode === "function") {
-          await img.decode().catch(function () {
-            return null;
-          });
-        }
-        return;
-      }
-      await new Promise(function (resolve) {
-        function finish() {
-          if (typeof img.decode === "function") {
-            img.decode().catch(function () {
-              return null;
-            }).finally(resolve);
-            return;
-          }
-          resolve();
-        }
-        img.addEventListener("load", finish, { once: true });
-        img.addEventListener("error", resolve, { once: true });
-      });
-    }));
-    return restoreEntries;
-  }
-
-  function restoreLiveGuideImages(restoreEntries) {
-    (restoreEntries || []).forEach(function (entry) {
-      if (!entry || !entry.img) {
-        return;
-      }
-      entry.img.setAttribute("src", entry.src);
-      entry.img.removeAttribute("data-export-inline-proxy-src");
-    });
-  }
-
-  function buildInlineImageDataMap(restoreEntries, inlineImageDiagnostics, exportImageDataCache) {
-    var entries = restoreEntries || [];
-    var diagnostics = inlineImageDiagnostics || {};
-    var uniqueFetchUrls = Array.isArray(diagnostics.uniqueFetchUrls) ? diagnostics.uniqueFetchUrls : [];
-    return Promise.all(uniqueFetchUrls.map(function (url) {
-      return getExportImageDataUri(url, exportImageDataCache).then(function (dataUri) {
-        return [url, dataUri];
-      });
-    })).then(function (pairs) {
-      var dataMap = {};
-      pairs.forEach(function (pair) {
-        dataMap[pair[0]] = pair[1];
-      });
-      entries.forEach(function (entry) {
-        if (entry && entry.proxySrc && entry.dataUri) {
-          dataMap[entry.proxySrc] = entry.dataUri;
-        }
-      });
-      return dataMap;
-    });
   }
 
   function fitImageSize(naturalWidth, naturalHeight, maxWidth, maxHeight) {
@@ -1945,12 +2019,14 @@
     if (!exportRoot || exportRoot.parentNode) {
       return exportRoot;
     }
-    var guideRoot = getGuideRoot();
-    exportRoot.style.top = (
-      guideRoot
-        ? (guideRoot.getBoundingClientRect().bottom + window.scrollY + 48)
-        : Math.max(document.body.scrollHeight, document.documentElement.scrollHeight, window.innerHeight) + 48
-    ) + "px";
+    exportRoot.style.position = "fixed";
+    exportRoot.style.left = PDF_EXPORT_OFFSCREEN_LEFT + "px";
+    exportRoot.style.top = "0";
+    exportRoot.style.opacity = "0";
+    exportRoot.style.visibility = "visible";
+    exportRoot.style.pointerEvents = "none";
+    exportRoot.style.zIndex = "-2147483647";
+    exportRoot.style.contain = "layout style paint";
     document.body.appendChild(exportRoot);
     return exportRoot;
   }
@@ -2082,7 +2158,7 @@
         mapMeta.appendChild(mapLink);
       }
 
-      if (model.map.attribution) {
+      if (model.map.attribution && !model.map.imageSrc) {
         var mapAttribution = document.createElement("span");
         mapAttribution.className = "pi-export-map-attribution notranslate";
         mapAttribution.textContent = model.map.attribution;
@@ -2128,7 +2204,7 @@
           );
         }
 
-        if (model.parkingMap.attribution) {
+        if (model.parkingMap.attribution && !model.parkingMap.imageSrc) {
           var parkingMapMeta = document.createElement("div");
           parkingMapMeta.className = "pi-export-map-meta";
           var parkingAttribution = document.createElement("span");
@@ -3216,7 +3292,10 @@
       var warmupLanguage = translationState.requestedLanguage || SOURCE_LANGUAGE;
       translationState.warmupScheduled = false;
       translationState.warmupIdleHandle = null;
-      prewarmPdfLibraries();
+      schedulePdfLibraryWarmup();
+      if (!translationState.readySnapshot || !getCurrentSnapshotIfReady(warmupLanguage, warmupGeneration)) {
+        return null;
+      }
       ensureSettledGuideSnapshot().then(function (snapshot) {
         return preparePdfDependenciesForSnapshot(snapshot, warmupButton);
       }).catch(function () {
@@ -3268,7 +3347,6 @@
       }
     }
     if (statusElement) {
-      statusElement.classList.remove("sr-only");
       statusElement.textContent = statusMessage || "…";
     }
     window.__propertyInstructionPdfStep = stepName || "";
@@ -3609,20 +3687,10 @@
     });
   }
 
-  function prepareCaptureClone(clonedDocument, inlineImageDataMap) {
+  function prepareCaptureClone(clonedDocument) {
     if (!clonedDocument || !clonedDocument.querySelectorAll) {
       return;
     }
-    Array.prototype.slice.call(clonedDocument.querySelectorAll("img")).forEach(function (img) {
-      var mappedSource =
-        String(img.getAttribute("data-export-image-resolved-src") || "").trim() ||
-        String((inlineImageDataMap || {})[String(img.getAttribute("data-export-inline-proxy-src") || "").trim()] || "").trim() ||
-        String((inlineImageDataMap || {})[String(img.getAttribute("src") || "").trim()] || "").trim();
-      if (mappedSource && isDataUrl(mappedSource)) {
-        img.setAttribute("src", mappedSource);
-        img.removeAttribute("srcset");
-      }
-    });
     Array.prototype.slice.call(clonedDocument.querySelectorAll("[data-guide-root], .goog-te-banner-frame, .skiptranslate")).forEach(function (node) {
       if (node && node.parentNode) {
         node.parentNode.removeChild(node);
@@ -3644,32 +3712,52 @@
     var frame = document.createElement("iframe");
     frame.id = "pi-pdf-capture-frame";
     frame.setAttribute("aria-hidden", "true");
-    frame.style.position = "absolute";
-    frame.style.left = "0";
-    frame.style.top = Math.max(document.body.scrollHeight, document.documentElement.scrollHeight, window.innerHeight) + 96 + "px";
+    frame.style.position = "fixed";
+    frame.style.left = PDF_EXPORT_OFFSCREEN_LEFT + "px";
+    frame.style.top = "0";
     frame.style.width = PDF_EXPORT_WIDTH + "px";
     frame.style.height = PDF_EXPORT_PAGE_HEIGHT + "px";
     frame.style.border = "0";
-    frame.style.opacity = "1";
+    frame.style.opacity = "0";
     frame.style.visibility = "visible";
     frame.style.pointerEvents = "none";
     frame.style.background = "#ffffff";
+    frame.style.zIndex = "-2147483647";
     document.body.appendChild(frame);
     return frame;
   }
 
-  function syncCaptureFrameHead(frameDocument) {
-    if (!frameDocument) {
-      return;
-    }
-    while (frameDocument.head.firstChild) {
-      frameDocument.head.removeChild(frameDocument.head.firstChild);
+  function initializeCaptureFrameHead(frameDocument, performanceState, startedAt) {
+    if (!frameDocument || frameDocument.__propertyInstructionExportHeadReady) {
+      return Promise.resolve();
     }
     var charset = frameDocument.createElement("meta");
     charset.setAttribute("charset", "utf-8");
     frameDocument.head.appendChild(charset);
-    Array.prototype.slice.call(document.head.querySelectorAll("style, link[rel='stylesheet']")).forEach(function (node) {
-      frameDocument.head.appendChild(node.cloneNode(true));
+    var viewport = frameDocument.createElement("meta");
+    viewport.setAttribute("name", "viewport");
+    viewport.setAttribute("content", "width=device-width, initial-scale=1");
+    frameDocument.head.appendChild(viewport);
+    var style = frameDocument.createElement("style");
+    style.id = "property-instruction-pdf-export-frame-css";
+    style.textContent = [
+      "html, body { margin: 0; padding: 0; background: #ffffff; min-height: 0; height: auto; overflow: hidden; }",
+      "body { width: " + PDF_EXPORT_WIDTH + "px; }",
+      getPdfExportStylesheetText()
+    ].join("\n");
+    frameDocument.head.appendChild(style);
+    frameDocument.__propertyInstructionExportHeadReady = true;
+    if (performanceState) {
+      performanceState.frameCreatedAt = startedAt || Date.now();
+      recordPdfPerformance(performanceState, "frameStylesReadyMs", startedAt || Date.now());
+    }
+    return (frameDocument.fonts && frameDocument.fonts.ready
+      ? frameDocument.fonts.ready.catch(function () { return null; })
+      : Promise.resolve()
+    ).then(function () {
+      if (performanceState) {
+        recordPdfPerformance(performanceState, "frameFontsReadyMs", startedAt || Date.now());
+      }
     });
   }
 
@@ -3711,13 +3799,15 @@
     };
   }
 
-  async function prepareCaptureFramePage(pageNode) {
+  async function prepareCaptureFramePage(pageNode, performanceState) {
+    var frameStartedAt = Date.now();
     var frame = ensureCaptureFrame();
     var frameDocument = frame.contentDocument;
     if (!frameDocument) {
       throw new Error("Unable to prepare PDF capture frame.");
     }
-    syncCaptureFrameHead(frameDocument);
+    await initializeCaptureFrameHead(frameDocument, performanceState, frameStartedAt);
+    var domStartedAt = Date.now();
     while (frameDocument.body.firstChild) {
       frameDocument.body.removeChild(frameDocument.body.firstChild);
     }
@@ -3729,6 +3819,9 @@
     frameDocument.body.appendChild(captureNodes.root);
     await waitForImages(captureNodes.root);
     await waitForTwoAnimationFrames();
+    if (performanceState) {
+      performanceState.pageDomReplacementMs.push(Date.now() - domStartedAt);
+    }
     return {
       frame: frame,
       document: frameDocument,
@@ -3795,12 +3888,6 @@
     var imageRatioDiagnostics = validateImageAspectRatios(exportState.exportRoot);
     var imageClipDiagnostics = validateExportImageClipping(exportState.exportRoot);
     validateExportDomParity(exportState.exportRoot, modelParityMap, "post-fonts-images", mutationGuardState);
-    var inlineImageDataMap = await buildInlineImageDataMap(
-      exportState.liveGuideImageRestoreEntries,
-      exportState.inlineImageDiagnostics,
-      exportState.exportImageDataCache
-    );
-
     var jsPDF = window.jspdf.jsPDF;
     var pdf = new jsPDF({
       orientation: "portrait",
@@ -3815,7 +3902,7 @@
     var paintedImageDiagnostics = [];
     window.__propertyInstructionPdfRenderer = "html2canvas+jspdf";
 
-    var renderScale = 1.2;
+    var renderScale = 1.8;
     var captureFrame = null;
 
     try {
@@ -3849,7 +3936,7 @@
         }
 
         var pageCaptureStartedAt = Date.now();
-        var captureTarget = await prepareCaptureFramePage(pageNode);
+        var captureTarget = await prepareCaptureFramePage(pageNode, performanceState);
         captureFrame = captureTarget.frame;
         var canvas;
         canvas = await window.html2canvas(captureTarget.page, {
@@ -3866,7 +3953,7 @@
           windowWidth: captureTarget.page.offsetWidth,
           windowHeight: captureTarget.page.offsetHeight,
           onclone: function (clonedDocument) {
-            prepareCaptureClone(clonedDocument, inlineImageDataMap);
+            prepareCaptureClone(clonedDocument);
           }
         });
         performanceState.pageCaptureMs[index] = Date.now() - pageCaptureStartedAt;
@@ -3894,7 +3981,31 @@
         }
 
         var encodingStartedAt = Date.now();
-        var jpegDataUrl = canvas.toDataURL("image/jpeg", 0.9);
+        var jpegDataUrl = await new Promise(function (resolve, reject) {
+          if (!canvas.toBlob) {
+            try {
+              resolve(canvas.toDataURL("image/jpeg", 0.95));
+              return;
+            } catch (error) {
+              reject(error);
+              return;
+            }
+          }
+          canvas.toBlob(function (blob) {
+            if (!blob) {
+              reject(new Error("Unable to encode PDF page image."));
+              return;
+            }
+            var reader = new FileReader();
+            reader.onload = function () {
+              resolve(reader.result);
+            };
+            reader.onerror = function () {
+              reject(new Error("Unable to encode PDF page image."));
+            };
+            reader.readAsDataURL(blob);
+          }, "image/jpeg", 0.95);
+        });
         performanceState.encodingMs += Date.now() - encodingStartedAt;
 
         var assemblyStartedAt = Date.now();
@@ -3946,7 +4057,6 @@
     var mutationGuardState = null;
     var performanceState = startPdfPerformance();
     var exportImageDataCache = new Map();
-    var liveGuideImageRestoreEntries = [];
     var clickStartedAt = Date.now();
     window.__propertyInstructionLastPdfError = null;
 
@@ -3976,7 +4086,7 @@
         window.__propertyInstructionPdfStep = "download-ready";
         triggerBlobDownload(immediateCachedPdf.blob, filename);
         if (statusElement) {
-          statusElement.textContent = originalLabel;
+          statusElement.textContent = "";
         }
         return;
       }
@@ -3996,7 +4106,7 @@
         window.__propertyInstructionPdfStep = "download-ready";
         triggerBlobDownload(cachedPdf.blob, filename);
         if (statusElement) {
-          statusElement.textContent = originalLabel;
+          statusElement.textContent = "";
         }
         return;
       }
@@ -4049,10 +4159,8 @@
       validateExportDomParity(exportState.exportRoot, preMountParity.modelParityMap, "post-mount");
       updateExportProgress(downloadButton, statusElement, null, null, "wait-images");
       var imagePrepStartedAt = Date.now();
-      liveGuideImageRestoreEntries = await temporarilyInlineDocumentProxyImages(exportState.exportRoot, exportImageDataCache);
       var inlineImageDiagnostics = await inlineExportImages(exportState.exportRoot, exportImageDataCache);
       exportState.exportImageDataCache = exportImageDataCache;
-      exportState.liveGuideImageRestoreEntries = liveGuideImageRestoreEntries;
       exportState.inlineImageDiagnostics = inlineImageDiagnostics;
       await waitForImages(exportState.exportRoot);
       updateExportProgress(downloadButton, statusElement, null, null, "prepare-layout");
@@ -4132,7 +4240,7 @@
       destroyExportRoot(exportState.exportRoot);
 
       if (statusElement) {
-        statusElement.textContent = originalLabel;
+        statusElement.textContent = "";
       }
     } catch (error) {
       window.__propertyInstructionLastPdfError = {
@@ -4148,17 +4256,18 @@
         stopExportMutationGuard(mutationGuardState);
         destroyExportRoot(exportState.exportRoot);
       }
-      restoreLiveGuideImages(liveGuideImageRestoreEntries);
       if (statusElement) {
         statusElement.textContent = "Translation is temporarily unavailable. Please wait and try again.";
       }
     } finally {
       stopExportMutationGuard(mutationGuardState);
-      restoreLiveGuideImages(liveGuideImageRestoreEntries);
       downloadButton.classList.remove("is-disabled");
       downloadButton.removeAttribute("aria-disabled");
       downloadButton.textContent = originalLabel;
       downloadButton.removeAttribute("data-progress-label");
+      if (statusElement && window.__propertyInstructionPdfStep === "download-ready") {
+        statusElement.textContent = "";
+      }
     }
   }
 
@@ -4233,7 +4342,7 @@
   if (getGuideScreen()) {
     try {
       ensureOriginalSnapshotCaptured();
-      schedulePdfPreparationWarmup(document.querySelector(".pi-pdf-download"));
+      schedulePdfLibraryWarmup();
     } catch (error) {
       // Ignore early snapshot capture failures; export-time validation will handle them.
     }
