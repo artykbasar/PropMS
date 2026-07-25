@@ -6,7 +6,7 @@ import os
 import unittest
 import uuid
 from unittest.mock import patch
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlparse
 
 import frappe
 from frappe.tests.utils import FrappeTestCase
@@ -455,6 +455,32 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 			self.assertAlmostEqual(coordinates.latitude, 51.399)
 			self.assertAlmostEqual(coordinates.longitude, -0.249)
 
+	def test_map_block_prefers_embed_marker_coordinates_over_viewport_center(self):
+		doc = self.make_instruction()
+		url = (
+			"https://www.google.com/maps/embed?pb=!1m17!1m12!1m3!1d1279.5630588056072!"
+			"2d-0.24875145778959576!3d51.40036019312703!2m3!1f0!2f0!3f0!"
+			"3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x48760b63ea8c7a0d%3A0x17987c5fb2499918!"
+			"2s99A%20Burlington%20Rd%2C%20New Malden%20KT3%204LR!5e0!3m2!1sen!2suk!"
+			"4v1753776094216!5m2!1sen!2suk!2zNTHCsDI0JzAyLjEiTiAwwrAxNCc1MC4zIlc"
+		)
+		coordinates = doc.parse_map_coordinates_from_url(url)
+		center = doc.parse_map_center_coordinates_from_url(url)
+		self.assertAlmostEqual(center.latitude, 51.40036019312703)
+		self.assertAlmostEqual(center.longitude, -0.24875145778959576)
+		self.assertAlmostEqual(coordinates.latitude, 51.4005833333, places=6)
+		self.assertAlmostEqual(coordinates.longitude, -0.2473055556, places=6)
+		self.assertEqual(coordinates.source, "google_embed_dms_marker")
+
+	def test_google_embed_marker_coordinate_decoder_supports_urlsafe_and_padding(self):
+		doc = self.make_instruction()
+		token = "NTHCsDI0JzAyLjEiTiAwwrAxNCc1MC4zIlc".replace("+", "-").replace("/", "_").rstrip("=")
+		decoded = doc.decode_google_embed_marker_token(token)
+		self.assertIn('51°24\'02.1"N', decoded)
+		coordinates = doc.parse_map_coordinates_from_dms_text(decoded)
+		self.assertAlmostEqual(coordinates.latitude, 51.4005833333, places=6)
+		self.assertAlmostEqual(coordinates.longitude, -0.2473055556, places=6)
+
 	def test_map_block_counts_as_content_and_uses_link_fallback_without_coordinates(self):
 		doc = self.make_instruction(
 			instruction_blocks=[
@@ -490,6 +516,9 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 		html = self.render_instruction(doc)
 		self.assertIn('data-guide-block-map', html)
 		self.assertIn('class="pi-instruction-map"', html)
+		self.assertIn('data-guide-block-map-center-latitude="51.399"', html)
+		self.assertIn('data-guide-block-map-marker-latitude="51.399"', html)
+		self.assertIn('data-guide-block-map-coordinate-source="google_embed_viewport_center"', html)
 
 	def test_text_block_with_embed_html_renders_a_validated_map(self):
 		embed_html = '<iframe src="https://www.google.com/maps?output=embed&q=51.399,-0.249"></iframe>'
@@ -509,6 +538,37 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 		self.assertEqual(block.map_embed_url, "https://www.google.com/maps?output=embed&q=51.399,-0.249")
 		self.assertAlmostEqual(block.map_latitude, 51.399)
 		self.assertAlmostEqual(block.map_longitude, -0.249)
+
+	def test_block_map_external_url_uses_marker_coordinates(self):
+		embed_html = (
+			'<iframe src="https://www.google.com/maps/embed?pb=!1m17!1m12!1m3!'
+			'1d1279.5630588056072!2d-0.24875145778959576!3d51.40036019312703!2m3!'
+			'1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!'
+			'1s0x48760b63ea8c7a0d%3A0x17987c5fb2499918!2s99A%20Burlington%20Rd%2C%20New%20Malden%20KT3%204LR!'
+			'5e0!3m2!1sen!2suk!4v1753776094216!5m2!1sen!2suk!2zNTHCsDI0JzAyLjEiTiAwwrAxNCc1MC4zIlc"></iframe>'
+		)
+		doc = self.make_instruction(
+			instruction_blocks=[
+				{
+					"section": "Parking",
+					"block_type": "Map",
+					"title": "Parking map",
+					"google_maps_embed_html": embed_html,
+				},
+			]
+		)
+		block = doc.get_grouped_blocks()[0].blocks[0]
+		self.assertAlmostEqual(block.map_center_latitude, 51.40036019312703)
+		self.assertAlmostEqual(block.map_center_longitude, -0.24875145778959576)
+		self.assertAlmostEqual(block.map_marker_latitude, 51.4005833333, places=6)
+		self.assertAlmostEqual(block.map_marker_longitude, -0.2473055556, places=6)
+		self.assertEqual(block.map_coordinate_source, "google_embed_dms_marker")
+		parsed = urlparse(block.map_external_url)
+		query = parse_qs(parsed.query or "")
+		self.assertEqual(query.get("api"), ["1"])
+		latitude_text, longitude_text = (query.get("query") or ["0,0"])[0].split(",", 1)
+		self.assertAlmostEqual(float(latitude_text), 51.4005833333, places=6)
+		self.assertAlmostEqual(float(longitude_text), -0.2473055556, places=6)
 
 	def test_non_map_blocks_do_not_require_embed_html(self):
 		doc = self.make_instruction(
@@ -841,12 +901,17 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 		self.assertIn("function buildTranslatedPdfFilename(fallbackFilename)", source)
 		self.assertIn("getVisibleText(document.querySelector(\"[data-guide-kicker]\"))", source)
 		self.assertIn("syncCustomLanguageSelectorFromGoogle", source)
+		self.assertIn("function syncShowOriginalButton(selectedLanguage)", source)
 		self.assertIn("applyCustomLanguageSelection", source)
 		self.assertIn("resetToSourceLanguage", source)
 		self.assertIn("expireCookie(\"googtrans\")", source)
-		self.assertIn("pi-google-translate-engine", self.render_instruction(self.make_instruction()))
+		html = self.render_instruction(self.make_instruction(title="Toolbar Guide"))
+		self.assertIn("data-guide-show-original", html)
+		self.assertIn("pi-google-translate-engine", html)
 		self.assertIn("getPdfFilename(downloadButton)", source)
 		self.assertIn("normalize(\"NFKC\")", source)
+		self.assertIn('setTranslationStatus("Restoring original…")', source)
+		self.assertIn("applyCustomLanguageSelection(SOURCE_LANGUAGE)", source)
 
 	def test_export_script_validates_image_clipping_separately_from_ratio(self):
 		source = self.get_export_script_source()
@@ -941,6 +1006,29 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 		self.assertIn('validateExportDomParity(exportState.exportRoot, modelParityMap, "before-canvas-page-" + (index + 1), mutationGuardState)', source)
 		self.assertIn('validateExportDomParity(exportState.exportRoot, modelParityMap, "post-render", mutationGuardState)', source)
 		self.assertIn('setTranslationAbortReason("Export DOM mutated after translation", "export-dom-mutated-after-translation")', source)
+
+	def test_export_script_syncs_sticky_toolbar_offset_and_active_nav(self):
+		source = self.get_export_script_source()
+		html = self.render_instruction(self.make_instruction())
+		self.assertIn("function syncStickyToolbarOffset()", source)
+		self.assertIn("function ensureStickyToolbarObservers()", source)
+		self.assertIn("function ensureSectionNavObserver()", source)
+		self.assertIn('shell.style.setProperty("--pi-toolbar-bottom-offset"', source)
+		self.assertIn("new ResizeObserver", source)
+		self.assertIn('linkNode.setAttribute("aria-current", "location")', source)
+		self.assertIn("--pi-toolbar-bottom-offset", html)
+		self.assertIn("scroll-margin-top: calc(var(--pi-toolbar-bottom-offset) + 1rem);", html)
+
+	def test_export_script_projects_map_marker_separately_from_center(self):
+		source = self.get_export_script_source()
+		self.assertIn("centerLatitude", source)
+		self.assertIn("centerLongitude", source)
+		self.assertIn("markerLatitude", source)
+		self.assertIn("markerLongitude", source)
+		self.assertIn("projectedMarkerX", source)
+		self.assertIn("projectedMarkerY", source)
+		self.assertIn("markerInsideCanvas", source)
+		self.assertIn("map-marker-outside-canvas", source)
 
 	def test_export_script_uses_language_sync_without_relying_only_on_change_event(self):
 		source = self.get_export_script_source()

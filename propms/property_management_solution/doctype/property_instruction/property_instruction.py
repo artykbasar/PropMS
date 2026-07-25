@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import base64
 import mimetypes
 import os
 import re
@@ -54,6 +55,10 @@ GOOGLE_MAP_AT_PATTERN = re.compile(r"@(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)")
 GOOGLE_MAP_3D4D_PATTERN = re.compile(r"!3d(-?\d+(?:\.\d+)?)!4d(-?\d+(?:\.\d+)?)")
 GOOGLE_MAP_2D3D_PATTERN = re.compile(r"!2d(-?\d+(?:\.\d+)?)!3d(-?\d+(?:\.\d+)?)")
 COORDINATE_TEXT_PATTERN = re.compile(r"(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)")
+DMS_COORDINATE_COMPONENT_PATTERN = re.compile(
+	r"(\d{1,3})\s*[°º]\s*(\d{1,2})\s*['’′]\s*(\d{1,2}(?:\.\d+)?)\s*(?:[\"”″]|''|”)?\s*([NSEW])",
+	re.IGNORECASE,
+)
 NOINDEX_ROBOTS_CONTENT = "noindex, nofollow, noarchive, nosnippet, noimageindex"
 GUEST_GUIDE_EXCLUDED_WEB_ASSET_PREFIXES = (
 	"/assets/propms/day/assets/",
@@ -322,6 +327,11 @@ class PropertyInstruction(WebsiteGenerator):
 					map_embed_url=block_map.embed_url,
 					map_latitude=block_map.latitude,
 					map_longitude=block_map.longitude,
+					map_center_latitude=block_map.center_latitude,
+					map_center_longitude=block_map.center_longitude,
+					map_marker_latitude=block_map.marker_latitude,
+					map_marker_longitude=block_map.marker_longitude,
+					map_coordinate_source=block_map.coordinate_source,
 					map_zoom=block_map.zoom,
 					map_external_url=block_map.external_url,
 					map_attribution=block_map.attribution,
@@ -366,6 +376,11 @@ class PropertyInstruction(WebsiteGenerator):
 				embed_url=block_map.embed_url,
 				latitude=block_map.latitude,
 				longitude=block_map.longitude,
+				center_latitude=block_map.center_latitude,
+				center_longitude=block_map.center_longitude,
+				marker_latitude=block_map.marker_latitude,
+				marker_longitude=block_map.marker_longitude,
+				coordinate_source=block_map.coordinate_source,
 				zoom=block_map.zoom,
 				external_url=block_map.external_url,
 				attribution=block_map.attribution,
@@ -473,26 +488,9 @@ class PropertyInstruction(WebsiteGenerator):
 		if not text:
 			return None
 
-		match = GOOGLE_MAP_AT_PATTERN.search(text)
-		if match:
-			latitude = self.parse_coordinate_value(match.group(1))
-			longitude = self.parse_coordinate_value(match.group(2))
-			if latitude is not None and longitude is not None:
-				return frappe._dict(latitude=latitude, longitude=longitude, source="google_maps_url")
-
-		match = GOOGLE_MAP_3D4D_PATTERN.search(text)
-		if match:
-			latitude = self.parse_coordinate_value(match.group(1))
-			longitude = self.parse_coordinate_value(match.group(2))
-			if latitude is not None and longitude is not None:
-				return frappe._dict(latitude=latitude, longitude=longitude, source="google_maps_url_pb")
-
-		match = GOOGLE_MAP_2D3D_PATTERN.search(text)
-		if match:
-			longitude = self.parse_coordinate_value(match.group(1))
-			latitude = self.parse_coordinate_value(match.group(2))
-			if latitude is not None and longitude is not None:
-				return frappe._dict(latitude=latitude, longitude=longitude, source="google_maps_url_pb")
+		marker_coordinates = self.parse_google_embed_marker_coordinates(text)
+		if marker_coordinates:
+			return marker_coordinates
 
 		parsed = urlparse(text)
 		query_params = parse_qs(parsed.query or "", keep_blank_values=False)
@@ -501,14 +499,161 @@ class PropertyInstruction(WebsiteGenerator):
 			for query_value in query_values:
 				query_coordinates = self.parse_map_coordinates_from_text(query_value)
 				if query_coordinates:
-					query_coordinates.source = f"google_maps_url_{key}"
+					query_coordinates.source = f"google_query_coordinate_{key}"
 					return query_coordinates
+
+		match = GOOGLE_MAP_AT_PATTERN.search(text)
+		if match:
+			latitude = self.parse_coordinate_value(match.group(1))
+			longitude = self.parse_coordinate_value(match.group(2))
+			if latitude is not None and longitude is not None:
+				return frappe._dict(latitude=latitude, longitude=longitude, source="google_at_coordinate")
+
+		center_coordinates = self.parse_map_center_coordinates_from_url(text)
+		if center_coordinates:
+			return frappe._dict(
+				latitude=center_coordinates.latitude,
+				longitude=center_coordinates.longitude,
+				source="fallback_center_as_marker",
+			)
+
 		query_coordinates = self.parse_map_coordinates_from_text(parsed.query or "")
 		if query_coordinates:
 			query_coordinates.source = "google_maps_url_query"
 			return query_coordinates
 
 		return None
+
+	def parse_map_center_coordinates_from_url(self, url):
+		text = (url or "").strip()
+		if not text:
+			return None
+
+		match = GOOGLE_MAP_2D3D_PATTERN.search(text)
+		if match:
+			longitude = self.parse_coordinate_value(match.group(1))
+			latitude = self.parse_coordinate_value(match.group(2))
+			if latitude is not None and longitude is not None:
+				return frappe._dict(
+					latitude=latitude,
+					longitude=longitude,
+					source="google_embed_viewport_center",
+				)
+
+		match = GOOGLE_MAP_AT_PATTERN.search(text)
+		if match:
+			latitude = self.parse_coordinate_value(match.group(1))
+			longitude = self.parse_coordinate_value(match.group(2))
+			if latitude is not None and longitude is not None:
+				return frappe._dict(
+					latitude=latitude,
+					longitude=longitude,
+					source="google_at_coordinate",
+				)
+
+		marker_coordinates = self.parse_google_embed_marker_coordinates(text)
+		if marker_coordinates:
+			return frappe._dict(
+				latitude=marker_coordinates.latitude,
+				longitude=marker_coordinates.longitude,
+				source=marker_coordinates.source,
+			)
+
+		return None
+
+	def parse_google_embed_marker_coordinates(self, url):
+		text = (url or "").strip()
+		if not text:
+			return None
+
+		match = re.search(r"!2z([^!&?#]+)", text)
+		if match:
+			encoded_marker = match.group(1).strip()
+			try:
+				marker_text = self.decode_google_embed_marker_token(encoded_marker)
+			except Exception:
+				marker_text = None
+			if marker_text:
+				marker_coordinates = self.parse_map_coordinates_from_dms_text(marker_text)
+				if marker_coordinates:
+					marker_coordinates.source = "google_embed_dms_marker"
+					return marker_coordinates
+
+		parsed = urlparse(text)
+		query_params = parse_qs(parsed.query or "", keep_blank_values=False)
+		for key in ("q", "query"):
+			query_values = query_params.get(key) or []
+			for query_value in query_values:
+				query_coordinates = self.parse_map_coordinates_from_text(query_value)
+				if query_coordinates:
+					query_coordinates.source = f"google_query_coordinate_{key}"
+					return query_coordinates
+
+		match = GOOGLE_MAP_AT_PATTERN.search(text)
+		if match:
+			latitude = self.parse_coordinate_value(match.group(1))
+			longitude = self.parse_coordinate_value(match.group(2))
+			if latitude is not None and longitude is not None:
+				return frappe._dict(latitude=latitude, longitude=longitude, source="google_at_coordinate")
+
+		match = GOOGLE_MAP_2D3D_PATTERN.search(text)
+		if match:
+			longitude = self.parse_coordinate_value(match.group(1))
+			latitude = self.parse_coordinate_value(match.group(2))
+			if latitude is not None and longitude is not None:
+				return frappe._dict(latitude=latitude, longitude=longitude, source="google_embed_viewport_center")
+
+		return None
+
+	def decode_google_embed_marker_token(self, token):
+		value = (token or "").strip()
+		if not value:
+			return None
+		decoded = urlparse(f"https://example.com/?q={value}").query[2:]
+		normalized = decoded.replace("-", "+").replace("_", "/")
+		padding = len(normalized) % 4
+		if padding:
+			normalized += "=" * (4 - padding)
+		try:
+			return base64.b64decode(normalized).decode("utf-8")
+		except Exception:
+			return None
+
+	def parse_map_coordinates_from_dms_text(self, value):
+		text = (value or "").strip()
+		if not text:
+			return None
+		matches = DMS_COORDINATE_COMPONENT_PATTERN.findall(text.replace("″", "\"").replace("′", "'"))
+		if len(matches) < 2:
+			return None
+		latitude = None
+		longitude = None
+		for degrees, minutes, seconds, hemisphere in matches:
+			decimal = self.convert_dms_to_decimal(degrees, minutes, seconds, hemisphere)
+			if decimal is None:
+				return None
+			hemisphere = hemisphere.upper()
+			if hemisphere in {"N", "S"} and latitude is None:
+				latitude = decimal
+			elif hemisphere in {"E", "W"} and longitude is None:
+				longitude = decimal
+		if latitude is None or longitude is None:
+			return None
+		if not (-90 <= latitude <= 90 and -180 <= longitude <= 180):
+			return None
+		return frappe._dict(latitude=latitude, longitude=longitude, source="google_embed_dms_marker")
+
+	def convert_dms_to_decimal(self, degrees, minutes, seconds, hemisphere):
+		try:
+			degrees_value = float(degrees)
+			minutes_value = float(minutes)
+			seconds_value = float(seconds)
+		except (TypeError, ValueError):
+			return None
+		decimal = degrees_value + (minutes_value / 60.0) + (seconds_value / 3600.0)
+		if hemisphere.upper() in {"S", "W"}:
+			decimal *= -1
+		return decimal
 
 	def parse_map_zoom_from_url(self, url, default_zoom=None):
 		parsed = urlparse((url or "").strip())
@@ -786,25 +931,39 @@ class PropertyInstruction(WebsiteGenerator):
 				embed_url=None,
 				latitude=None,
 				longitude=None,
+				center_latitude=None,
+				center_longitude=None,
+				marker_latitude=None,
+				marker_longitude=None,
+				coordinate_source=None,
 				zoom=None,
 				external_url=None,
 				attribution="© OpenStreetMap contributors",
 			)
 		embed_url = self.extract_google_maps_embed_url(row.google_maps_embed_html)
-		coordinates = self.parse_map_coordinates_from_url(embed_url)
+		marker_coordinates = self.parse_map_coordinates_from_url(embed_url)
+		center_coordinates = self.parse_map_center_coordinates_from_url(embed_url)
 		zoom = self.parse_map_zoom_from_url(embed_url, self.map_zoom)
 		external_url = (row.link_url or "").strip()
-		if not external_url and coordinates:
+		preferred_latitude = marker_coordinates.latitude if marker_coordinates else (center_coordinates.latitude if center_coordinates else None)
+		preferred_longitude = marker_coordinates.longitude if marker_coordinates else (center_coordinates.longitude if center_coordinates else None)
+		coordinate_source = marker_coordinates.source if marker_coordinates else (center_coordinates.source if center_coordinates else None)
+		if not external_url and preferred_latitude is not None and preferred_longitude is not None:
 			external_url = (
 				"https://www.google.com/maps/search/?"
-				+ urlencode({"api": 1, "query": f"{coordinates.latitude},{coordinates.longitude}"})
+				+ urlencode({"api": 1, "query": f"{preferred_latitude},{preferred_longitude}"})
 			)
 		if not external_url and embed_url:
 			external_url = embed_url
 		return frappe._dict(
 			embed_url=embed_url,
-			latitude=coordinates.latitude if coordinates else None,
-			longitude=coordinates.longitude if coordinates else None,
+			latitude=preferred_latitude,
+			longitude=preferred_longitude,
+			center_latitude=center_coordinates.latitude if center_coordinates else preferred_latitude,
+			center_longitude=center_coordinates.longitude if center_coordinates else preferred_longitude,
+			marker_latitude=marker_coordinates.latitude if marker_coordinates else preferred_latitude,
+			marker_longitude=marker_coordinates.longitude if marker_coordinates else preferred_longitude,
+			coordinate_source=coordinate_source,
 			zoom=zoom,
 			external_url=external_url,
 			attribution="© OpenStreetMap contributors",

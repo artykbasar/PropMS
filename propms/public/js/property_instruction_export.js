@@ -339,10 +339,35 @@
     return document.querySelector("[data-guide-translation-status]");
   }
 
+  function getShowOriginalButton() {
+    return document.querySelector("[data-guide-show-original]");
+  }
+
   function setTranslationStatus(message) {
     var statusElement = getTranslationStatusElement();
     if (statusElement) {
       statusElement.textContent = String(message || "");
+    }
+  }
+
+  function syncShowOriginalButton(selectedLanguage) {
+    var button = getShowOriginalButton();
+    var customSelect = getCustomLanguageSelect();
+    var activeLanguage = String(selectedLanguage || SOURCE_LANGUAGE).trim().toLowerCase() || SOURCE_LANGUAGE;
+    var shouldShow = !!(
+      button
+      && customSelect
+      && !customSelect.disabled
+      && activeLanguage !== SOURCE_LANGUAGE
+    );
+    if (!button) {
+      return;
+    }
+    button.hidden = !shouldShow;
+    button.setAttribute("aria-hidden", shouldShow ? "false" : "true");
+    if (!shouldShow) {
+      button.disabled = false;
+      button.removeAttribute("aria-disabled");
     }
   }
 
@@ -377,6 +402,7 @@
     }
     if (!hiddenSelect) {
       customSelect.disabled = true;
+      syncShowOriginalButton(SOURCE_LANGUAGE);
       return;
     }
     var optionMarkup = [];
@@ -402,6 +428,7 @@
     if (customSelect.value !== selectedLanguage) {
       customSelect.value = selectedLanguage;
     }
+    syncShowOriginalButton(selectedLanguage);
   }
 
   function applyCustomLanguageSelection(nextLanguage) {
@@ -414,6 +441,7 @@
         hiddenSelect.value = SOURCE_LANGUAGE;
         hiddenSelect.dispatchEvent(new Event("change", { bubbles: true }));
         hiddenSelect.dispatchEvent(new Event("input", { bubbles: true }));
+        syncShowOriginalButton(SOURCE_LANGUAGE);
         return;
       }
       resetToSourceLanguage();
@@ -425,6 +453,7 @@
     hiddenSelect.value = normalizedLanguage;
     hiddenSelect.dispatchEvent(new Event("change", { bubbles: true }));
     hiddenSelect.dispatchEvent(new Event("input", { bubbles: true }));
+    syncShowOriginalButton(normalizedLanguage);
   }
 
   function getInstructionBlockMapModels() {
@@ -456,6 +485,11 @@
     shell.setAttribute("data-guide-block-map-embed-url", mapModel.embed_url || "");
     shell.setAttribute("data-guide-block-map-latitude", mapModel.latitude != null ? String(mapModel.latitude) : "");
     shell.setAttribute("data-guide-block-map-longitude", mapModel.longitude != null ? String(mapModel.longitude) : "");
+    shell.setAttribute("data-guide-block-map-center-latitude", mapModel.center_latitude != null ? String(mapModel.center_latitude) : "");
+    shell.setAttribute("data-guide-block-map-center-longitude", mapModel.center_longitude != null ? String(mapModel.center_longitude) : "");
+    shell.setAttribute("data-guide-block-map-marker-latitude", mapModel.marker_latitude != null ? String(mapModel.marker_latitude) : "");
+    shell.setAttribute("data-guide-block-map-marker-longitude", mapModel.marker_longitude != null ? String(mapModel.marker_longitude) : "");
+    shell.setAttribute("data-guide-block-map-coordinate-source", mapModel.coordinate_source || "");
     shell.setAttribute("data-guide-block-map-zoom", mapModel.zoom != null ? String(mapModel.zoom) : "");
     shell.setAttribute("data-guide-block-map-external-url", mapModel.external_url || "");
     shell.setAttribute("data-guide-block-map-attribution", mapModel.attribution || "© OpenStreetMap contributors");
@@ -518,6 +552,97 @@
           blockNode.appendChild(linkWrap);
         }
       }
+    });
+  }
+
+  function scheduleStickyToolbarOffsetSync() {
+    if (translationState.stickyToolbarOffsetFrame) {
+      return;
+    }
+    translationState.stickyToolbarOffsetFrame = window.requestAnimationFrame(function () {
+      translationState.stickyToolbarOffsetFrame = 0;
+      syncStickyToolbarOffset();
+    });
+  }
+
+  function syncStickyToolbarOffset() {
+    var shell = document.querySelector(".pi-shell");
+    var toolbar = document.querySelector("[data-guide-toolbar]");
+    if (!shell || !toolbar) {
+      return;
+    }
+    var toolbarRect = toolbar.getBoundingClientRect();
+    var computedToolbarStyle = window.getComputedStyle(toolbar);
+    var stickyTop = parseFloat(computedToolbarStyle.top || "0") || 0;
+    var toolbarBottomOffset = Math.max(0, Math.ceil(stickyTop + toolbarRect.height));
+    shell.style.setProperty("--pi-toolbar-bottom-offset", toolbarBottomOffset + "px");
+    window.__propertyInstructionStickyDiagnostics = window.__propertyInstructionStickyDiagnostics || {};
+    window.__propertyInstructionStickyDiagnostics.toolbarBottomOffset = toolbarBottomOffset;
+    window.__propertyInstructionStickyDiagnostics.toolbarHeight = Math.ceil(toolbarRect.height);
+    window.__propertyInstructionStickyDiagnostics.toolbarTop = stickyTop;
+  }
+
+  function ensureStickyToolbarObservers() {
+    if (translationState.stickyToolbarObserversBound) {
+      return;
+    }
+    translationState.stickyToolbarObserversBound = true;
+    var toolbar = document.querySelector("[data-guide-toolbar]");
+    if (!toolbar) {
+      return;
+    }
+    if (window.ResizeObserver) {
+      translationState.stickyToolbarResizeObserver = new ResizeObserver(function () {
+        scheduleStickyToolbarOffsetSync();
+      });
+      translationState.stickyToolbarResizeObserver.observe(toolbar);
+    }
+    window.addEventListener("resize", scheduleStickyToolbarOffsetSync, { passive: true });
+    scheduleStickyToolbarOffsetSync();
+  }
+
+  function ensureSectionNavObserver() {
+    if (translationState.sectionNavObserverBound || window.innerWidth <= 768 || !window.IntersectionObserver) {
+      return;
+    }
+    translationState.sectionNavObserverBound = true;
+    var navLinks = Array.prototype.slice.call(document.querySelectorAll(".pi-nav a[href^='#']"));
+    if (!navLinks.length) {
+      return;
+    }
+    var navLinkMap = {};
+    navLinks.forEach(function (linkNode) {
+      var targetId = String(linkNode.getAttribute("href") || "").replace(/^#/, "");
+      if (targetId) {
+        navLinkMap[targetId] = linkNode;
+      }
+    });
+    translationState.sectionNavObserver = new IntersectionObserver(function (entries) {
+      var visibleEntry = entries
+        .filter(function (entry) {
+          return entry.isIntersecting;
+        })
+        .sort(function (leftEntry, rightEntry) {
+          return rightEntry.intersectionRatio - leftEntry.intersectionRatio;
+        })[0];
+      if (!visibleEntry || !visibleEntry.target) {
+        return;
+      }
+      var activeId = visibleEntry.target.getAttribute("id") || visibleEntry.target.getAttribute("data-guide-section-anchor");
+      navLinks.forEach(function (linkNode) {
+        if (String(linkNode.getAttribute("href") || "") === "#" + activeId) {
+          linkNode.setAttribute("aria-current", "location");
+        } else {
+          linkNode.removeAttribute("aria-current");
+        }
+      });
+    }, {
+      root: null,
+      rootMargin: "-20% 0px -60% 0px",
+      threshold: [0.1, 0.35, 0.6]
+    });
+    Array.prototype.slice.call(document.querySelectorAll("[data-guide-section]")).forEach(function (sectionNode) {
+      translationState.sectionNavObserver.observe(sectionNode);
     });
   }
 
@@ -1106,6 +1231,8 @@
       }
     });
     syncCustomLanguageSelectorFromGoogle();
+    syncShowOriginalButton(translationState.requestedLanguage || SOURCE_LANGUAGE);
+    scheduleStickyToolbarOffsetSync();
     enforceGoogleUiHidden();
     return translationState.requestedLanguage || SOURCE_LANGUAGE;
   }
@@ -1149,6 +1276,7 @@
       if (customSelect) {
         setTranslationStatus("");
         applyCustomLanguageSelection(customSelect.value || SOURCE_LANGUAGE);
+        scheduleStickyToolbarOffsetSync();
         return;
       }
       var widgetSelect = event.target.closest(".goog-te-combo");
@@ -2238,6 +2366,11 @@
           mapEmbedUrl: mapNode ? String(mapNode.getAttribute("data-guide-block-map-embed-url") || "").trim() : "",
           mapLatitude: parseNumericDataAttribute(mapNode, "data-guide-block-map-latitude"),
           mapLongitude: parseNumericDataAttribute(mapNode, "data-guide-block-map-longitude"),
+          mapCenterLatitude: parseNumericDataAttribute(mapNode, "data-guide-block-map-center-latitude"),
+          mapCenterLongitude: parseNumericDataAttribute(mapNode, "data-guide-block-map-center-longitude"),
+          mapMarkerLatitude: parseNumericDataAttribute(mapNode, "data-guide-block-map-marker-latitude"),
+          mapMarkerLongitude: parseNumericDataAttribute(mapNode, "data-guide-block-map-marker-longitude"),
+          mapCoordinateSource: mapNode ? String(mapNode.getAttribute("data-guide-block-map-coordinate-source") || "").trim() : "",
           mapZoom: parseNumericDataAttribute(mapNode, "data-guide-block-map-zoom") || 16,
           mapExternalUrl: normalizeHref(mapNode && mapNode.getAttribute("data-guide-block-map-external-url")),
           mapAttribution: mapNode ? String(mapNode.getAttribute("data-guide-block-map-attribution") || "").trim() : ""
@@ -3193,8 +3326,10 @@
 
   function getMapSnapshotCacheKey(mapConfig) {
     return [
-      Number(mapConfig.longitude).toFixed(6),
-      Number(mapConfig.latitude).toFixed(6),
+      Number(mapConfig.centerLongitude != null ? mapConfig.centerLongitude : mapConfig.longitude).toFixed(6),
+      Number(mapConfig.centerLatitude != null ? mapConfig.centerLatitude : mapConfig.latitude).toFixed(6),
+      Number(mapConfig.markerLongitude != null ? mapConfig.markerLongitude : mapConfig.longitude).toFixed(6),
+      Number(mapConfig.markerLatitude != null ? mapConfig.markerLatitude : mapConfig.latitude).toFixed(6),
       String(mapConfig.zoom || 16),
       String(mapConfig.width || 760),
       String(mapConfig.height || 300),
@@ -3257,8 +3392,8 @@
     ctx.drawImage(mapCanvas, 0, 0, mapConfig.width, mapConfig.height);
 
     var markerCanvas = createMapMarkerCanvas();
-    var markerX = Math.round((mapConfig.width - markerCanvas.width) / 2);
-    var markerY = Math.round((mapConfig.height - markerCanvas.height) / 2) - 6;
+    var markerX = Math.round(Number(mapConfig.projectedMarkerX || 0) - (markerCanvas.width / 2));
+    var markerY = Math.round(Number(mapConfig.projectedMarkerY || 0) - (markerCanvas.height - 4));
     ctx.drawImage(markerCanvas, markerX, markerY);
     drawMapAttribution(ctx, exportCanvas.width, mapConfig.height, mapConfig.attribution);
 
@@ -3417,10 +3552,17 @@
     if (!mapConfig || !Number.isFinite(mapConfig.latitude) || !Number.isFinite(mapConfig.longitude)) {
       throw new Error("map-coordinates-missing");
     }
+    var centerLatitude = Number.isFinite(mapConfig.centerLatitude) ? mapConfig.centerLatitude : mapConfig.latitude;
+    var centerLongitude = Number.isFinite(mapConfig.centerLongitude) ? mapConfig.centerLongitude : mapConfig.longitude;
+    var markerLatitude = Number.isFinite(mapConfig.markerLatitude) ? mapConfig.markerLatitude : centerLatitude;
+    var markerLongitude = Number.isFinite(mapConfig.markerLongitude) ? mapConfig.markerLongitude : centerLongitude;
     var diagnostic = {
       kind: mapConfig.kind,
-      latitude: Number(mapConfig.latitude.toFixed(6)),
-      longitude: Number(mapConfig.longitude.toFixed(6)),
+      centerLatitude: Number(centerLatitude.toFixed(6)),
+      centerLongitude: Number(centerLongitude.toFixed(6)),
+      markerLatitude: Number(markerLatitude.toFixed(6)),
+      markerLongitude: Number(markerLongitude.toFixed(6)),
+      markerCoordinateSource: mapConfig.markerCoordinateSource || "",
       zoom: mapConfig.zoom,
       style: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
       width: mapConfig.width,
@@ -3442,8 +3584,8 @@
       tileContext.fillRect(0, 0, mapConfig.width, mapConfig.height);
 
       var zoomLevel = Math.max(0, Math.min(19, Math.round(mapConfig.zoom || 16)));
-      var worldX = projectLongitudeToWorldX(mapConfig.longitude, zoomLevel);
-      var worldY = projectLatitudeToWorldY(mapConfig.latitude, zoomLevel);
+      var worldX = projectLongitudeToWorldX(centerLongitude, zoomLevel);
+      var worldY = projectLatitudeToWorldY(centerLatitude, zoomLevel);
       var leftWorldX = worldX - (mapConfig.width / 2);
       var topWorldY = worldY - (mapConfig.height / 2);
       var startTileX = Math.floor(leftWorldX / 256);
@@ -3495,7 +3637,23 @@
         throw new Error("map-render-timeout");
       }
 
+      var markerWorldX = projectLongitudeToWorldX(markerLongitude, zoomLevel);
+      var markerWorldY = projectLatitudeToWorldY(markerLatitude, zoomLevel);
+      var projectedMarkerX = markerWorldX - leftWorldX;
+      var projectedMarkerY = markerWorldY - topWorldY;
+      diagnostic.projectedMarkerX = Number(projectedMarkerX.toFixed(2));
+      diagnostic.projectedMarkerY = Number(projectedMarkerY.toFixed(2));
+      diagnostic.markerInsideCanvas = projectedMarkerX >= 0
+        && projectedMarkerX <= mapConfig.width
+        && projectedMarkerY >= 0
+        && projectedMarkerY <= mapConfig.height;
+      if (!diagnostic.markerInsideCanvas) {
+        throw new Error("map-marker-outside-canvas");
+      }
+
       var dataUri = buildMapSnapshotDataUri(tileCanvas, Object.assign({}, mapConfig, {
+        projectedMarkerX: projectedMarkerX,
+        projectedMarkerY: projectedMarkerY,
         attribution: mapConfig.attribution || "© OpenStreetMap contributors"
       }));
       diagnostic.finishedAt = Date.now();
@@ -3544,6 +3702,11 @@
           kind: "property",
           latitude: preparedModel.map.latitude,
           longitude: preparedModel.map.longitude,
+          centerLatitude: preparedModel.map.latitude,
+          centerLongitude: preparedModel.map.longitude,
+          markerLatitude: preparedModel.map.latitude,
+          markerLongitude: preparedModel.map.longitude,
+          markerCoordinateSource: preparedModel.map.coordinateSource || "property_center",
           zoom: preparedModel.map.zoom || 16,
           width: 760,
           height: 300,
@@ -3569,6 +3732,11 @@
           kind: "parking",
           latitude: preparedModel.parkingMap.latitude,
           longitude: preparedModel.parkingMap.longitude,
+          centerLatitude: preparedModel.parkingMap.latitude,
+          centerLongitude: preparedModel.parkingMap.longitude,
+          markerLatitude: preparedModel.parkingMap.latitude,
+          markerLongitude: preparedModel.parkingMap.longitude,
+          markerCoordinateSource: preparedModel.parkingMap.coordinateSource || "parking_center",
           zoom: preparedModel.parkingMap.zoom || 15,
           width: 760,
           height: 260,
@@ -3596,6 +3764,11 @@
               kind: "block-" + (blockModel.id || "map"),
               latitude: blockModel.mapLatitude,
               longitude: blockModel.mapLongitude,
+              centerLatitude: Number.isFinite(blockModel.mapCenterLatitude) ? blockModel.mapCenterLatitude : blockModel.mapLatitude,
+              centerLongitude: Number.isFinite(blockModel.mapCenterLongitude) ? blockModel.mapCenterLongitude : blockModel.mapLongitude,
+              markerLatitude: Number.isFinite(blockModel.mapMarkerLatitude) ? blockModel.mapMarkerLatitude : blockModel.mapLatitude,
+              markerLongitude: Number.isFinite(blockModel.mapMarkerLongitude) ? blockModel.mapMarkerLongitude : blockModel.mapLongitude,
+              markerCoordinateSource: blockModel.mapCoordinateSource || "fallback_center_as_marker",
               zoom: blockModel.mapZoom || 16,
               width: 760,
               height: 280,
@@ -4795,6 +4968,25 @@
       return;
     }
 
+    const showOriginalButton = event.target.closest("[data-guide-show-original]");
+    if (showOriginalButton) {
+      event.preventDefault();
+      if (showOriginalButton.disabled) {
+        return;
+      }
+      showOriginalButton.disabled = true;
+      showOriginalButton.setAttribute("aria-disabled", "true");
+      setTranslationStatus("Restoring original…");
+      syncShowOriginalButton(translationState.requestedLanguage || getWidgetLanguage() || SOURCE_LANGUAGE);
+      applyCustomLanguageSelection(SOURCE_LANGUAGE);
+      window.setTimeout(function () {
+        showOriginalButton.disabled = false;
+        showOriginalButton.removeAttribute("aria-disabled");
+        syncShowOriginalButton(getWidgetLanguage() || SOURCE_LANGUAGE);
+      }, 1000);
+      return;
+    }
+
     const printButton = event.target.closest(".property-instruction-print");
     if (printButton) {
       window.print();
@@ -4802,6 +4994,9 @@
   });
 
   hydrateInstructionBlockMaps();
+  ensureStickyToolbarObservers();
+  ensureSectionNavObserver();
+  scheduleStickyToolbarOffsetSync();
 
   document.addEventListener("pointerenter", function (event) {
     if (event.target && event.target.closest && event.target.closest(".pi-pdf-download")) {
