@@ -6,9 +6,10 @@
 
   var HTML2CANVAS_LIBRARY_URL = "/assets/propms/js/vendor/html2canvas.min.js";
   var JSPDF_LIBRARY_URL = "/assets/propms/js/vendor/jspdf.umd.min.js";
+  var QRCODE_LIBRARY_URL = "/assets/propms/js/vendor/qrcodegen.js";
   var PUBLIC_PDF_IMAGE_ENDPOINT = "/api/method/propms.property_management_solution.doctype.property_instruction.property_instruction.public_pdf_image";
   var OPEN_STREET_MAP_TILE_TEMPLATE = "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
-  var PDF_LAYOUT_VERSION = "2026-07-24-adaptive-osm-raster-v1";
+  var PDF_LAYOUT_VERSION = "2026-07-25-contents-qr-v1";
   var PDF_EXPORT_WIDTH = 794;
   var PDF_EXPORT_PAGE_HEIGHT = 1122;
   var PDF_EXPORT_OFFSCREEN_LEFT = -20000;
@@ -22,7 +23,9 @@
   var PDF_EXPORT_TIMEOUT_MS = 240000;
   var PDF_EXPORT_IMAGE_RATIO_TOLERANCE = 0.02;
   var PDF_EXPORT_IMAGE_CLIP_TOLERANCE = 1.5;
-  var PDF_EXPORT_FONT_FAMILY = '"PropMS PDF Inter"';
+  var PRINT_PAGE_WIDTH_PT = 594;
+  var PRINT_PAGE_HEIGHT_PT = 840;
+  var PRINT_PAGE_LAYOUT_SETTLE_MS = 40;
   var PDF_EXPORT_FONT_LOADS = [
     '400 16px "PropMS PDF Inter"',
     '500 16px "PropMS PDF Inter"',
@@ -46,8 +49,10 @@
     ".goog-tooltip",
     ".goog-text-highlight"
   ];
-  var PDF_MAP_RENDER_TIMEOUT_MS = 10000;
   var PDF_WARM_PREPARE_TIMEOUT_MS = 1500;
+  var PDF_PROGRESS_HISTORY_LIMIT = 6;
+  var PDF_PROGRESS_HISTORY_PREFIX = "propmsPdfProgressHistory::";
+  var PDF_QR_MODULE_BORDER = 4;
   var PROTECTED_GUIDE_FIELDS = {
     address: true,
     wifi_name: true,
@@ -76,19 +81,27 @@
     preparationPromise: null,
     preparationKey: "",
     warmupScheduled: false,
-    warmupIdleHandle: null,
     googleUiObserverBound: false,
     googleUiEnforceScheduled: false
   };
   var pdfPreparationState = {
     preparedState: null,
-    preparedStatesByKey: {},
-    blobCache: {},
+    artifactCache: {},
     warmupPromise: null,
-    warmupKey: "",
     imageDataCache: new Map(),
-    mapImageCache: new Map()
+    mapImageCache: new Map(),
+    qrImageCache: new Map(),
+    decodedTileImageCache: new Map()
   };
+  var pdfExportController = {
+    activePromise: null,
+    activeLanguage: "",
+    readyObjectUrl: "",
+    readyMimeType: "",
+    readySize: 0,
+    readyObjectUrlRevokeTimer: 0
+  };
+  var activePrintController = null;
   var instructionBlockMapModels = null;
 
   function getGoogleWidgetState() {
@@ -116,6 +129,8 @@
       encodingMs: 0,
       jsPdfAssemblyMs: 0,
       blobCreationMs: 0,
+      qrGenerationMs: 0,
+      contentsResolutionMs: 0,
       buttonClickToPdfBlobMs: 0,
       warmRepeatedDownloadMs: 0,
       totalMs: 0
@@ -127,11 +142,135 @@
     return window.__propertyInstructionPdfPerformance || startPdfPerformance();
   }
 
+  function getBrowserFamily() {
+    var userAgent = String((navigator && navigator.userAgent) || "").toLowerCase();
+    if (userAgent.indexOf("firefox") !== -1) {
+      return "Firefox";
+    }
+    if (userAgent.indexOf("safari") !== -1 && userAgent.indexOf("chrome") === -1 && userAgent.indexOf("chromium") === -1) {
+      return "WebKit";
+    }
+    return "Chromium";
+  }
+
+  function isSafariFamily() {
+    return getBrowserFamily() === "WebKit";
+  }
+
+  function setPdfExportLifecycle(stageName) {
+    var lifecycle = window.__propertyInstructionPdfLifecycle || {
+      startedAt: Date.now(),
+      browserFamily: getBrowserFamily(),
+      currentStage: "idle",
+      transitions: []
+    };
+    var nextStage = String(stageName || "idle");
+    if (lifecycle.currentStage !== nextStage) {
+      lifecycle.transitions.push({
+        stage: nextStage,
+        at: Date.now(),
+        elapsedMs: Math.max(0, Date.now() - lifecycle.startedAt)
+      });
+      lifecycle.currentStage = nextStage;
+    }
+    window.__propertyInstructionPdfLifecycle = lifecycle;
+    return lifecycle;
+  }
+
   function recordPdfPerformance(performanceState, key, startedAt, value) {
     if (!performanceState || !key) {
       return;
     }
     performanceState[key] = typeof value === "number" ? value : (Date.now() - startedAt);
+  }
+
+  function getProgressHistoryStorageKey(pageCount, renderScale) {
+    return [
+      PDF_PROGRESS_HISTORY_PREFIX,
+      getBrowserFamily(),
+      String(pageCount || 0),
+      String(renderScale || 1.8),
+      PDF_LAYOUT_VERSION
+    ].join("");
+  }
+
+  function readProgressHistory(pageCount, renderScale) {
+    try {
+      var storageValue = window.sessionStorage.getItem(getProgressHistoryStorageKey(pageCount, renderScale));
+      if (!storageValue) {
+        return [];
+      }
+      var parsed = JSON.parse(storageValue);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (error) {
+      return [];
+    }
+  }
+
+  function writeProgressHistory(pageCount, renderScale, history) {
+    try {
+      window.sessionStorage.setItem(
+        getProgressHistoryStorageKey(pageCount, renderScale),
+        JSON.stringify((history || []).slice(-PDF_PROGRESS_HISTORY_LIMIT))
+      );
+    } catch (error) {
+      return null;
+    }
+    return history;
+  }
+
+  function recordProgressHistory(pageCount, renderScale, performanceState) {
+    if (!pageCount || !performanceState) {
+      return;
+    }
+    var history = readProgressHistory(pageCount, renderScale);
+    history.push({
+      totalMs: performanceState.totalMs || 0,
+      translationReadyMs: performanceState.translationReadyMs || 0,
+      translationReadyToExportPreparedMs: performanceState.translationReadyToExportPreparedMs || 0,
+      imagePreparationMs: performanceState.imagePreparationMs || 0,
+      mapPreparationMs: performanceState.mapPreparationMs || 0,
+      qrGenerationMs: performanceState.qrGenerationMs || 0,
+      contentsResolutionMs: performanceState.contentsResolutionMs || 0,
+      paginationMs: performanceState.paginationMs || 0,
+      pageCaptureMs: (performanceState.pageCaptureMs || []).reduce(function (sum, value) {
+        return sum + (Number(value) || 0);
+      }, 0),
+      encodingMs: performanceState.encodingMs || 0,
+      jsPdfAssemblyMs: performanceState.jsPdfAssemblyMs || 0,
+      blobCreationMs: performanceState.blobCreationMs || 0
+    });
+    writeProgressHistory(pageCount, renderScale, history);
+  }
+
+  function getAverageProgressHistory(pageCount, renderScale) {
+    var history = readProgressHistory(pageCount, renderScale).filter(function (entry) {
+      return entry && Number(entry.totalMs) > 0;
+    });
+    if (!history.length) {
+      return null;
+    }
+    var keys = [
+      "totalMs",
+      "translationReadyMs",
+      "translationReadyToExportPreparedMs",
+      "imagePreparationMs",
+      "mapPreparationMs",
+      "qrGenerationMs",
+      "contentsResolutionMs",
+      "paginationMs",
+      "pageCaptureMs",
+      "encodingMs",
+      "jsPdfAssemblyMs",
+      "blobCreationMs"
+    ];
+    var averages = {};
+    keys.forEach(function (key) {
+      averages[key] = Math.round(history.reduce(function (sum, entry) {
+        return sum + (Number(entry[key]) || 0);
+      }, 0) / history.length);
+    });
+    return averages;
   }
 
   function getPdfExportStylesheetText() {
@@ -192,26 +331,6 @@
     return window.setTimeout(callback, Math.min(effectiveTimeout, 250));
   }
 
-  function cancelIdleWork(handle) {
-    if (!handle) {
-      return;
-    }
-    if (typeof handle === "object") {
-      if (handle.timeoutHandle) {
-        window.clearTimeout(handle.timeoutHandle);
-      }
-      if (handle.idleHandle && window.cancelIdleCallback) {
-        window.cancelIdleCallback(handle.idleHandle);
-      }
-      return;
-    }
-    if (window.cancelIdleCallback) {
-      window.cancelIdleCallback(handle);
-      return;
-    }
-    window.clearTimeout(handle);
-  }
-
   function hashString(value) {
     var text = String(value || "");
     var hash = 5381;
@@ -220,6 +339,19 @@
       hash = hash >>> 0;
     }
     return hash.toString(16);
+  }
+
+  function summarizeDiagnosticImageSource(source, role, extra) {
+    var rawSource = String(source || "").trim();
+    var mimeMatch = rawSource.match(/^data:([^;,]+)/i);
+    var summary = Object.assign({
+      role: role || "image",
+      sourceKind: rawSource ? (isDataUrl(rawSource) ? "data" : (isSameOriginUrl(rawSource) ? "same-origin" : "external")) : "missing",
+      mimeType: mimeMatch ? mimeMatch[1].toLowerCase() : "",
+      encodedLength: rawSource.length,
+      safeId: rawSource ? hashString(rawSource.slice(0, 128)) : ""
+    }, extra || {});
+    return summary;
   }
 
   async function copyValue(value) {
@@ -339,8 +471,248 @@
     return document.querySelector("[data-guide-translation-status]");
   }
 
+  function getPdfProgressPanel() {
+    return document.querySelector("[data-pdf-progress]");
+  }
+
+  function getPdfProgressLabel() {
+    return document.querySelector("[data-pdf-progress-label]");
+  }
+
+  function getPdfProgressEta() {
+    return document.querySelector("[data-pdf-progress-eta]");
+  }
+
+  function getPdfProgressBar() {
+    return document.querySelector("[data-pdf-progress-bar]");
+  }
+
   function getShowOriginalButton() {
     return document.querySelector("[data-guide-show-original]");
+  }
+
+  function getDownloadButton() {
+    return document.querySelector(".pi-pdf-download");
+  }
+
+  function getPrintButton() {
+    return document.querySelector(".property-instruction-print");
+  }
+
+  function getPdfDownloadAnchor() {
+    var anchor = document.querySelector("[data-pdf-download-anchor]");
+    if (anchor) {
+      return anchor;
+    }
+    anchor = document.createElement("a");
+    anchor.hidden = true;
+    anchor.setAttribute("data-pdf-download-anchor", "");
+    anchor.setAttribute("aria-hidden", "true");
+    anchor.setAttribute("tabindex", "-1");
+    document.body.appendChild(anchor);
+    return anchor;
+  }
+
+  function getGuideCopyText(copyKey, fallbackText) {
+    var copyNode = document.querySelector("[data-guide-progress-copy='" + copyKey + "']");
+    var text = getVisibleText(copyNode);
+    return text || String(fallbackText || "");
+  }
+
+  function resetPdfProgressUi() {
+    var panel = getPdfProgressPanel();
+    var label = getPdfProgressLabel();
+    var eta = getPdfProgressEta();
+    var bar = getPdfProgressBar();
+    if (label) {
+      label.textContent = "";
+    }
+    if (eta) {
+      eta.textContent = "";
+    }
+    if (bar) {
+      bar.value = 0;
+      bar.setAttribute("aria-valuenow", "0");
+    }
+    if (panel) {
+      panel.hidden = true;
+    }
+    window.__propertyInstructionPdfProgressUi = null;
+  }
+
+  function clearReadyPdfObjectUrl() {
+    var anchor = getPdfDownloadAnchor();
+    if (pdfExportController.readyObjectUrlRevokeTimer) {
+      window.clearTimeout(pdfExportController.readyObjectUrlRevokeTimer);
+      pdfExportController.readyObjectUrlRevokeTimer = 0;
+    }
+    if (anchor) {
+      anchor.removeAttribute("href");
+      anchor.removeAttribute("download");
+    }
+    if (!pdfExportController.readyObjectUrl) {
+      return;
+    }
+    if (pdfExportController.readyObjectUrl && window.URL && window.URL.revokeObjectURL) {
+      window.URL.revokeObjectURL(pdfExportController.readyObjectUrl);
+    }
+    pdfExportController.readyObjectUrl = "";
+  }
+
+  function scheduleReadyPdfObjectUrlRevocation() {
+    if (pdfExportController.readyObjectUrlRevokeTimer) {
+      window.clearTimeout(pdfExportController.readyObjectUrlRevokeTimer);
+    }
+    pdfExportController.readyObjectUrlRevokeTimer = window.setTimeout(function () {
+      clearReadyPdfObjectUrl();
+    }, 5 * 60 * 1000);
+  }
+
+  function createReadyPdfObjectUrl(blob) {
+    if (!blob || !window.URL || !window.URL.createObjectURL) {
+      return "";
+    }
+    clearReadyPdfObjectUrl();
+    var objectUrl = window.URL.createObjectURL(blob);
+    pdfExportController.readyObjectUrl = objectUrl;
+    pdfExportController.readyMimeType = blob.type || "";
+    pdfExportController.readySize = blob.size || 0;
+    scheduleReadyPdfObjectUrlRevocation();
+    return objectUrl;
+  }
+
+  function triggerAutomaticPdfDownload(blob, filename) {
+    var anchor = getPdfDownloadAnchor();
+    if (!anchor) {
+      return false;
+    }
+    var objectUrl = createReadyPdfObjectUrl(blob);
+    if (!objectUrl) {
+      return false;
+    }
+    anchor.href = objectUrl;
+    anchor.download = filename;
+    if (!anchor.parentNode) {
+      document.body.appendChild(anchor);
+    }
+    updateTranslationDiagnostics({
+      pdfDownloadAttempt: {
+        mimeType: pdfExportController.readyMimeType,
+        size: pdfExportController.readySize,
+        objectUrlCreated: !!objectUrl,
+        automaticDownloadAttempted: true,
+        clickTimestamp: Date.now(),
+        browserFamily: getBrowserFamily()
+      }
+    });
+    anchor.click();
+    return true;
+  }
+
+  function updatePdfProgressUi(stepName, details) {
+    var panel = getPdfProgressPanel();
+    var label = getPdfProgressLabel();
+    var eta = getPdfProgressEta();
+    var bar = getPdfProgressBar();
+    if (!panel || !label || !bar) {
+      return;
+    }
+
+    var stageDetails = details || {};
+    var progressValue = 0;
+    var labelText = "";
+    switch (stepName) {
+      case "wait-translation":
+        progressValue = 12;
+        labelText = getGuideCopyText("wait_translation", "Waiting for translation");
+        break;
+      case "load-libraries":
+        progressValue = 22;
+        labelText = getGuideCopyText("prepare_dependencies", "Loading PDF tools");
+        break;
+      case "wait-images":
+        progressValue = 32;
+        labelText = getGuideCopyText("prepare_assets", "Preparing photographs, maps and QR codes");
+        break;
+      case "prepare-layout":
+      case "build-export":
+      case "extract-model":
+      case "paginate":
+      case "validate":
+        progressValue = 48;
+        labelText = getGuideCopyText("build_layout", "Building and paginating layout");
+        break;
+      case "render-pdf":
+        progressValue = 52;
+        labelText = getGuideCopyText("render_page", "Rendering page");
+        break;
+      case "finalize-pdf":
+        progressValue = 94;
+        labelText = getGuideCopyText("assemble_pdf", "Encoding and assembling PDF");
+        break;
+      case "prepare-print-preview":
+        progressValue = 98;
+        labelText = getGuideCopyText("prepare_print_preview", "Preparing print preview…");
+        break;
+      case "open-print-dialog":
+        progressValue = 100;
+        labelText = getGuideCopyText("opening_print_dialog", "Opening print dialog…");
+        break;
+      case "download-ready":
+        progressValue = 100;
+        labelText = getGuideCopyText("pdf_ready", "PDF ready");
+        break;
+      case "starting-download":
+        progressValue = 100;
+        labelText = getGuideCopyText("starting_download", "Starting download…");
+        break;
+      case "download-started":
+        progressValue = 100;
+        labelText = getGuideCopyText("download_started", "Download started");
+        break;
+      default:
+        progressValue = 4;
+        labelText = getGuideCopyText("prepare_dependencies", "Loading PDF tools");
+        break;
+    }
+
+    if (stageDetails.pageIndex && stageDetails.pageCount && stepName === "render-pdf") {
+      progressValue = 50 + Math.round((Math.max(0, stageDetails.pageIndex - 1) / Math.max(stageDetails.pageCount, 1)) * 40);
+      labelText = getGuideCopyText("render_page", "Rendering page") + " " + stageDetails.pageIndex + " " + getGuideCopyText("of_total", "of") + " " + stageDetails.pageCount;
+    }
+    progressValue = Math.max(
+      window.__propertyInstructionPdfProgressUi && typeof window.__propertyInstructionPdfProgressUi.value === "number"
+        ? window.__propertyInstructionPdfProgressUi.value
+        : 0,
+      Math.min(progressValue, 100)
+    );
+
+    panel.hidden = false;
+    label.textContent = labelText;
+    bar.value = progressValue;
+    bar.setAttribute("aria-valuenow", String(progressValue));
+
+    var averageHistory = stageDetails.averageHistory || null;
+    var elapsedMs = Number(stageDetails.elapsedMs || 0);
+    if (eta) {
+      if (averageHistory && averageHistory.totalMs && elapsedMs > 0 && progressValue < 100) {
+        var remainingMs = Math.max(0, averageHistory.totalMs - elapsedMs);
+        if (remainingMs >= 1000) {
+          eta.textContent = getGuideCopyText("about_remaining", "About") + " " + Math.max(1, Math.round(remainingMs / 1000)) + " " + getGuideCopyText("seconds_remaining", "seconds remaining");
+        } else {
+          eta.textContent = "";
+        }
+      } else {
+        eta.textContent = "";
+      }
+    }
+
+    window.__propertyInstructionPdfProgressUi = {
+      step: stepName,
+      value: progressValue,
+      label: labelText,
+      eta: eta ? eta.textContent : ""
+    };
   }
 
   function setTranslationStatus(message) {
@@ -369,6 +741,31 @@
       button.disabled = false;
       button.removeAttribute("aria-disabled");
     }
+  }
+
+  function setPdfExportControlsDisabled(disabled) {
+    var shouldDisable = !!disabled;
+    var customSelect = getCustomLanguageSelect();
+    var showOriginalButton = getShowOriginalButton();
+    if (customSelect) {
+      customSelect.disabled = shouldDisable;
+      customSelect.setAttribute("aria-disabled", shouldDisable ? "true" : "false");
+    }
+    if (showOriginalButton) {
+      showOriginalButton.disabled = shouldDisable;
+      showOriginalButton.setAttribute("aria-disabled", shouldDisable ? "true" : "false");
+    }
+  }
+
+  function setGuidePdfActionButtonsDisabled(disabled) {
+    [getDownloadButton(), getPrintButton()].forEach(function (button) {
+      if (!button) {
+        return;
+      }
+      button.disabled = !!disabled;
+      button.classList.toggle("is-disabled", !!disabled);
+      button.setAttribute("aria-disabled", disabled ? "true" : "false");
+    });
   }
 
   function expireCookie(name) {
@@ -434,6 +831,12 @@
   function applyCustomLanguageSelection(nextLanguage) {
     var hiddenSelect = document.querySelector(".goog-te-combo");
     var normalizedLanguage = String(nextLanguage || SOURCE_LANGUAGE).trim().toLowerCase() || SOURCE_LANGUAGE;
+    if (
+      pdfExportController.activePromise &&
+      normalizedLanguage !== (pdfExportController.activeLanguage || SOURCE_LANGUAGE)
+    ) {
+      return;
+    }
     if (normalizedLanguage === SOURCE_LANGUAGE) {
       if (hiddenSelect && Array.prototype.slice.call(hiddenSelect.options || []).some(function (optionNode) {
         return String(optionNode.value || "").trim().toLowerCase() === SOURCE_LANGUAGE;
@@ -580,6 +983,7 @@
     window.__propertyInstructionStickyDiagnostics.toolbarBottomOffset = toolbarBottomOffset;
     window.__propertyInstructionStickyDiagnostics.toolbarHeight = Math.ceil(toolbarRect.height);
     window.__propertyInstructionStickyDiagnostics.toolbarTop = stickyTop;
+    scheduleActiveSectionNavigationSync();
   }
 
   function ensureStickyToolbarObservers() {
@@ -601,49 +1005,78 @@
     scheduleStickyToolbarOffsetSync();
   }
 
+  function getStickyGapPx() {
+    var shell = document.querySelector(".pi-shell");
+    var gapValue = shell ? window.getComputedStyle(shell).getPropertyValue("--pi-sticky-gap") : "";
+    return parseFloat(gapValue || "0") || 0;
+  }
+
+  function getGuideActivationY() {
+    var toolbar = document.querySelector("[data-guide-toolbar]");
+    if (!toolbar) {
+      return 0;
+    }
+    return Math.max(0, toolbar.getBoundingClientRect().bottom + getStickyGapPx());
+  }
+
+  function getActiveGuideSectionId(sectionNodes, activationY, atDocumentBottom) {
+    if (!sectionNodes || !sectionNodes.length) {
+      return "";
+    }
+    if (atDocumentBottom) {
+      return String(
+        sectionNodes[sectionNodes.length - 1].getAttribute("id")
+        || sectionNodes[sectionNodes.length - 1].getAttribute("data-guide-section-anchor")
+        || ""
+      );
+    }
+    var activeId = String(sectionNodes[0].getAttribute("id") || sectionNodes[0].getAttribute("data-guide-section-anchor") || "");
+    sectionNodes.forEach(function (sectionNode) {
+      var rect = sectionNode.getBoundingClientRect();
+      if (rect.top <= activationY) {
+        activeId = String(sectionNode.getAttribute("id") || sectionNode.getAttribute("data-guide-section-anchor") || activeId);
+      }
+    });
+    return activeId;
+  }
+
+  function syncActiveSectionNavigation() {
+    translationState.activeSectionNavFrame = 0;
+    if (window.innerWidth <= 768) {
+      return;
+    }
+    var sectionNodes = Array.prototype.slice.call(document.querySelectorAll("[data-guide-section]"));
+    var navLinks = Array.prototype.slice.call(document.querySelectorAll(".pi-nav a[href^='#']"));
+    if (!sectionNodes.length || !navLinks.length) {
+      return;
+    }
+    var atDocumentBottom = window.scrollY + window.innerHeight >= document.documentElement.scrollHeight - 2;
+    var activeId = getActiveGuideSectionId(sectionNodes, getGuideActivationY(), atDocumentBottom);
+    navLinks.forEach(function (linkNode) {
+      if (String(linkNode.getAttribute("href") || "") === "#" + activeId) {
+        linkNode.setAttribute("aria-current", "location");
+      } else {
+        linkNode.removeAttribute("aria-current");
+      }
+    });
+  }
+
+  function scheduleActiveSectionNavigationSync() {
+    if (translationState.activeSectionNavFrame) {
+      return;
+    }
+    translationState.activeSectionNavFrame = window.requestAnimationFrame(syncActiveSectionNavigation);
+  }
+
   function ensureSectionNavObserver() {
-    if (translationState.sectionNavObserverBound || window.innerWidth <= 768 || !window.IntersectionObserver) {
+    if (translationState.sectionNavObserverBound) {
       return;
     }
     translationState.sectionNavObserverBound = true;
-    var navLinks = Array.prototype.slice.call(document.querySelectorAll(".pi-nav a[href^='#']"));
-    if (!navLinks.length) {
-      return;
-    }
-    var navLinkMap = {};
-    navLinks.forEach(function (linkNode) {
-      var targetId = String(linkNode.getAttribute("href") || "").replace(/^#/, "");
-      if (targetId) {
-        navLinkMap[targetId] = linkNode;
-      }
-    });
-    translationState.sectionNavObserver = new IntersectionObserver(function (entries) {
-      var visibleEntry = entries
-        .filter(function (entry) {
-          return entry.isIntersecting;
-        })
-        .sort(function (leftEntry, rightEntry) {
-          return rightEntry.intersectionRatio - leftEntry.intersectionRatio;
-        })[0];
-      if (!visibleEntry || !visibleEntry.target) {
-        return;
-      }
-      var activeId = visibleEntry.target.getAttribute("id") || visibleEntry.target.getAttribute("data-guide-section-anchor");
-      navLinks.forEach(function (linkNode) {
-        if (String(linkNode.getAttribute("href") || "") === "#" + activeId) {
-          linkNode.setAttribute("aria-current", "location");
-        } else {
-          linkNode.removeAttribute("aria-current");
-        }
-      });
-    }, {
-      root: null,
-      rootMargin: "-20% 0px -60% 0px",
-      threshold: [0.1, 0.35, 0.6]
-    });
-    Array.prototype.slice.call(document.querySelectorAll("[data-guide-section]")).forEach(function (sectionNode) {
-      translationState.sectionNavObserver.observe(sectionNode);
-    });
+    window.addEventListener("scroll", scheduleActiveSectionNavigationSync, { passive: true });
+    window.addEventListener("resize", scheduleActiveSectionNavigationSync, { passive: true });
+    window.addEventListener("hashchange", scheduleActiveSectionNavigationSync);
+    scheduleActiveSectionNavigationSync();
   }
 
   function getGooglePresentationNodes() {
@@ -772,6 +1205,18 @@
     return "";
   }
 
+  function getGuideRootDataAttribute(attributeName) {
+    var guideRoot = getGuideRoot();
+    if (!guideRoot) {
+      return "";
+    }
+    return String(guideRoot.getAttribute(attributeName) || "").trim();
+  }
+
+  function getGuideRootBooleanAttribute(attributeName) {
+    return getGuideRootDataAttribute(attributeName) === "1";
+  }
+
   function isDataUrl(value) {
     return String(value || "").trim().toLowerCase().indexOf("data:") === 0;
   }
@@ -852,6 +1297,125 @@
       return "block:" + (blockForLink ? blockForLink.getAttribute("data-guide-block-id") || "" : "") + ":link_label";
     }
     return "";
+  }
+
+  function collectStructuredContentLinks(structuredContent, sourceNodeId, links, blockId) {
+    (structuredContent || []).forEach(function (item) {
+      if (item.type === "paragraph") {
+        collectStructuredInlineLinks(item.content || [], sourceNodeId, links, blockId);
+      } else if (item.type === "list") {
+        (item.items || []).forEach(function (listItem) {
+          collectStructuredInlineLinks(listItem || [], sourceNodeId, links, blockId);
+        });
+      }
+    });
+  }
+
+  function collectStructuredInlineLinks(inlineContent, sourceNodeId, links, blockId) {
+    (inlineContent || []).forEach(function (part) {
+      if (!part) {
+        return;
+      }
+      if (part.type === "link") {
+        var href = normalizeHref(part.href || "");
+        if (href) {
+          links.push({
+            href: href,
+            label: normalizeText(flattenStructuredInlineContent(part.content || [])) || href,
+            sourceNodeId: sourceNodeId || "",
+            blockId: blockId || ""
+          });
+        }
+      }
+      if (part.content) {
+        collectStructuredInlineLinks(part.content, sourceNodeId, links, blockId);
+      }
+    });
+  }
+
+  function dedupeGuideLinks(links) {
+    var uniqueLinks = [];
+    var seen = {};
+    (links || []).forEach(function (linkEntry) {
+      if (!linkEntry || !linkEntry.href) {
+        return;
+      }
+      var href = normalizeHref(linkEntry.href);
+      if (!href || seen[href]) {
+        return;
+      }
+      seen[href] = true;
+      uniqueLinks.push({
+        href: href,
+        label: normalizeText(linkEntry.label || "") || href,
+        sourceNodeId: linkEntry.sourceNodeId || "",
+        blockId: linkEntry.blockId || "",
+        kind: linkEntry.kind || "external"
+      });
+    });
+    return uniqueLinks;
+  }
+
+  function escapeWifiQrValue(value) {
+    return String(value || "").replace(/([\\\\;,:"])/g, "\\$1");
+  }
+
+  function buildWifiQrPayload(model) {
+    if (!model || !model.showWifiQr || !model.wifiName || !model.wifiName.value) {
+      return null;
+    }
+    var securityType = String(model.wifiSecurityType || "WPA").trim().toUpperCase();
+    var ssid = String(model.wifiName.value || "");
+    var password = model.wifiPassword && model.wifiPassword.value ? String(model.wifiPassword.value) : "";
+    var hidden = !!model.wifiHiddenNetwork;
+    if ((securityType === "WPA" || securityType === "WEP") && !password) {
+      return null;
+    }
+    if (securityType === "OPEN") {
+      return "WIFI:T:nopass;S:" + escapeWifiQrValue(ssid) + ";H:" + (hidden ? "true" : "false") + ";;";
+    }
+    return "WIFI:T:" + securityType + ";S:" + escapeWifiQrValue(ssid) + ";P:" + escapeWifiQrValue(password) + ";H:" + (hidden ? "true" : "false") + ";;";
+  }
+
+  function createQrPngDataUri(payload) {
+    var qrCode = window.qrcodegen.QrCode.encodeText(payload, window.qrcodegen.QrCode.Ecc.MEDIUM);
+    var border = PDF_QR_MODULE_BORDER;
+    var moduleCount = qrCode.size + border * 2;
+    var targetPixels = 384;
+    var moduleScale = Math.max(1, Math.floor(targetPixels / moduleCount));
+    var size = moduleCount * moduleScale;
+    var canvas = document.createElement("canvas");
+    canvas.width = size;
+    canvas.height = size;
+    var context = canvas.getContext("2d", { alpha: false });
+    if (!context) {
+      throw new Error("QR canvas unavailable");
+    }
+    context.imageSmoothingEnabled = false;
+    context.fillStyle = "#ffffff";
+    context.fillRect(0, 0, size, size);
+    context.fillStyle = "#000000";
+    for (var y = 0; y < qrCode.size; y += 1) {
+      for (var x = 0; x < qrCode.size; x += 1) {
+        if (qrCode.getModule(x, y)) {
+          context.fillRect(
+            (x + border) * moduleScale,
+            (y + border) * moduleScale,
+            moduleScale,
+            moduleScale
+          );
+        }
+      }
+    }
+    return canvas.toDataURL("image/png");
+  }
+
+  function getOrCreateQrImageDataUri(payload, qrImageCache) {
+    var cacheKey = hashString(payload);
+    if (!qrImageCache.has(cacheKey)) {
+      qrImageCache.set(cacheKey, createQrPngDataUri(payload));
+    }
+    return qrImageCache.get(cacheKey);
   }
 
   function getSemanticSourceNodes() {
@@ -1010,23 +1574,6 @@
     ].join("::");
   }
 
-  function countMeaningfulSnapshotChanges(currentSnapshot, originalSnapshot) {
-    if (!currentSnapshot || !originalSnapshot) {
-      return 0;
-    }
-    var changedNodes = 0;
-    currentSnapshot.orderedNodeIds.forEach(function (nodeId) {
-      var meta = currentSnapshot.nodeMeta[nodeId] || originalSnapshot.nodeMeta[nodeId] || {};
-      if (meta.kind !== "translatable") {
-        return;
-      }
-      if ((currentSnapshot.nodeMap[nodeId] || "") !== (originalSnapshot.nodeMap[nodeId] || "")) {
-        changedNodes += 1;
-      }
-    });
-    return changedNodes;
-  }
-
   function redactSnapshot(snapshot) {
     if (!snapshot) {
       return null;
@@ -1157,7 +1704,10 @@
     translationState.preparationKey = "";
     pdfPreparationState.preparedState = null;
     pdfPreparationState.warmupPromise = null;
-    pdfPreparationState.warmupKey = "";
+    pdfPreparationState.artifactCache = {};
+    clearReadyPdfObjectUrl();
+    window.__propertyInstructionLastPdfBlob = null;
+    window.__propertyInstructionLastPdfLanguage = "";
   }
 
   function clearTranslationReadyState() {
@@ -1256,6 +1806,7 @@
       translationState.mutationTimestamps = translationState.mutationTimestamps.slice(-120);
       translationState.readySnapshot = null;
       translationState.readyLanguage = "";
+      invalidatePreparedPdfArtifacts();
       syncTranslationLanguageState();
       updateTranslationDiagnostics({
         firstTranslationMutationAt: translationState.firstMutationAt,
@@ -1349,7 +1900,6 @@
         baselineCapturedAt: translationState.baselineCapturedAt,
         widgetScriptRequestedAt: translationState.widgetScriptRequestedAt
       });
-      schedulePdfLibraryWarmup();
     }
   }
 
@@ -1643,7 +2193,7 @@
     while (Date.now() - startedAt < GUIDE_SETTLE_TIMEOUT_MS) {
       var syncedLanguage = syncTranslationLanguageState();
       var currentLanguage = syncedLanguage || getGuideLanguage() || SOURCE_LANGUAGE;
-      var quietFor = Date.now() - translationState.lastMutationAt;
+      var rawQuietFor = Date.now() - translationState.lastMutationAt;
       var currentSnapshot = captureSemanticSnapshot();
       var snapshotAnalysis = analyzeSnapshotState(currentSnapshot, translationState.originalSnapshot, expectedLanguage);
       var progressFingerprint = getSnapshotProgressFingerprint(currentSnapshot, snapshotAnalysis);
@@ -1656,8 +2206,11 @@
         translationState.lastSnapshotProgressFingerprint = progressFingerprint;
         translationState.lastSemanticProgressAt = Date.now();
       }
+      var semanticQuietFor = Date.now() - (translationState.lastSemanticProgressAt || translationState.lastMutationAt || Date.now());
       updateTranslationDiagnostics({
         mutationTimestamps: translationState.mutationTimestamps.slice(-60),
+        semanticQuietForMs: semanticQuietFor,
+        rawQuietForMs: rawQuietFor,
         totalSemanticNodes: currentSnapshot.nodeCount,
         expectedTranslatableNodeCount: snapshotAnalysis.expectedTranslatableNodeIds.length,
         changedTranslatableNodeCount: snapshotAnalysis.changedTranslatableNodeIds.length,
@@ -1674,7 +2227,7 @@
         orderMismatchNodeIds: snapshotAnalysis.orderMismatchNodeIds.slice(),
         sectionReadiness: translationState.sectionReadiness
       });
-      recordTranslationProgress(snapshotAnalysis, quietFor);
+      recordTranslationProgress(snapshotAnalysis, semanticQuietFor);
 
       if (
         !primedSections &&
@@ -1696,7 +2249,7 @@
         !snapshotAnalysis.structureOk ||
         (expectedLanguage !== SOURCE_LANGUAGE && snapshotAnalysis.unexpectedUnchangedTranslatableNodeIds.length > 0) ||
         (expectedLanguage !== SOURCE_LANGUAGE && snapshotAnalysis.changedTranslatableNodeIds.length <= 0) ||
-        quietFor < GUIDE_SETTLE_QUIET_MS
+        semanticQuietFor < GUIDE_SETTLE_QUIET_MS
       ) {
         lastStableSnapshot = null;
         translationState.stablePassTimestamps = [];
@@ -2101,6 +2654,11 @@
         replaceImageWithPlaceholder(img);
         return;
       }
+      if (isDataUrl(fetchUrl)) {
+        img.src = fetchUrl;
+        img.setAttribute("data-export-image-resolved-src", fetchUrl);
+        return;
+      }
       if (!seenUrls[fetchUrl]) {
         seenUrls[fetchUrl] = true;
         uniqueFetchUrls.push(fetchUrl);
@@ -2117,7 +2675,9 @@
     return {
       imageCount: imageNodes.length,
       uniqueFetchCount: uniqueFetchUrls.length,
-      uniqueFetchUrls: uniqueFetchUrls
+      uniqueFetchUrls: uniqueFetchUrls.map(function (url) {
+        return summarizeDiagnosticImageSource(url, "image");
+      })
     };
   }
 
@@ -2238,7 +2798,10 @@
       frame.style.minHeight = "0";
 
       diagnostics.push({
-        src: String(img.getAttribute("data-export-image-original-src") || img.currentSrc || img.src || "").trim(),
+        image: summarizeDiagnosticImageSource(
+          img.getAttribute("data-export-image-original-src") || img.currentSrc || img.src || "",
+          role
+        ),
         role: role,
         naturalWidth: img.naturalWidth,
         naturalHeight: img.naturalHeight,
@@ -2270,7 +2833,7 @@
       var clippedHorizontally = imageRect.left < (frameRect.left - PDF_EXPORT_IMAGE_CLIP_TOLERANCE) || imageRect.right > (frameRect.right + PDF_EXPORT_IMAGE_CLIP_TOLERANCE);
       var clippedVertically = imageRect.top < (frameRect.top - PDF_EXPORT_IMAGE_CLIP_TOLERANCE) || imageRect.bottom > (frameRect.bottom + PDF_EXPORT_IMAGE_CLIP_TOLERANCE);
       var diagnostics = {
-        src: img.currentSrc || img.src || "",
+        image: summarizeDiagnosticImageSource(img.currentSrc || img.src || "", String(img.getAttribute("data-export-image-role") || "image")),
         naturalWidth: img.naturalWidth,
         naturalHeight: img.naturalHeight,
         renderedWidth: Number(imageRect.width.toFixed(2)),
@@ -2329,7 +2892,8 @@
         return {
           href: normalizedHref,
           label: block.linkLabel || normalizedHref,
-          sourceNodeId: block.id ? ("block:" + block.id + ":link_label") : ""
+          sourceNodeId: block.id ? ("block:" + block.id + ":link_label") : "",
+          blockId: block.id || ""
         };
       }
     }
@@ -2400,6 +2964,7 @@
 
     var mapCard = document.querySelector("[data-guide-map-card]");
     var mapLink = document.querySelector("[data-guide-map-link]") || document.querySelector(".pi-hero .pi-btn-primary");
+    var contentsTitleNode = document.querySelector("[data-guide-contents-title]");
     var coverNode = document.querySelector("[data-guide-cover]");
     var languageCode = getGuideLanguage();
     var emptyNode = document.querySelector("[data-guide-empty-state]");
@@ -2419,12 +2984,64 @@
       propertyLongitude = fallbackCoordinates.longitude;
     }
 
+    var guideLinks = [];
+    if (mapLinkHref) {
+      guideLinks.push({
+        href: mapLinkHref,
+        label: getVisibleText(mapLink),
+        sourceNodeId: "map:link_label",
+        kind: "property-map"
+      });
+    }
+    if (parkingLink && parkingLink.href) {
+      guideLinks.push({
+        href: parkingLink.href,
+        label: parkingLink.label || parkingLink.href,
+        sourceNodeId: parkingLink.sourceNodeId || "",
+        blockId: parkingLink.blockId || "",
+        kind: "parking-map"
+      });
+    }
+    sections.forEach(function (sectionModel) {
+      (sectionModel.blocks || []).forEach(function (blockModel) {
+        if (blockModel.linkHref) {
+          guideLinks.push({
+            href: blockModel.linkHref,
+            label: blockModel.linkLabel || blockModel.linkHref,
+            sourceNodeId: blockModel.id ? ("block:" + blockModel.id + ":link_label") : "",
+            blockId: blockModel.id || "",
+            kind: "block-link"
+          });
+        }
+        if (blockModel.mapExternalUrl) {
+          guideLinks.push({
+            href: blockModel.mapExternalUrl,
+            label: blockModel.linkLabel || blockModel.mapExternalUrl,
+            sourceNodeId: blockModel.id ? ("block:" + blockModel.id + ":link_label") : "",
+            blockId: blockModel.id || "",
+            kind: "block-map"
+          });
+        }
+        collectStructuredContentLinks(
+          blockModel.bodyContent || [],
+          blockModel.id ? ("block:" + blockModel.id + ":body") : "",
+          guideLinks,
+          blockModel.id || ""
+        );
+      });
+    });
+
     return {
       languageCode: languageCode,
       direction: getGuideDirection(languageCode),
       title: getGuideTitle(),
       kicker: getVisibleText(guideKicker),
+      contentsTitle: getVisibleText(contentsTitleNode),
+      quickAccessTitle: getGuideCopyText("quick_access", "Quick access"),
       emptyMessage: getVisibleText(emptyNode),
+      showWifiQr: getGuideRootBooleanAttribute("data-guide-show-wifi-qr"),
+      wifiSecurityType: getGuideRootDataAttribute("data-guide-wifi-security-type") || "WPA",
+      wifiHiddenNetwork: getGuideRootBooleanAttribute("data-guide-wifi-hidden-network"),
       coverImage: coverNode ? {
         src: String(coverNode.getAttribute("src") || "").trim(),
         alt: String(coverNode.getAttribute("alt") || "").trim()
@@ -2455,6 +3072,14 @@
         zoom: parseNumericDataAttribute(mapCard, "data-guide-map-parking-zoom") || 15,
         attribution: mapCard ? String(mapCard.getAttribute("data-guide-map-attribution") || "").trim() : ""
       },
+      contentsEntries: sections.map(function (sectionModel) {
+        return {
+          anchor: sectionModel.anchor,
+          title: sectionModel.title,
+          count: (sectionModel.blocks || []).length
+        };
+      }),
+      guideLinks: dedupeGuideLinks(guideLinks),
       sections: sections,
       counts: {
         sections: domSectionCount,
@@ -2484,6 +3109,90 @@
     item.appendChild(label);
     item.appendChild(value);
     parentNode.appendChild(item);
+  }
+
+  function createPdfContentsPanel(documentNode, model) {
+    if (!model.contentsEntries || !model.contentsEntries.length) {
+      return null;
+    }
+    var panel = documentNode.createElement("section");
+    panel.className = "pi-export-contents";
+    panel.setAttribute("data-pdf-contents-panel", "1");
+    var title = documentNode.createElement("h2");
+    title.className = "pi-export-panel-title";
+    title.textContent = model.contentsTitle || getGuideCopyText("in_this_guide", "In this guide");
+    panel.appendChild(title);
+
+    var list = documentNode.createElement("ol");
+    list.className = "pi-export-contents-list";
+    panel.appendChild(list);
+
+    (model.contentsEntries || []).forEach(function (entry) {
+      var item = documentNode.createElement("li");
+      var link = documentNode.createElement("a");
+      link.className = "pi-export-contents-link";
+      link.href = "#" + entry.anchor;
+      link.setAttribute("data-pdf-internal-target", entry.anchor);
+      link.textContent = entry.title || entry.anchor;
+      link.setAttribute("data-export-source-id", "section:" + entry.anchor + ":title");
+      item.appendChild(link);
+      var pageNumber = documentNode.createElement("span");
+      pageNumber.className = "pi-export-contents-page";
+      pageNumber.setAttribute("data-pdf-contents-page", entry.anchor);
+      item.appendChild(pageNumber);
+      list.appendChild(item);
+    });
+    return panel;
+  }
+
+  function createPdfQrPanel(documentNode, titleText, qrEntries, panelClassName) {
+    if (!qrEntries || !qrEntries.length) {
+      return null;
+    }
+    var panel = documentNode.createElement("section");
+    panel.className = panelClassName || "pi-export-quick-access";
+    var title = documentNode.createElement("h2");
+    title.className = "pi-export-panel-title";
+    title.textContent = titleText || getGuideCopyText("quick_access", "Quick access");
+    panel.appendChild(title);
+    var list = documentNode.createElement("div");
+    list.className = "pi-export-qr-grid";
+    panel.appendChild(list);
+
+    qrEntries.forEach(function (entry) {
+      var card = documentNode.createElement("article");
+      card.className = "pi-export-qr-card";
+      if (entry.linkHref) {
+        var link = documentNode.createElement("a");
+        link.href = entry.linkHref;
+        link.target = "_blank";
+        link.rel = "noopener noreferrer nofollow";
+        link.className = "pi-export-qr-link";
+        link.textContent = entry.label;
+        if (entry.sourceNodeId) {
+          link.setAttribute("data-export-source-id", entry.sourceNodeId);
+        }
+        card.appendChild(link);
+      } else {
+        var text = documentNode.createElement("p");
+        text.className = "pi-export-qr-label";
+        text.textContent = entry.label;
+        card.appendChild(text);
+      }
+      card.appendChild(
+        createManagedImage(documentNode, {
+          src: entry.qrImageSrc,
+          alt: entry.label || "",
+          className: "pi-export-qr-image",
+          frameClassName: "pi-export-image-frame pi-export-qr-frame",
+          imageRole: "qr",
+          placeholderClass: "pi-export-image-placeholder"
+        }, [])
+      );
+      list.appendChild(card);
+    });
+
+    return panel;
   }
 
   function createExportRoot() {
@@ -2665,9 +3374,30 @@
       exportDocument.appendChild(mapSection);
     }
 
+    var pageOneExtras = document.createElement("section");
+    pageOneExtras.className = "pi-export-page-one-extras";
+    var contentsPanel = createPdfContentsPanel(document, model);
+    if (contentsPanel) {
+      pageOneExtras.appendChild(contentsPanel);
+    }
+    var quickAccessPanel = createPdfQrPanel(
+      document,
+      model.quickAccessTitle,
+      model.quickAccessEntries || [],
+      "pi-export-quick-access"
+    );
+    if (quickAccessPanel) {
+      pageOneExtras.appendChild(quickAccessPanel);
+    }
+    if (pageOneExtras.childNodes.length) {
+      pageOneExtras.setAttribute("data-pdf-section-item", "1");
+      exportDocument.appendChild(pageOneExtras);
+    }
+
     model.sections.forEach(function (sectionModel) {
       var section = document.createElement("section");
       section.className = "pi-export-section";
+      section.setAttribute("data-pdf-section-anchor", sectionModel.anchor || "");
 
       var sectionTitle = document.createElement("h2");
       sectionTitle.className = "pi-export-section-title";
@@ -2682,6 +3412,7 @@
       ) {
         var parkingMap = document.createElement("div");
         parkingMap.className = "pi-export-parking-map";
+        parkingMap.setAttribute("data-pdf-section-item", "1");
 
         if (model.parkingMap.imageSrc) {
           parkingMap.appendChild(
@@ -2713,6 +3444,7 @@
       sectionModel.blocks.forEach(function (blockModel) {
         var card = document.createElement("article");
         card.className = "pi-export-card pi-export-card--" + String(blockModel.type || "text").toLowerCase().replace(/\s+/g, "-");
+        card.setAttribute("data-pdf-section-item", "1");
 
         if (blockModel.type === "Warning") {
           card.classList.add("pi-export-card--warning");
@@ -2803,6 +3535,22 @@
           link.setAttribute("data-export-source-id", "block:" + blockModel.id + ":link_label");
           linkWrap.appendChild(link);
           textColumn.appendChild(linkWrap);
+        }
+
+        if (blockModel.qrEntries && blockModel.qrEntries.length) {
+          var blockQrPanel = createPdfQrPanel(
+            document,
+            "",
+            blockModel.qrEntries,
+            "pi-export-card-qr-panel"
+          );
+          if (blockQrPanel) {
+            var panelTitle = blockQrPanel.querySelector(".pi-export-panel-title");
+            if (panelTitle && panelTitle.parentNode) {
+              panelTitle.parentNode.removeChild(panelTitle);
+            }
+            textColumn.appendChild(blockQrPanel);
+          }
         }
 
         if (blockModel.mapAttribution && !blockModel.mapImageSrc) {
@@ -2906,17 +3654,26 @@
   function createSectionSlice(documentNode, titleNode) {
     var section = documentNode.createElement("section");
     section.className = "pi-export-section";
+    var parentSection = titleNode && titleNode.parentNode && titleNode.parentNode.classList && titleNode.parentNode.classList.contains("pi-export-section")
+      ? titleNode.parentNode
+      : null;
+    if (parentSection) {
+      var sectionAnchor = String(parentSection.getAttribute("data-pdf-section-anchor") || "").trim();
+      if (sectionAnchor) {
+        section.setAttribute("data-pdf-section-anchor", sectionAnchor);
+      }
+    }
 
     var sectionTitle = titleNode.cloneNode(true);
     section.appendChild(sectionTitle);
 
-    var cards = documentNode.createElement("div");
-    cards.className = "pi-export-section-cards";
-    section.appendChild(cards);
+    var items = documentNode.createElement("div");
+    items.className = "pi-export-section-items";
+    section.appendChild(items);
 
     return {
       section: section,
-      cards: cards
+      items: items
     };
   }
 
@@ -2924,6 +3681,7 @@
     var documentNode = exportState.exportDocument.ownerDocument;
     var exportPages = documentNode.createElement("div");
     exportPages.className = "pi-export-pages";
+    var sourcePaginatableItemCount = exportState.exportDocument.querySelectorAll("[data-pdf-section-item='1']").length;
     exportState.exportPage.innerHTML = "";
     exportState.exportPage.appendChild(exportPages);
 
@@ -2949,30 +3707,32 @@
     Array.from(exportState.exportDocument.children).forEach(function (childNode) {
       if (childNode.classList.contains("pi-export-section")) {
         var sectionTitle = childNode.querySelector(".pi-export-section-title");
-        var sourceCards = Array.from(childNode.querySelectorAll(".pi-export-card"));
+        var sourceItems = Array.from(childNode.children).filter(function (sectionChild) {
+          return sectionChild !== sectionTitle && sectionChild.getAttribute("data-pdf-section-item") === "1";
+        });
         var sectionSlice = createSectionSlice(documentNode, sectionTitle);
         pageState.body.appendChild(sectionSlice.section);
 
-        sourceCards.forEach(function (sourceCard) {
-          sectionSlice.cards.appendChild(sourceCard);
+        sourceItems.forEach(function (sourceItem) {
+          sectionSlice.items.appendChild(sourceItem);
 
           if (pageBodyOverflows(pageState)) {
-            sectionSlice.cards.removeChild(sourceCard);
+            sectionSlice.items.removeChild(sourceItem);
 
-            if (!sectionSlice.cards.children.length) {
+            if (!sectionSlice.items.children.length) {
               pageState.body.removeChild(sectionSlice.section);
             }
 
             newPage();
             sectionSlice = createSectionSlice(documentNode, sectionTitle);
             pageState.body.appendChild(sectionSlice.section);
-            sectionSlice.cards.appendChild(sourceCard);
+            sectionSlice.items.appendChild(sourceItem);
           }
 
           pageState.hasContent = true;
         });
 
-        if (!sectionSlice.cards.children.length && sectionSlice.section.parentNode === pageState.body) {
+        if (!sectionSlice.items.children.length && sectionSlice.section.parentNode === pageState.body) {
           pageState.body.removeChild(sectionSlice.section);
         }
         return;
@@ -2982,6 +3742,10 @@
     });
 
     exportState.exportPages = exportPages;
+    var paginatedItemCount = exportPages.querySelectorAll("[data-pdf-section-item='1']").length;
+    if (sourcePaginatableItemCount !== paginatedItemCount) {
+      throw new Error("PDF pagination dropped export content");
+    }
     return exportState;
   }
 
@@ -3009,6 +3773,40 @@
       footer.appendChild(left);
       footer.appendChild(right);
     });
+  }
+
+  function resolvePdfContentsDestinations(exportState) {
+    var destinations = {};
+    var pageNodes = Array.prototype.slice.call(exportState.exportPages.querySelectorAll(".pi-export-page"));
+    pageNodes.forEach(function (pageNode, pageIndex) {
+      var pageRect = pageNode.getBoundingClientRect();
+      Array.prototype.slice.call(pageNode.querySelectorAll("[data-pdf-section-anchor]")).forEach(function (sectionNode) {
+        var anchor = String(sectionNode.getAttribute("data-pdf-section-anchor") || "").trim();
+        if (!anchor || destinations[anchor]) {
+          return;
+        }
+        var sectionRect = sectionNode.getBoundingClientRect();
+        destinations[anchor] = {
+          pageNumber: pageIndex + 1,
+          topRatio: pageRect.height ? Math.max(0, (sectionRect.top - pageRect.top) / pageRect.height) : 0
+        };
+      });
+    });
+    return destinations;
+  }
+
+  function populatePdfContentsDestinations(exportState) {
+    var startedAt = Date.now();
+    var destinations = resolvePdfContentsDestinations(exportState);
+    Array.prototype.slice.call(exportState.exportRoot.querySelectorAll("[data-pdf-contents-page]")).forEach(function (pageNode) {
+      var anchor = String(pageNode.getAttribute("data-pdf-contents-page") || "").trim();
+      var destination = destinations[anchor];
+      pageNode.textContent = destination ? String(destination.pageNumber) : "";
+    });
+    exportState.contentsDestinations = destinations;
+    recordPdfPerformance(getPdfPerformanceState(), "contentsResolutionMs", startedAt);
+    window.__propertyInstructionPdfContentsDestinations = destinations;
+    return destinations;
   }
 
   function buildModelParityMap(model) {
@@ -3285,6 +4083,15 @@
     }
   }
 
+  async function ensureQrCodeLibrary() {
+    await loadScriptOnce("propms-qrcodegen", QRCODE_LIBRARY_URL, function () {
+      return !!(window.qrcodegen && window.qrcodegen.QrCode && window.qrcodegen.QrCode.Ecc);
+    });
+    if (!(window.qrcodegen && window.qrcodegen.QrCode && window.qrcodegen.QrCode.Ecc)) {
+      throw new Error("QR library unavailable");
+    }
+  }
+
   function collectModelImageSources(model) {
     var imageSources = [];
     function pushSource(sourceUrl) {
@@ -3442,6 +4249,16 @@
     });
   }
 
+  async function getOrCreateDecodedTileImage(tileUrl, exportImageDataCache, decodedTileImageCache) {
+    if (!decodedTileImageCache.has(tileUrl)) {
+      decodedTileImageCache.set(tileUrl, (async function () {
+        var tileDataUri = await getExportImageDataUri(tileUrl, exportImageDataCache);
+        return loadImageFromDataUri(tileDataUri);
+      })());
+    }
+    return decodedTileImageCache.get(tileUrl);
+  }
+
   function sampleCanvasPaintStats(sourceCanvas) {
     if (!sourceCanvas || !sourceCanvas.width || !sourceCanvas.height) {
       return {
@@ -3498,54 +4315,6 @@
       nonWhiteRatio: Number(nonWhiteRatio.toFixed(4)),
       painted: variance > 8 || (nonWhiteRatio > 0.05 && nonWhiteRatio < 0.98)
     };
-  }
-
-  async function waitForMapCanvasPaint(map, diagnostic, timeoutMs) {
-    var startedAt = Date.now();
-    var lastPaintStats = null;
-
-    while (Date.now() - startedAt < timeoutMs) {
-      map.resize();
-      map.triggerRepaint();
-      await sleep(250);
-
-      var renderCanvas = map.getCanvas();
-      if (!renderCanvas || !renderCanvas.width || !renderCanvas.height) {
-        continue;
-      }
-
-      try {
-        lastPaintStats = sampleCanvasPaintStats(renderCanvas);
-      } catch (error) {
-        diagnostic.events.push({
-          type: "paint-sample-error",
-          timestamp: Date.now(),
-          message: error && error.message ? error.message : "paint-sample-error"
-        });
-        continue;
-      }
-
-      diagnostic.lastPaintStats = lastPaintStats;
-      diagnostic.events.push({
-        type: "paint-sample",
-        timestamp: Date.now(),
-        painted: !!lastPaintStats.painted,
-        variance: lastPaintStats.variance,
-        nonWhiteRatio: lastPaintStats.nonWhiteRatio,
-        tilesLoaded: typeof map.areTilesLoaded === "function" ? !!map.areTilesLoaded() : true
-      });
-
-      if (lastPaintStats.painted) {
-        return {
-          canvas: renderCanvas,
-          paintStats: lastPaintStats
-        };
-      }
-    }
-
-    var paintError = new Error("map-render-timeout");
-    paintError.lastPaintStats = lastPaintStats;
-    throw paintError;
   }
 
   async function renderStaticMapSnapshot(mapConfig, exportImageDataCache) {
@@ -3622,8 +4391,11 @@
         if (!resolvedTileUrl) {
           throw new Error("map-tile-load-failed");
         }
-        var tileDataUri = await getExportImageDataUri(resolvedTileUrl, exportImageDataCache);
-        var tileImage = await loadImageFromDataUri(tileDataUri);
+        var tileImage = await getOrCreateDecodedTileImage(
+          resolvedTileUrl,
+          exportImageDataCache,
+          pdfPreparationState.decodedTileImageCache
+        );
         var drawX = Math.round((tileRequest.tileX * 256) - leftWorldX);
         var drawY = Math.round((tileRequest.tileY * 256) - topWorldY);
         tileContext.drawImage(tileImage, drawX, drawY, 256, 256);
@@ -3686,11 +4458,92 @@
     return mapImageCache.get(cacheKey);
   }
 
+  function buildQuickAccessEntries(model) {
+    var quickEntries = [];
+    var remainingLinks = (model.guideLinks || []).slice();
+    var wifiPayload = buildWifiQrPayload(model);
+    if (wifiPayload) {
+      quickEntries.push({
+        kind: "wifi",
+        label: ((model.wifiName && model.wifiName.label) || "Wi-Fi") + ": " + ((model.wifiName && model.wifiName.value) || ""),
+        linkHref: "",
+        sourceNodeId: (model.wifiName && model.wifiName.valueNodeId) || "",
+        payload: wifiPayload
+      });
+    }
+
+    var propertyMapIndex = remainingLinks.findIndex(function (entry) {
+      return entry.kind === "property-map";
+    });
+    if (propertyMapIndex !== -1) {
+      var propertyMapEntry = remainingLinks.splice(propertyMapIndex, 1)[0];
+      quickEntries.push({
+        kind: propertyMapEntry.kind,
+        label: propertyMapEntry.label,
+        linkHref: propertyMapEntry.href,
+        sourceNodeId: propertyMapEntry.sourceNodeId || "",
+        blockId: propertyMapEntry.blockId || "",
+        payload: propertyMapEntry.href
+      });
+    }
+
+    return {
+      quickAccessEntries: quickEntries,
+      remainingLinkEntries: remainingLinks.map(function (entry) {
+        return {
+          kind: entry.kind,
+          label: entry.label,
+          linkHref: entry.href,
+          sourceNodeId: entry.sourceNodeId || "",
+          blockId: entry.blockId || "",
+          payload: entry.href
+        };
+      })
+    };
+  }
+
+  function assignQrImagesToEntries(entries, qrImageCache) {
+    return (entries || []).map(function (entry) {
+      return Object.assign({}, entry, {
+        qrImageSrc: getOrCreateQrImageDataUri(entry.payload, qrImageCache)
+      });
+    });
+  }
+
+  function attachBlockQrEntries(model, remainingEntries, qrImageCache) {
+    var blockEntryMap = {};
+    (remainingEntries || []).forEach(function (entry) {
+      if (!entry || !entry.blockId || !entry.linkHref) {
+        return;
+      }
+      blockEntryMap[entry.blockId] = blockEntryMap[entry.blockId] || [];
+      if (!blockEntryMap[entry.blockId].some(function (existingEntry) {
+        return existingEntry.linkHref === entry.linkHref;
+      })) {
+        blockEntryMap[entry.blockId].push(Object.assign({}, entry, {
+          qrImageSrc: getOrCreateQrImageDataUri(entry.payload, qrImageCache)
+        }));
+      }
+    });
+
+    (model.sections || []).forEach(function (sectionModel) {
+      (sectionModel.blocks || []).forEach(function (blockModel) {
+        blockModel.qrEntries = (blockEntryMap[blockModel.id] || []).slice();
+      });
+    });
+  }
+
   async function prepareGuideModelAssets(model, exportImageDataCache, mapImageCache) {
     var preparedModel = deepCloneModel(model);
     var imageDiagnostics = await prewarmImageDataCacheForModel(preparedModel, exportImageDataCache);
     var mapStartedAt = Date.now();
+    var mapRenderPlan = {
+      propertyMap: !!(preparedModel.map && Number.isFinite(preparedModel.map.latitude) && Number.isFinite(preparedModel.map.longitude)),
+      parkingMap: false,
+      blockMapIds: []
+    };
     var mapDiagnostics = {
+      plan: mapRenderPlan,
       propertyMap: null,
       parkingMap: null,
       blockMaps: []
@@ -3698,7 +4551,7 @@
 
     try {
       if (Number.isFinite(preparedModel.map.latitude) && Number.isFinite(preparedModel.map.longitude)) {
-        mapDiagnostics.propertyMap = await getOrCreateMapSnapshot({
+        var propertyMapSnapshot = await getOrCreateMapSnapshot({
           kind: "property",
           latitude: preparedModel.map.latitude,
           longitude: preparedModel.map.longitude,
@@ -3709,11 +4562,16 @@
           markerCoordinateSource: preparedModel.map.coordinateSource || "property_center",
           zoom: preparedModel.map.zoom || 16,
           width: 760,
-          height: 300,
+          height: 220,
           attribution: "© OpenStreetMap contributors"
         }, mapImageCache, exportImageDataCache);
-        preparedModel.map.imageSrc = mapDiagnostics.propertyMap.dataUri;
-        preparedModel.map.attribution = mapDiagnostics.propertyMap.attribution || preparedModel.map.attribution;
+        preparedModel.map.imageSrc = propertyMapSnapshot.dataUri;
+        preparedModel.map.attribution = propertyMapSnapshot.attribution || preparedModel.map.attribution;
+        mapDiagnostics.propertyMap = {
+          code: "ok",
+          durationMs: propertyMapSnapshot.durationMs || 0,
+          image: summarizeDiagnosticImageSource(propertyMapSnapshot.dataUri, "map")
+        };
       }
     } catch (error) {
       mapDiagnostics.propertyMap = {
@@ -3722,29 +4580,9 @@
     }
 
     try {
-      if (
-        preparedModel.parkingMap &&
-        preparedModel.parkingMap.linkHref &&
-        Number.isFinite(preparedModel.parkingMap.latitude) &&
-        Number.isFinite(preparedModel.parkingMap.longitude)
-      ) {
-        mapDiagnostics.parkingMap = await getOrCreateMapSnapshot({
-          kind: "parking",
-          latitude: preparedModel.parkingMap.latitude,
-          longitude: preparedModel.parkingMap.longitude,
-          centerLatitude: preparedModel.parkingMap.latitude,
-          centerLongitude: preparedModel.parkingMap.longitude,
-          markerLatitude: preparedModel.parkingMap.latitude,
-          markerLongitude: preparedModel.parkingMap.longitude,
-          markerCoordinateSource: preparedModel.parkingMap.coordinateSource || "parking_center",
-          zoom: preparedModel.parkingMap.zoom || 15,
-          width: 760,
-          height: 260,
-          attribution: "© OpenStreetMap contributors"
-        }, mapImageCache, exportImageDataCache);
-        preparedModel.parkingMap.imageSrc = mapDiagnostics.parkingMap.dataUri;
-        preparedModel.parkingMap.attribution = mapDiagnostics.parkingMap.attribution || preparedModel.parkingMap.attribution;
-      }
+      mapDiagnostics.parkingMap = {
+        code: "omitted-by-render-plan"
+      };
     } catch (error) {
       mapDiagnostics.parkingMap = {
         code: error && error.message ? error.message : "map-render-failed"
@@ -3759,6 +4597,7 @@
           continue;
         }
         if (Number.isFinite(blockModel.mapLatitude) && Number.isFinite(blockModel.mapLongitude)) {
+          mapRenderPlan.blockMapIds.push(blockModel.id);
           try {
             var blockMapSnapshot = await getOrCreateMapSnapshot({
               kind: "block-" + (blockModel.id || "map"),
@@ -3778,7 +4617,9 @@
             blockModel.mapAttribution = blockMapSnapshot.attribution || blockModel.mapAttribution;
             mapDiagnostics.blockMaps.push({
               blockId: blockModel.id,
-              code: "ok"
+              code: "ok",
+              durationMs: blockMapSnapshot.durationMs || 0,
+              image: summarizeDiagnosticImageSource(blockMapSnapshot.dataUri, "map")
             });
           } catch (error) {
             mapDiagnostics.blockMaps.push({
@@ -3795,11 +4636,22 @@
       }
     }
 
+    var qrStartedAt = Date.now();
+    var qrEntries = buildQuickAccessEntries(preparedModel);
+    preparedModel.quickAccessEntries = assignQrImagesToEntries(qrEntries.quickAccessEntries, pdfPreparationState.qrImageCache);
+    attachBlockQrEntries(preparedModel, qrEntries.remainingLinkEntries, pdfPreparationState.qrImageCache);
+    var qrDiagnostics = {
+      quickAccessCount: preparedModel.quickAccessEntries.length,
+      blockQrCount: qrEntries.remainingLinkEntries.length
+    };
+
     return {
       model: preparedModel,
       imageDiagnostics: imageDiagnostics,
       mapPreparationMs: Date.now() - mapStartedAt,
-      mapDiagnostics: mapDiagnostics
+      mapDiagnostics: mapDiagnostics,
+      qrGenerationMs: Date.now() - qrStartedAt,
+      qrDiagnostics: qrDiagnostics
     };
   }
 
@@ -3836,6 +4688,9 @@
       }
 
       var model = extractGuideModel();
+      if (buildWifiQrPayload(model) || (model.guideLinks || []).length) {
+        await ensureQrCodeLibrary();
+      }
       var preparedAssets = await prepareGuideModelAssets(
         model,
         pdfPreparationState.imageDataCache,
@@ -3852,16 +4707,18 @@
         imageDataCache: pdfPreparationState.imageDataCache,
         preparedAt: Date.now(),
         mapPreparationMs: preparedAssets.mapPreparationMs,
+        qrGenerationMs: preparedAssets.qrGenerationMs,
         mapDiagnostics: preparedAssets.mapDiagnostics,
+        qrDiagnostics: preparedAssets.qrDiagnostics,
         imageWarmDiagnostics: preparedAssets.imageDiagnostics
       };
       pdfPreparationState.preparedState = preparedState;
-      pdfPreparationState.preparedStatesByKey[preparationKey] = preparedState;
       getPdfPerformanceState().translationReadyToExportPreparedMs =
         translationState.readyAt
           ? Math.max(0, preparedState.preparedAt - translationState.readyAt)
           : (Date.now() - preparationStartedAt);
       getPdfPerformanceState().mapPreparationMs = preparedAssets.mapPreparationMs;
+      getPdfPerformanceState().qrGenerationMs = preparedAssets.qrGenerationMs;
       return preparedState;
     })().finally(function () {
       if (translationState.preparationKey === preparationKey) {
@@ -3880,12 +4737,11 @@
       return;
     }
     translationState.warmupScheduled = true;
-    translationState.warmupIdleHandle = requestIdleWork(function () {
+    requestIdleWork(function () {
       var warmupButton = downloadButton || document.querySelector(".pi-pdf-download");
       var warmupGeneration = translationState.generation;
       var warmupLanguage = translationState.requestedLanguage || SOURCE_LANGUAGE;
       translationState.warmupScheduled = false;
-      translationState.warmupIdleHandle = null;
       schedulePdfLibraryWarmup();
       if (!translationState.readySnapshot || !getCurrentSnapshotIfReady(warmupLanguage, warmupGeneration)) {
         return null;
@@ -3909,15 +4765,15 @@
     }, PDF_WARM_PREPARE_TIMEOUT_MS);
   }
 
-  function cachePdfBlob(cacheKey, pdfBlob) {
-    pdfPreparationState.blobCache[cacheKey] = {
-      blob: pdfBlob,
+  function cachePdfArtifact(cacheKey, artifact) {
+    pdfPreparationState.artifactCache = {};
+    pdfPreparationState.artifactCache[cacheKey] = Object.assign({
       cachedAt: Date.now()
-    };
+    }, artifact || {});
   }
 
-  function getCachedPdfBlob(cacheKey) {
-    return pdfPreparationState.blobCache[cacheKey] || null;
+  function getCachedPdfArtifact(cacheKey) {
+    return pdfPreparationState.artifactCache[cacheKey] || null;
   }
 
   function withTimeout(promise, timeoutMs, message) {
@@ -3931,19 +4787,32 @@
     ]);
   }
 
-  function updateExportProgress(downloadButton, statusElement, buttonLabel, statusMessage, stepName) {
+  function updateExportProgress(downloadButton, statusElement, buttonLabel, statusMessage, stepName, extraDetails) {
     var currentLabel = downloadButton ? String(downloadButton.getAttribute("data-progress-label") || downloadButton.textContent || "").trim() : "";
     if (downloadButton) {
       if (buttonLabel) {
-        downloadButton.textContent = buttonLabel;
+        setToolbarButtonLabel(downloadButton, buttonLabel);
       } else if (currentLabel) {
-        downloadButton.textContent = currentLabel + "…";
+        setToolbarButtonLabel(downloadButton, currentLabel + "…");
       }
     }
     if (statusElement) {
       statusElement.textContent = statusMessage || "…";
     }
     window.__propertyInstructionPdfStep = stepName || "";
+    updatePdfProgressUi(stepName || "", extraDetails || {});
+  }
+
+  function setToolbarButtonLabel(button, labelText) {
+    if (!button) {
+      return;
+    }
+    var labelNode = button.querySelector(".pi-toolbar-action-label");
+    if (labelNode) {
+      labelNode.textContent = String(labelText || "");
+      return;
+    }
+    button.textContent = String(labelText || "");
   }
 
   function waitForFonts() {
@@ -3964,13 +4833,23 @@
   }
 
   function describeImageNode(img) {
-    return {
-      alt: img.alt || "",
-      currentSrc: img.currentSrc || img.src || "",
+    return Object.assign(
+      summarizeDiagnosticImageSource(
+        img.currentSrc || img.src || "",
+        String(img.getAttribute("data-export-image-role") || "image"),
+        {
+          originalSourceKind: summarizeDiagnosticImageSource(
+            img.getAttribute("data-export-image-original-src") || "",
+            String(img.getAttribute("data-export-image-role") || "image")
+          ).sourceKind
+        }
+      ),
+      {
       complete: !!img.complete,
       naturalWidth: img.naturalWidth || 0,
       naturalHeight: img.naturalHeight || 0
-    };
+      }
+    );
   }
 
   function waitForImages(exportRoot) {
@@ -4080,11 +4959,16 @@
   function assertExportImageSourcesAreCapturable(exportRoot) {
     return Array.prototype.slice.call(exportRoot.querySelectorAll("img")).map(function (img) {
       var resolvedSource = String(img.getAttribute("data-export-image-resolved-src") || img.currentSrc || img.src || "").trim();
-      var diagnostics = {
-        role: String(img.getAttribute("data-export-image-role") || "image"),
-        originalSrc: String(img.getAttribute("data-export-image-original-src") || "").trim(),
-        resolvedSrc: resolvedSource
-      };
+      var diagnostics = summarizeDiagnosticImageSource(
+        resolvedSource,
+        String(img.getAttribute("data-export-image-role") || "image"),
+        {
+          originalSourceKind: summarizeDiagnosticImageSource(
+            img.getAttribute("data-export-image-original-src") || "",
+            String(img.getAttribute("data-export-image-role") || "image")
+          ).sourceKind
+        }
+      );
 
       if (!resolvedSource) {
         throw new Error("One or more export images are missing a resolved source.");
@@ -4126,15 +5010,22 @@
         return sum + (delta * delta);
       }, 0) / Math.max(samples.length, 1);
       return {
-        role: String(img.getAttribute("data-export-image-role") || "image"),
-        originalSrc: String(img.getAttribute("data-export-image-original-src") || "").trim(),
-        resolvedSrc: source,
+        image: summarizeDiagnosticImageSource(
+          source,
+          String(img.getAttribute("data-export-image-role") || "image"),
+          {
+            originalSourceKind: summarizeDiagnosticImageSource(
+              img.getAttribute("data-export-image-original-src") || "",
+              String(img.getAttribute("data-export-image-role") || "image")
+            ).sourceKind
+          }
+        ),
         paintable: alphaPixels > 0 && variance > 0.5,
         alphaPixels: alphaPixels,
         sampleVariance: Number(variance.toFixed(4))
       };
     } catch (error) {
-      throw new Error("Export image could not be painted to canvas: " + source);
+      throw new Error("Export image could not be painted to canvas");
     }
   }
 
@@ -4142,7 +5033,7 @@
     return Array.prototype.slice.call(exportRoot.querySelectorAll("img")).map(function (img) {
       var diagnostics = verifyImageCanPaintToCanvas(img);
       if (!diagnostics.paintable) {
-        throw new Error("Export image could not be painted to canvas: " + diagnostics.resolvedSrc);
+        throw new Error("Export image could not be painted to canvas");
       }
       return diagnostics;
     });
@@ -4203,9 +5094,16 @@
       var region = analyzeCanvasRegion(canvasContext, canvas, left, top, clampedWidth, clampedHeight);
       var painted = region.variance > 12 && region.nonWhiteCoverage > 0.05;
       diagnostics.push({
-        role: String(img.getAttribute("data-export-image-role") || "image"),
-        originalSrc: String(img.getAttribute("data-export-image-original-src") || "").trim(),
-        resolvedSrc: String(img.getAttribute("data-export-image-resolved-src") || img.currentSrc || img.src || "").trim(),
+        image: summarizeDiagnosticImageSource(
+          img.getAttribute("data-export-image-resolved-src") || img.currentSrc || img.src || "",
+          String(img.getAttribute("data-export-image-role") || "image"),
+          {
+            originalSourceKind: summarizeDiagnosticImageSource(
+              img.getAttribute("data-export-image-original-src") || "",
+              String(img.getAttribute("data-export-image-role") || "image")
+            ).sourceKind
+          }
+        ),
         page: pageIndex + 1,
         canvasRegion: {
           left: left,
@@ -4238,7 +5136,14 @@
       var renderedRatio = rect.width / rect.height;
       var ratioDifference = Math.abs(renderedRatio - naturalRatio) / naturalRatio;
       var diagnostics = {
-        src: img.currentSrc || img.src || "",
+        image: summarizeDiagnosticImageSource(
+          img.currentSrc || img.src || "",
+          role,
+          {
+            naturalWidth: img.naturalWidth,
+            naturalHeight: img.naturalHeight
+          }
+        ),
         naturalWidth: img.naturalWidth,
         naturalHeight: img.naturalHeight,
         renderedWidth: Number(rect.width.toFixed(2)),
@@ -4250,34 +5155,10 @@
       };
 
       if (role !== "map" && ratioDifference > PDF_EXPORT_IMAGE_RATIO_TOLERANCE) {
-        throw new Error("Export image aspect ratio changed beyond tolerance for " + diagnostics.src);
+        throw new Error("Export image aspect ratio changed beyond tolerance");
       }
 
       return diagnostics;
-    });
-  }
-
-  function applyCaptureIgnoreAttributes(exportRoot, currentPageNode) {
-    var ignoredNodes = [];
-    function mark(node) {
-      if (!node || node.getAttribute("data-html2canvas-ignore") === "true") {
-        return;
-      }
-      node.setAttribute("data-html2canvas-ignore", "true");
-      ignoredNodes.push(node);
-    }
-    mark(getGuideRoot());
-    Array.prototype.slice.call(exportRoot.querySelectorAll("[data-pdf-page]")).forEach(function (pageNode) {
-      if (pageNode !== currentPageNode) {
-        mark(pageNode);
-      }
-    });
-    return ignoredNodes;
-  }
-
-  function clearCaptureIgnoreAttributes(ignoredNodes) {
-    (ignoredNodes || []).forEach(function (node) {
-      node.removeAttribute("data-html2canvas-ignore");
     });
   }
 
@@ -4484,8 +5365,10 @@
   function addPageLinkAnnotations(pdf, pageNode, pdfWidth, pdfHeight) {
     var pageRect = pageNode.getBoundingClientRect();
     Array.prototype.slice.call(pageNode.querySelectorAll("a[href]")).forEach(function (anchor) {
+      var internalTarget = String(anchor.getAttribute("data-pdf-internal-target") || "").trim();
       var href = normalizeHref(anchor.getAttribute("href") || anchor.href || "");
-      if (!href) {
+      var destination = internalTarget ? (((window.__propertyInstructionPdfContentsDestinations || {})[internalTarget]) || null) : null;
+      if (!href && !destination) {
         return;
       }
       Array.prototype.slice.call(anchor.getClientRects()).forEach(function (rect) {
@@ -4496,26 +5379,39 @@
         var y = ((rect.top - pageRect.top) / pageRect.height) * pdfHeight;
         var width = (rect.width / pageRect.width) * pdfWidth;
         var height = (rect.height / pageRect.height) * pdfHeight;
+        if (destination) {
+          pdf.link(x, y, width, height, {
+            pageNumber: destination.pageNumber,
+            top: Number((destination.topRatio * pdfHeight).toFixed(2))
+          });
+          return;
+        }
         pdf.link(x, y, width, height, { url: href });
       });
     });
   }
 
-  function triggerBlobDownload(blob, filename) {
-    var objectUrl = window.URL.createObjectURL(blob);
-    var temporaryLink = document.createElement("a");
-    temporaryLink.href = objectUrl;
-    temporaryLink.download = filename;
-    temporaryLink.rel = "noopener";
-    document.body.appendChild(temporaryLink);
-    temporaryLink.click();
-    temporaryLink.remove();
-    window.setTimeout(function () {
-      window.URL.revokeObjectURL(objectUrl);
-    }, 1000);
+  async function encodeCanvasToJpegBlob(canvas) {
+    if (!canvas) {
+      throw new Error("Unable to encode PDF page image.");
+    }
+    if (!canvas.toBlob) {
+      var fallbackDataUrl = canvas.toDataURL("image/jpeg", 0.95);
+      var response = await fetch(fallbackDataUrl);
+      return response.blob();
+    }
+    return new Promise(function (resolve, reject) {
+      canvas.toBlob(function (blob) {
+        if (!blob) {
+          reject(new Error("Unable to encode PDF page image."));
+          return;
+        }
+        resolve(blob);
+      }, "image/jpeg", 0.95);
+    });
   }
 
-  async function renderExportPagesToPdf(exportState, filename, modelParityMap, mutationGuardState) {
+  async function renderExportPagesToPdf(exportState, filename, modelParityMap, mutationGuardState, progressContext) {
     var pageNodes = Array.prototype.slice.call(exportState.exportRoot.querySelectorAll("[data-pdf-page]"));
     if (!pageNodes.length) {
       throw new Error("No PDF pages were created.");
@@ -4551,10 +5447,12 @@
     var pdfWidth = pdf.internal.pageSize.getWidth();
     var pdfHeight = pdf.internal.pageSize.getHeight();
     var pageDiagnostics = [];
+    var pageImageBlobs = [];
     var paintedImageDiagnostics = [];
     window.__propertyInstructionPdfRenderer = "html2canvas+jspdf";
 
     var renderScale = 1.8;
+    var averageHistory = getAverageProgressHistory(pageNodes.length, renderScale);
     var captureFrame = null;
 
     try {
@@ -4563,6 +5461,21 @@
         validateExportDomParity(exportState.exportRoot, modelParityMap, "before-canvas-page-" + (index + 1), mutationGuardState);
         var diagnostics = collectPageDiagnostics(pageNode);
         window.__propertyInstructionPdfStep = "render-page-" + (index + 1);
+        if (progressContext) {
+          updateExportProgress(
+            progressContext.downloadButton,
+            progressContext.statusElement,
+            null,
+            null,
+            "render-pdf",
+            {
+              pageIndex: index + 1,
+              pageCount: pageNodes.length,
+              averageHistory: averageHistory,
+              elapsedMs: Date.now() - progressContext.clickStartedAt
+            }
+          );
+        }
 
         if (diagnostics.viewportScrollHeight > diagnostics.viewportHeight + 2) {
           window.__propertyInstructionLastPdfDiagnostics = {
@@ -4633,32 +5546,10 @@
         }
 
         var encodingStartedAt = Date.now();
-        var jpegDataUrl = await new Promise(function (resolve, reject) {
-          if (!canvas.toBlob) {
-            try {
-              resolve(canvas.toDataURL("image/jpeg", 0.95));
-              return;
-            } catch (error) {
-              reject(error);
-              return;
-            }
-          }
-          canvas.toBlob(function (blob) {
-            if (!blob) {
-              reject(new Error("Unable to encode PDF page image."));
-              return;
-            }
-            var reader = new FileReader();
-            reader.onload = function () {
-              resolve(reader.result);
-            };
-            reader.onerror = function () {
-              reject(new Error("Unable to encode PDF page image."));
-            };
-            reader.readAsDataURL(blob);
-          }, "image/jpeg", 0.95);
-        });
+        var jpegBlob = await encodeCanvasToJpegBlob(canvas);
+        var jpegDataUrl = await blobToDataUri(jpegBlob);
         performanceState.encodingMs += Date.now() - encodingStartedAt;
+        pageImageBlobs.push(jpegBlob);
 
         var assemblyStartedAt = Date.now();
         pdf.addImage(
@@ -4674,6 +5565,15 @@
         addPageLinkAnnotations(pdf, pageNode, pdfWidth, pdfHeight);
         performanceState.jsPdfAssemblyMs += Date.now() - assemblyStartedAt;
         pageDiagnostics.push(diagnostics);
+        jpegDataUrl = null;
+        canvas.width = 1;
+        canvas.height = 1;
+        if (captureTarget && captureTarget.document && captureTarget.document.body) {
+          while (captureTarget.document.body.firstChild) {
+            captureTarget.document.body.removeChild(captureTarget.document.body.firstChild);
+          }
+        }
+        await sleep(isSafariFamily() ? 16 : 0);
       }
     } finally {
       destroyCaptureFrame(captureFrame);
@@ -4696,25 +5596,35 @@
       shellCount: pageNodes.length
     };
 
-    return pdf;
+    return {
+      pdf: pdf,
+      pageImageBlobs: pageImageBlobs,
+      pageCount: pageNodes.length
+    };
   }
 
-  async function downloadTranslatedPdf(downloadButton) {
+  async function performGuidePdfArtifactGeneration(triggerElement) {
     const statusElement = document.querySelector(".pi-action-status");
-    const originalLabel = downloadButton.textContent;
+    const originalLabelNode = triggerElement.querySelector(".pi-toolbar-action-label");
+    const originalLabel = String(originalLabelNode ? originalLabelNode.textContent : triggerElement.textContent || "");
     const guideTitle = getGuideTitle();
-    const guideIdentity = getGuideIdentity(downloadButton);
+    const guideIdentity = getGuideIdentity(triggerElement);
     var exportState = null;
     var mutationGuardState = null;
     var performanceState = startPdfPerformance();
     var exportImageDataCache = new Map();
     var clickStartedAt = Date.now();
     window.__propertyInstructionLastPdfError = null;
+    setPdfExportControlsDisabled(true);
+    setGuidePdfActionButtonsDisabled(true);
+    window.__propertyInstructionPdfLifecycle = null;
+    setPdfExportLifecycle("idle");
 
-    downloadButton.classList.add("is-disabled");
-    downloadButton.setAttribute("aria-disabled", "true");
-    downloadButton.setAttribute("data-progress-label", originalLabel);
-    updateExportProgress(downloadButton, statusElement, null, null, "initializing");
+    triggerElement.disabled = true;
+    triggerElement.classList.add("is-disabled");
+    triggerElement.setAttribute("aria-disabled", "true");
+    triggerElement.setAttribute("data-progress-label", originalLabel);
+    updateExportProgress(triggerElement, statusElement, null, null, "initializing");
 
     try {
       syncTranslationLanguageState();
@@ -4728,21 +5638,17 @@
         currentGeneration,
         immediateSnapshotHash
       );
-      var immediateCachedPdf = getCachedPdfBlob(immediateCacheKey);
-      if (immediateCachedPdf && immediateCachedPdf.blob) {
-        var immediateFilename = getPdfFilename(downloadButton);
+      var immediateCachedArtifact = getCachedPdfArtifact(immediateCacheKey);
+      if (immediateCachedArtifact && immediateCachedArtifact.pdfBlob) {
         recordPdfPerformance(performanceState, "warmRepeatedDownloadMs", clickStartedAt);
         recordPdfPerformance(performanceState, "totalMs", performanceState.startedAt);
-        window.__propertyInstructionLastPdfBlob = immediateCachedPdf.blob;
+        window.__propertyInstructionLastPdfBlob = immediateCachedArtifact.pdfBlob;
         window.__propertyInstructionLastPdfLanguage = currentLanguage;
-        window.__propertyInstructionPdfStep = "download-ready";
-        triggerBlobDownload(immediateCachedPdf.blob, immediateFilename);
-        if (statusElement) {
-          statusElement.textContent = "";
-        }
-        return;
+        return immediateCachedArtifact;
       }
-      updateExportProgress(downloadButton, statusElement, null, null, "wait-translation");
+
+      setPdfExportLifecycle("waiting-for-translation");
+      updateExportProgress(triggerElement, statusElement, null, null, "wait-translation");
       var translationStartedAt = Date.now();
       var settledSnapshot = await ensureSettledGuideSnapshot();
       recordPdfPerformance(performanceState, "translationReadyMs", translationStartedAt);
@@ -4750,23 +5656,18 @@
       var exportLanguage = translationState.requestedLanguage || SOURCE_LANGUAGE;
       var snapshotHash = getSnapshotHash(settledSnapshot);
       var cacheKey = getPreparedStateKey(guideIdentity, exportLanguage, exportGeneration, snapshotHash);
-      var cachedPdf = getCachedPdfBlob(cacheKey);
-      if (cachedPdf && cachedPdf.blob) {
-        var cachedFilename = getPdfFilename(downloadButton);
+      var cachedArtifact = getCachedPdfArtifact(cacheKey);
+      if (cachedArtifact && cachedArtifact.pdfBlob) {
         recordPdfPerformance(performanceState, "warmRepeatedDownloadMs", clickStartedAt);
         recordPdfPerformance(performanceState, "totalMs", performanceState.startedAt);
-        window.__propertyInstructionLastPdfBlob = cachedPdf.blob;
-        window.__propertyInstructionPdfStep = "download-ready";
-        triggerBlobDownload(cachedPdf.blob, cachedFilename);
-        if (statusElement) {
-          statusElement.textContent = "";
-        }
-        return;
+        window.__propertyInstructionLastPdfBlob = cachedArtifact.pdfBlob;
+        return cachedArtifact;
       }
 
-      updateExportProgress(downloadButton, statusElement, null, null, "load-libraries");
+      setPdfExportLifecycle("preparing-assets");
+      updateExportProgress(triggerElement, statusElement, null, null, "load-libraries");
       var prepareStartedAt = Date.now();
-      var preparedState = await preparePdfDependenciesForSnapshot(settledSnapshot, downloadButton);
+      var preparedState = await preparePdfDependenciesForSnapshot(settledSnapshot, triggerElement);
       exportImageDataCache = preparedState.imageDataCache || exportImageDataCache;
       recordPdfPerformance(
         performanceState,
@@ -4776,7 +5677,7 @@
       );
       recordPdfPerformance(performanceState, "mapPreparationMs", 0, preparedState.mapPreparationMs || 0);
 
-      updateExportProgress(downloadButton, statusElement, null, null, "extract-model");
+      updateExportProgress(triggerElement, statusElement, null, null, "extract-model");
       syncTranslationLanguageState();
       if (translationState.generation !== exportGeneration || (translationState.requestedLanguage || SOURCE_LANGUAGE) !== exportLanguage) {
         throw new Error("Selected translation changed during PDF export");
@@ -4787,7 +5688,7 @@
         settledSnapshot = await ensureSettledGuideSnapshot();
         snapshotHash = getSnapshotHash(settledSnapshot);
         cacheKey = getPreparedStateKey(guideIdentity, exportLanguage, exportGeneration, snapshotHash);
-        preparedState = await preparePdfDependenciesForSnapshot(settledSnapshot, downloadButton);
+        preparedState = await preparePdfDependenciesForSnapshot(settledSnapshot, triggerElement);
         exportImageDataCache = preparedState.imageDataCache || exportImageDataCache;
       }
       var guideModel = deepCloneModel(preparedState.model);
@@ -4800,7 +5701,9 @@
       if (preMountParity.mismatches.length) {
         throw new Error("Guide translation changed before PDF rendering");
       }
-      updateExportProgress(downloadButton, statusElement, null, null, "build-export");
+
+      setPdfExportLifecycle("building-layout");
+      updateExportProgress(triggerElement, statusElement, null, null, "build-export");
       var buildStartedAt = Date.now();
       exportState = buildPdfExportDocument(guideModel);
       exportState.performanceState = performanceState;
@@ -4810,28 +5713,31 @@
       validateExportDomParity(exportState.exportRoot, preMountParity.modelParityMap, "detached-build");
       mountExportRoot(exportState.exportRoot);
       validateExportDomParity(exportState.exportRoot, preMountParity.modelParityMap, "post-mount");
-      updateExportProgress(downloadButton, statusElement, null, null, "wait-images");
+
+      updateExportProgress(triggerElement, statusElement, null, null, "wait-images");
       var imagePrepStartedAt = Date.now();
       var inlineImageDiagnostics = await inlineExportImages(exportState.exportRoot, exportImageDataCache);
       exportState.exportImageDataCache = exportImageDataCache;
       exportState.inlineImageDiagnostics = inlineImageDiagnostics;
       await waitForImages(exportState.exportRoot);
-      updateExportProgress(downloadButton, statusElement, null, null, "prepare-layout");
+      updateExportProgress(triggerElement, statusElement, null, null, "prepare-layout");
       var sizingDiagnostics = applyExportImageSizing(exportState.exportRoot);
       await waitForFonts();
       await waitForTwoAnimationFrames();
       var prePaginationRatioDiagnostics = validateImageAspectRatios(exportState.exportRoot);
       var prePaginationClipDiagnostics = validateExportImageClipping(exportState.exportRoot);
       recordPdfPerformance(performanceState, "imagePreparationMs", imagePrepStartedAt);
-      updateExportProgress(downloadButton, statusElement, null, null, "paginate");
+
+      updateExportProgress(triggerElement, statusElement, null, null, "paginate");
       var paginationStartedAt = Date.now();
       paginateExportDocument(exportState);
       populatePageFooters(exportState, guideModel.title || guideTitle);
+      populatePdfContentsDestinations(exportState);
       recordPdfPerformance(performanceState, "paginationMs", paginationStartedAt);
       var layoutDiagnostics = collectCardLayoutDiagnostics(exportState.exportRoot);
       validateExportDomParity(exportState.exportRoot, preMountParity.modelParityMap, "post-pagination");
       mutationGuardState = startExportMutationGuard(exportState.exportRoot);
-      updateExportProgress(downloadButton, statusElement, null, null, "validate");
+      updateExportProgress(triggerElement, statusElement, null, null, "validate");
       validateExportParity(guideModel, exportState, settledSnapshot);
       var finalSnapshot = captureSemanticSnapshot();
       updateTranslationDiagnostics({
@@ -4845,13 +5751,25 @@
         throw new Error("Selected translation changed during PDF export");
       }
 
-      updateExportProgress(downloadButton, statusElement, null, null, "render-pdf");
-      var pdf = await withTimeout(
-        renderExportPagesToPdf(exportState, getPdfFilename(downloadButton), preMountParity.modelParityMap, mutationGuardState),
+      setPdfExportLifecycle("rendering-pages");
+      updateExportProgress(triggerElement, statusElement, null, null, "render-pdf");
+      var renderResult = await withTimeout(
+        renderExportPagesToPdf(
+          exportState,
+          getPdfFilename(triggerElement),
+          preMountParity.modelParityMap,
+          mutationGuardState,
+          {
+            downloadButton: triggerElement,
+            statusElement: statusElement,
+            clickStartedAt: clickStartedAt
+          }
+        ),
         PDF_EXPORT_TIMEOUT_MS,
         "PDF export timed out"
       );
-      updateExportProgress(downloadButton, statusElement, null, null, "finalize-pdf");
+      setPdfExportLifecycle("assembling-pdf");
+      updateExportProgress(triggerElement, statusElement, null, null, "finalize-pdf");
       syncTranslationLanguageState();
       if (translationState.generation !== exportGeneration || (translationState.requestedLanguage || SOURCE_LANGUAGE) !== exportLanguage) {
         throw new Error("Selected translation changed during PDF export");
@@ -4870,12 +5788,22 @@
       if (postRenderParity.mismatches.length) {
         throw new Error("PDF export content does not match the visible guide");
       }
+
       var blobStartedAt = Date.now();
-      var pdfBlob = pdf.output("blob");
+      var pdfBlob = renderResult.pdf.output("blob");
       recordPdfPerformance(performanceState, "blobCreationMs", blobStartedAt);
       recordPdfPerformance(performanceState, "buttonClickToPdfBlobMs", clickStartedAt);
       recordPdfPerformance(performanceState, "totalMs", performanceState.startedAt);
-      cachePdfBlob(cacheKey, pdfBlob);
+      recordProgressHistory(renderResult.pageCount, 1.8, performanceState);
+      var artifact = {
+        pdfBlob: pdfBlob,
+        pageImageBlobs: (renderResult.pageImageBlobs || []).slice(),
+        pageCount: renderResult.pageCount,
+        languageCode: guideModel.languageCode || SOURCE_LANGUAGE,
+        cacheKey: cacheKey,
+        performance: Object.assign({}, performanceState)
+      };
+      cachePdfArtifact(cacheKey, artifact);
       window.__propertyInstructionLastPdfBlob = pdfBlob;
       window.__propertyInstructionLastPdfLanguage = guideModel.languageCode || SOURCE_LANGUAGE;
       window.__propertyInstructionPdfStep = "download-ready";
@@ -4886,15 +5814,20 @@
         prePaginationClipDiagnostics: prePaginationClipDiagnostics,
         layoutDiagnostics: layoutDiagnostics,
         mapDiagnostics: preparedState.mapDiagnostics || {},
+        qrDiagnostics: preparedState.qrDiagnostics || {},
         performance: performanceState
       });
       stopExportMutationGuard(mutationGuardState);
-      triggerBlobDownload(pdfBlob, getPdfFilename(downloadButton));
-      destroyExportRoot(exportState.exportRoot);
-
+      setPdfExportLifecycle("ready");
+      updateExportProgress(triggerElement, statusElement, null, null, "download-ready", {
+        averageHistory: getAverageProgressHistory(renderResult.pageCount, 1.8),
+        elapsedMs: Date.now() - clickStartedAt
+      });
       if (statusElement) {
-        statusElement.textContent = "";
+        statusElement.textContent = getGuideCopyText("pdf_ready", "PDF ready");
       }
+      destroyExportRoot(exportState.exportRoot);
+      return artifact;
     } catch (error) {
       window.__propertyInstructionLastPdfError = {
         message: error && error.message ? error.message : "Unable to prepare PDF",
@@ -4902,25 +5835,433 @@
         capturedAt: Date.now()
       };
       window.__propertyInstructionPdfStep = "failed";
-      if (!(translationState.diagnostics || {}).abortReason) {
-        setTranslationAbortReason(error && error.message ? error.message : "Unable to prepare PDF", "translation-timeout-unknown");
+      if (error && /Selected translation changed during PDF export/.test(String(error.message || ""))) {
+        setPdfExportLifecycle("cancelled-language-change");
+      } else {
+        setPdfExportLifecycle("failed");
       }
       if (typeof exportState !== "undefined" && exportState && exportState.exportRoot) {
         stopExportMutationGuard(mutationGuardState);
         destroyExportRoot(exportState.exportRoot);
       }
       if (statusElement) {
-        statusElement.textContent = "Translation is temporarily unavailable. Please wait and try again.";
+        if (error && /Selected translation changed during PDF export/.test(String(error.message || ""))) {
+          statusElement.textContent = getGuideCopyText("cancelled_language_change", "PDF generation was cancelled because the language changed.");
+        } else if ((translationState.diagnostics || {}).abortCode && String((translationState.diagnostics || {}).abortCode).indexOf("translation") === 0) {
+          statusElement.textContent = getGuideCopyText("translation_unavailable", "Translation is temporarily unavailable.");
+        } else {
+          statusElement.textContent = getGuideCopyText("pdf_generation_failed", "The PDF could not be generated. Please try again.");
+        }
       }
+      setTranslationStatus(statusElement ? statusElement.textContent : "");
+      return null;
     } finally {
       stopExportMutationGuard(mutationGuardState);
-      downloadButton.classList.remove("is-disabled");
-      downloadButton.removeAttribute("aria-disabled");
-      downloadButton.textContent = originalLabel;
-      downloadButton.removeAttribute("data-progress-label");
-      if (statusElement && window.__propertyInstructionPdfStep === "download-ready") {
-        statusElement.textContent = "";
+      triggerElement.disabled = false;
+      triggerElement.classList.remove("is-disabled");
+      triggerElement.removeAttribute("aria-disabled");
+      setToolbarButtonLabel(triggerElement, originalLabel);
+      triggerElement.removeAttribute("data-progress-label");
+      setGuidePdfActionButtonsDisabled(false);
+      setPdfExportControlsDisabled(false);
+      syncCustomLanguageSelectorFromGoogle();
+      window.setTimeout(function () {
+        if (!pdfExportController.activePromise) {
+          resetPdfProgressUi();
+        }
+      }, 1200);
+    }
+  }
+
+  async function getOrCreateGuidePdfArtifact(triggerElement) {
+    if (!triggerElement) {
+      return null;
+    }
+    if (pdfExportController.activePromise) {
+      return pdfExportController.activePromise;
+    }
+    syncTranslationLanguageState();
+    pdfExportController.activeLanguage = translationState.requestedLanguage || SOURCE_LANGUAGE;
+    pdfExportController.activePromise = performGuidePdfArtifactGeneration(triggerElement).finally(function () {
+      pdfExportController.activePromise = null;
+      pdfExportController.activeLanguage = "";
+    });
+    return pdfExportController.activePromise;
+  }
+
+  async function downloadTranslatedPdf(downloadButton) {
+    if (!downloadButton) {
+      return null;
+    }
+    var statusElement = document.querySelector(".pi-action-status");
+    var clickStartedAt = Date.now();
+    var artifact = await getOrCreateGuidePdfArtifact(downloadButton);
+    if (!artifact || !artifact.pdfBlob) {
+      return null;
+    }
+    setGuidePdfActionButtonsDisabled(true);
+    setPdfExportLifecycle("ready");
+    updateExportProgress(downloadButton, statusElement, null, null, "download-ready", {
+      averageHistory: getAverageProgressHistory(artifact.pageCount || 0, 1.8),
+      elapsedMs: Date.now() - clickStartedAt
+    });
+    setPdfExportLifecycle("starting-download");
+    updateExportProgress(downloadButton, statusElement, null, null, "starting-download", {
+      averageHistory: getAverageProgressHistory(artifact.pageCount || 0, 1.8),
+      elapsedMs: Date.now() - clickStartedAt
+    });
+    triggerAutomaticPdfDownload(artifact.pdfBlob, getPdfFilename(downloadButton));
+    setPdfExportLifecycle("download-triggered");
+    updateExportProgress(downloadButton, statusElement, null, null, "download-started", {
+      averageHistory: getAverageProgressHistory(artifact.pageCount || 0, 1.8),
+      elapsedMs: Date.now() - clickStartedAt
+    });
+    if (statusElement) {
+      statusElement.textContent = getGuideCopyText("download_started", "Download started");
+    }
+    window.setTimeout(function () {
+      setGuidePdfActionButtonsDisabled(false);
+      resetPdfProgressUi();
+    }, 1200);
+    return artifact;
+  }
+
+  function setPrintLifecycle(stageName, extraDetails) {
+    var diagnostics = window.__propertyInstructionPrintDiagnostics || {
+      lifecycle: "idle",
+      artifactCacheHit: false,
+      pageCount: 0,
+      pageImageByteLengths: [],
+      iframeCreatedAt: 0,
+      imagesReadyAt: 0,
+      firstLayoutMeasuredAt: 0,
+      finalLayoutMeasuredAt: 0,
+      pageDimensions: [],
+      bodyDimensions: {},
+      expectedBodyHeight: 0,
+      overflowDetected: false,
+      printCalledAt: 0,
+      printReturnedAt: 0,
+      cleanupTimestamp: 0,
+      afterPrintAt: 0,
+      failureCode: ""
+    };
+    diagnostics.lifecycle = String(stageName || "idle");
+    if (extraDetails) {
+      Object.keys(extraDetails).forEach(function (key) {
+        diagnostics[key] = extraDetails[key];
+      });
+    }
+    window.__propertyInstructionPrintDiagnostics = diagnostics;
+    return diagnostics;
+  }
+
+  function createPrintFrame() {
+    cleanupActivePrintFrame();
+    var frame = document.createElement("iframe");
+    frame.setAttribute("aria-hidden", "true");
+    frame.setAttribute("tabindex", "-1");
+    frame.style.position = "fixed";
+    frame.style.left = PDF_EXPORT_OFFSCREEN_LEFT + "px";
+    frame.style.top = "0";
+    frame.style.width = PRINT_PAGE_WIDTH_PT + "pt";
+    frame.style.height = PRINT_PAGE_HEIGHT_PT + "pt";
+    frame.style.border = "0";
+    frame.style.opacity = "0";
+    frame.style.pointerEvents = "none";
+    frame.style.background = "#ffffff";
+    document.body.appendChild(frame);
+    setPrintLifecycle("waiting-for-artifact", {
+      iframeCreatedAt: Date.now()
+    });
+    return {
+      frame: frame,
+      objectUrls: [],
+      cleanupTimer: 0,
+      cleaned: false
+    };
+  }
+
+  function cleanupPrintFrame(printState) {
+    if (!printState || printState.cleaned) {
+      return;
+    }
+    printState.cleaned = true;
+    if (printState.cleanupTimer) {
+      window.clearTimeout(printState.cleanupTimer);
+      printState.cleanupTimer = 0;
+    }
+    (printState.objectUrls || []).forEach(function (objectUrl) {
+      if (objectUrl && window.URL && window.URL.revokeObjectURL) {
+        window.URL.revokeObjectURL(objectUrl);
       }
+    });
+    if (printState.frame && printState.frame.parentNode) {
+      printState.frame.parentNode.removeChild(printState.frame);
+    }
+    if (activePrintController === printState) {
+      activePrintController = null;
+    }
+  }
+
+  function cleanupActivePrintFrame() {
+    if (activePrintController) {
+      cleanupPrintFrame(activePrintController);
+    }
+  }
+
+  function collectPrintLayoutDiagnostics(frameDocument) {
+    var pageNodes = Array.prototype.slice.call(frameDocument.querySelectorAll(".pi-generated-print-page"));
+    var pageDimensions = pageNodes.map(function (pageNode, index) {
+      var imageNode = pageNode.querySelector("img");
+      var pageRect = pageNode.getBoundingClientRect();
+      var imageRect = imageNode ? imageNode.getBoundingClientRect() : null;
+      var computedStyle = frameDocument.defaultView
+        ? frameDocument.defaultView.getComputedStyle(pageNode)
+        : null;
+      return {
+        pageNumber: index + 1,
+        clientWidth: pageNode.clientWidth,
+        clientHeight: pageNode.clientHeight,
+        scrollWidth: pageNode.scrollWidth,
+        scrollHeight: pageNode.scrollHeight,
+        offsetTop: pageNode.offsetTop,
+        breakBefore: computedStyle ? String(computedStyle.breakBefore || "") : "",
+        pageBreakBefore: computedStyle ? String(computedStyle.pageBreakBefore || "") : "",
+        marginTop: computedStyle ? String(computedStyle.marginTop || "") : "",
+        marginBottom: computedStyle ? String(computedStyle.marginBottom || "") : "",
+        imageRect: imageRect ? {
+          left: imageRect.left,
+          top: imageRect.top,
+          right: imageRect.right,
+          bottom: imageRect.bottom,
+          width: imageRect.width,
+          height: imageRect.height
+        } : null,
+        pageRect: {
+          left: pageRect.left,
+          top: pageRect.top,
+          right: pageRect.right,
+          bottom: pageRect.bottom,
+          width: pageRect.width,
+          height: pageRect.height
+        }
+      };
+    });
+    var expectedBodyHeight = pageDimensions.length
+      ? Math.round(pageDimensions.length * pageDimensions[0].pageRect.height)
+      : 0;
+    return {
+      pageDimensions: pageDimensions,
+      bodyDimensions: {
+        scrollWidth: frameDocument.body.scrollWidth,
+        scrollHeight: frameDocument.body.scrollHeight,
+        clientWidth: frameDocument.body.clientWidth,
+        clientHeight: frameDocument.body.clientHeight
+      },
+      expectedBodyHeight: expectedBodyHeight
+    };
+  }
+
+  function validatePrintFrameLayout(frameDocument) {
+    var diagnostics = collectPrintLayoutDiagnostics(frameDocument);
+    var hasOverflow = false;
+    var forcedBreakDetected = false;
+    var bodyHeightDelta = Math.abs(
+      Number(diagnostics.bodyDimensions.scrollHeight || 0) - Number(diagnostics.expectedBodyHeight || 0)
+    );
+    diagnostics.pageDimensions.forEach(function (pageInfo) {
+      var imageRect = pageInfo.imageRect;
+      var pageRect = pageInfo.pageRect;
+      if (pageInfo.scrollWidth > pageInfo.clientWidth + 1 || pageInfo.scrollHeight > pageInfo.clientHeight + 1) {
+        hasOverflow = true;
+        return;
+      }
+      if (imageRect && (
+        imageRect.left < pageRect.left - 1
+        || imageRect.top < pageRect.top - 1
+        || imageRect.right > pageRect.right + 1
+        || imageRect.bottom > pageRect.bottom + 1
+      )) {
+        hasOverflow = true;
+      }
+      if (pageInfo.pageNumber > 1 && (
+        String(pageInfo.breakBefore || "").toLowerCase() !== "auto"
+        || String(pageInfo.pageBreakBefore || "").toLowerCase() !== "auto"
+        || String(pageInfo.marginTop || "") !== "0px"
+        || String(pageInfo.marginBottom || "") !== "0px"
+      )) {
+        forcedBreakDetected = true;
+      }
+    });
+    diagnostics.overflowDetected = hasOverflow;
+    diagnostics.forcedBreakDetected = forcedBreakDetected;
+    diagnostics.bodyHeightDelta = bodyHeightDelta;
+    if (forcedBreakDetected || bodyHeightDelta > 2) {
+      setPrintLifecycle("failed", {
+        failureCode: "print-forced-break-detected",
+        pageDimensions: diagnostics.pageDimensions,
+        bodyDimensions: diagnostics.bodyDimensions,
+        expectedBodyHeight: diagnostics.expectedBodyHeight,
+        overflowDetected: hasOverflow
+      });
+      throw new Error("print-forced-break-detected");
+    }
+    if (hasOverflow) {
+      setPrintLifecycle("failed", {
+        failureCode: "print-page-overflow",
+        pageDimensions: diagnostics.pageDimensions,
+        bodyDimensions: diagnostics.bodyDimensions,
+        expectedBodyHeight: diagnostics.expectedBodyHeight,
+        overflowDetected: true
+      });
+      throw new Error("print-page-overflow");
+    }
+    return diagnostics;
+  }
+
+  async function prepareGeneratedPrintFrame(printState, artifact) {
+    if (!printState || !printState.frame || !artifact) {
+      throw new Error("The print layout could not be prepared. Please try again.");
+    }
+    var frameDocument = printState.frame.contentDocument;
+    if (!frameDocument) {
+      throw new Error("The print layout could not be prepared. Please try again.");
+    }
+    frameDocument.open();
+    frameDocument.write(
+      '<!doctype html><html><head><meta charset="utf-8"><title>Print guide</title><style>' +
+      '@page{size:A4 portrait;margin:0;}' +
+      'html,body{margin:0;padding:0;background:#fff;}' +
+      'body{width:100%;}' +
+      '*{box-sizing:border-box;}' +
+      '.pi-generated-print-page{display:block;width:' + PRINT_PAGE_WIDTH_PT + 'pt;height:' + PRINT_PAGE_HEIGHT_PT + 'pt;margin:0 auto;padding:0;overflow:hidden;break-inside:avoid;page-break-inside:avoid;print-color-adjust:exact;-webkit-print-color-adjust:exact;}' +
+      '.pi-generated-print-page img{display:block;width:100%;height:100%;object-fit:contain;object-position:center;image-rendering:auto;}' +
+      "</style></head><body></body></html>"
+    );
+    frameDocument.close();
+    var imagePromises = [];
+    (artifact.pageImageBlobs || []).forEach(function (blob) {
+      var objectUrl = window.URL.createObjectURL(blob);
+      printState.objectUrls.push(objectUrl);
+      var pageNode = frameDocument.createElement("div");
+      pageNode.className = "pi-generated-print-page";
+      var imageNode = frameDocument.createElement("img");
+      imageNode.src = objectUrl;
+      pageNode.appendChild(imageNode);
+      frameDocument.body.appendChild(pageNode);
+      imagePromises.push(new Promise(function (resolve, reject) {
+        function finalizeLoaded() {
+          if (!imageNode.naturalWidth || !imageNode.naturalHeight) {
+            reject(new Error("The print layout could not be prepared. Please try again."));
+            return;
+          }
+          if (typeof imageNode.decode === "function") {
+            imageNode.decode().catch(function () {
+              return null;
+            }).finally(resolve);
+            return;
+          }
+          resolve();
+        }
+        imageNode.addEventListener("load", finalizeLoaded, { once: true });
+        imageNode.addEventListener("error", function () {
+          reject(new Error("The print layout could not be prepared. Please try again."));
+        }, { once: true });
+      }));
+    });
+    await Promise.all(imagePromises);
+    setPrintLifecycle("preparing-pages", {
+      pageCount: artifact.pageCount || 0,
+      pageImageByteLengths: (artifact.pageImageBlobs || []).map(function (blob) {
+        return blob && blob.size ? blob.size : 0;
+      }),
+      imagesReadyAt: Date.now()
+    });
+    await waitForTwoAnimationFrames();
+    var firstDiagnostics = collectPrintLayoutDiagnostics(frameDocument);
+    setPrintLifecycle("validating-layout", {
+      firstLayoutMeasuredAt: Date.now(),
+      pageDimensions: firstDiagnostics.pageDimensions,
+      bodyDimensions: firstDiagnostics.bodyDimensions,
+      expectedBodyHeight: firstDiagnostics.expectedBodyHeight
+    });
+    await sleep(PRINT_PAGE_LAYOUT_SETTLE_MS);
+    await waitForTwoAnimationFrames();
+    var finalDiagnostics = validatePrintFrameLayout(frameDocument);
+    setPrintLifecycle("validating-layout", {
+      finalLayoutMeasuredAt: Date.now(),
+      pageDimensions: finalDiagnostics.pageDimensions,
+      bodyDimensions: finalDiagnostics.bodyDimensions,
+      expectedBodyHeight: finalDiagnostics.expectedBodyHeight,
+      overflowDetected: false
+    });
+    return frameDocument;
+  }
+
+  async function printGeneratedGuide(printButton) {
+    if (!printButton) {
+      return null;
+    }
+    var statusElement = document.querySelector(".pi-action-status");
+    var printState = createPrintFrame();
+    activePrintController = printState;
+    var artifact = null;
+    setGuidePdfActionButtonsDisabled(true);
+    try {
+      updateExportProgress(printButton, statusElement, null, null, "wait-translation");
+      artifact = await getOrCreateGuidePdfArtifact(printButton);
+      if (!artifact || !artifact.pageImageBlobs || !artifact.pageImageBlobs.length) {
+        throw new Error("The print layout could not be prepared. Please try again.");
+      }
+      updateExportProgress(printButton, statusElement, null, null, "prepare-print-preview");
+      if (statusElement) {
+        statusElement.textContent = getGuideCopyText("prepare_print_preview", "Preparing print preview…");
+      }
+      await prepareGeneratedPrintFrame(printState, artifact);
+      setPrintLifecycle("opening-print-dialog");
+      updateExportProgress(printButton, statusElement, null, null, "open-print-dialog");
+      if (statusElement) {
+        statusElement.textContent = getGuideCopyText("opening_print_dialog", "Opening print dialog…");
+      }
+      if (printState.frame.contentWindow) {
+        printState.frame.contentWindow.addEventListener("afterprint", function () {
+          setPrintLifecycle("completed", {
+            afterPrintAt: Date.now()
+          });
+          cleanupPrintFrame(printState);
+        }, { once: true });
+      }
+      printState.cleanupTimer = window.setTimeout(function () {
+        setPrintLifecycle("cleanup-timeout-completed", {
+          cleanupTimestamp: Date.now()
+        });
+        cleanupPrintFrame(printState);
+      }, 5 * 60 * 1000);
+      printState.frame.contentWindow.focus();
+      setPrintLifecycle("print-called", {
+        printCalledAt: Date.now()
+      });
+      printState.frame.contentWindow.print();
+      setPrintLifecycle("print-returned", {
+        printReturnedAt: Date.now()
+      });
+      return artifact;
+    } catch (error) {
+      cleanupPrintFrame(printState);
+      setPrintLifecycle("failed", {
+        failureCode: String(error && error.message || "print-layout-preparation-failed")
+      });
+      if (statusElement) {
+        statusElement.textContent = "The print layout could not be prepared. Please try again.";
+      }
+      setTranslationStatus(statusElement ? statusElement.textContent : "");
+      return null;
+    } finally {
+      setGuidePdfActionButtonsDisabled(false);
+      window.setTimeout(function () {
+        resetPdfProgressUi();
+      }, 1200);
     }
   }
 
@@ -4989,7 +6330,8 @@
 
     const printButton = event.target.closest(".property-instruction-print");
     if (printButton) {
-      window.print();
+      event.preventDefault();
+      await printGeneratedGuide(printButton);
     }
   });
 
@@ -4999,27 +6341,40 @@
   scheduleStickyToolbarOffsetSync();
 
   document.addEventListener("pointerenter", function (event) {
-    if (event.target && event.target.closest && event.target.closest(".pi-pdf-download")) {
-      schedulePdfPreparationWarmup(event.target.closest(".pi-pdf-download"));
+    if (event.target && event.target.closest) {
+      var warmButton = event.target.closest(".pi-pdf-download, .property-instruction-print");
+      if (warmButton) {
+        schedulePdfPreparationWarmup(warmButton);
+      }
     }
   }, true);
 
   document.addEventListener("focus", function (event) {
-    if (event.target && event.target.closest && event.target.closest(".pi-pdf-download")) {
-      schedulePdfPreparationWarmup(event.target.closest(".pi-pdf-download"));
+    if (event.target && event.target.closest) {
+      var warmButton = event.target.closest(".pi-pdf-download, .property-instruction-print");
+      if (warmButton) {
+        schedulePdfPreparationWarmup(warmButton);
+      }
     }
   }, true);
 
   document.addEventListener("touchstart", function (event) {
-    if (event.target && event.target.closest && event.target.closest(".pi-pdf-download")) {
-      schedulePdfPreparationWarmup(event.target.closest(".pi-pdf-download"));
+    if (event.target && event.target.closest) {
+      var warmButton = event.target.closest(".pi-pdf-download, .property-instruction-print");
+      if (warmButton) {
+        schedulePdfPreparationWarmup(warmButton);
+      }
     }
   }, { passive: true, capture: true });
+
+  window.addEventListener("pagehide", clearReadyPdfObjectUrl);
+  window.addEventListener("beforeunload", clearReadyPdfObjectUrl);
+  window.addEventListener("pagehide", cleanupActivePrintFrame);
+  window.addEventListener("beforeunload", cleanupActivePrintFrame);
 
   if (getGuideScreen()) {
     try {
       ensureOriginalSnapshotCaptured();
-      schedulePdfLibraryWarmup();
     } catch (error) {
       // Ignore early snapshot capture failures; export-time validation will handle them.
     }

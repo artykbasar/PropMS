@@ -36,8 +36,7 @@
   }
   .pi-hero,
   .pi-card,
-  .pi-nav,
-  .pi-translate-shell {
+  .pi-nav {
     background: var(--pi-card);
     border: 1px solid var(--pi-border);
     border-radius: 24px;
@@ -45,15 +44,6 @@
   }
   .pi-screen-layout {
     display: block;
-  }
-  .pi-print-layout {
-    position: fixed;
-    left: -10000px;
-    top: 0;
-    width: 1080px;
-    opacity: 0;
-    visibility: hidden;
-    pointer-events: none;
   }
   .pi-hero {
     overflow: hidden;
@@ -190,8 +180,7 @@
   }
   .pi-copy-button:focus-visible,
   .pi-btn:focus-visible,
-  .pi-nav a:focus-visible,
-  .pi-language-option:focus-visible {
+  .pi-nav a:focus-visible {
     outline: 2px solid var(--pi-accent);
     outline-offset: 2px;
   }
@@ -360,66 +349,6 @@
     border: 0;
     display: block;
   }
-  .pi-language-switcher {
-    display: flex;
-    flex-wrap: wrap;
-    gap: .5rem;
-    margin-bottom: 1rem;
-    align-items: center;
-  }
-  .pi-language-label {
-    margin: 0;
-    color: var(--pi-muted);
-    font-size: .88rem;
-    text-transform: uppercase;
-    letter-spacing: .06em;
-  }
-  .pi-language-option {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    padding: .5rem .85rem;
-    border-radius: 999px;
-    border: 1px solid var(--pi-border);
-    color: var(--pi-ink);
-    text-decoration: none;
-    font-weight: 600;
-    background: rgba(255, 255, 255, 0.75);
-  }
-  .pi-language-option.is-active {
-    background: var(--pi-accent);
-    border-color: var(--pi-accent);
-    color: #fff;
-  }
-  .pi-translate-shell {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: .75rem;
-    margin-bottom: 1rem;
-    padding: .9rem 1rem;
-  }
-  .pi-translate-copy {
-    margin: 0;
-    color: var(--pi-muted);
-    font-size: .95rem;
-  }
-  .pi-translate-widget {
-    min-height: 2.5rem;
-  }
-  .pi-translate-widget .goog-te-gadget {
-    color: var(--pi-ink) !important;
-    font-family: inherit;
-    font-size: .95rem !important;
-  }
-  .pi-translate-widget .goog-te-combo {
-    min-width: 220px;
-    border: 1px solid var(--pi-border);
-    border-radius: 999px;
-    padding: .55rem .9rem;
-    background: #fff;
-    color: var(--pi-ink);
-  }
   .pi-guide-toolbar {
     position: sticky;
     top: max(.5rem, env(safe-area-inset-top));
@@ -451,6 +380,58 @@
   .pi-toolbar-actions {
     justify-content: flex-end;
   }
+  .pi-toolbar-actions .pi-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: .5rem;
+  }
+  .pi-pdf-progress {
+    flex: 1 1 100%;
+    display: grid;
+    gap: .45rem;
+    padding: .65rem .75rem;
+    border: 1px solid rgba(17, 94, 89, 0.14);
+    border-radius: 16px;
+    background: rgba(240, 253, 250, 0.92);
+  }
+  .pi-pdf-progress[hidden] {
+    display: none !important;
+  }
+  .pi-pdf-progress-copy {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: .4rem .75rem;
+    font-size: .88rem;
+    color: var(--pi-muted);
+  }
+  .pi-pdf-progress-copy strong,
+  .pi-pdf-progress-copy span[data-pdf-progress-label] {
+    color: var(--pi-ink);
+    font-weight: 700;
+  }
+  .pi-pdf-progress progress {
+    width: 100%;
+    height: .7rem;
+    border: 0;
+    border-radius: 999px;
+    overflow: hidden;
+    background: rgba(148, 163, 184, 0.18);
+    accent-color: var(--pi-accent);
+  }
+  .pi-pdf-progress progress::-webkit-progress-bar {
+    background: rgba(148, 163, 184, 0.18);
+    border-radius: 999px;
+  }
+  .pi-pdf-progress progress::-webkit-progress-value {
+    background: linear-gradient(90deg, var(--pi-accent), #0f766e);
+    border-radius: 999px;
+  }
+  .pi-pdf-progress progress::-moz-progress-bar {
+    background: linear-gradient(90deg, var(--pi-accent), #0f766e);
+    border-radius: 999px;
+  }
   .pi-show-original[hidden] {
     display: none !important;
   }
@@ -468,6 +449,21 @@
     stroke: currentColor;
     stroke-width: 1.8;
     fill: none;
+  }
+  .pi-toolbar-action-icon {
+    display: block;
+    width: 1.2rem;
+    height: 1.2rem;
+    flex: 0 0 auto;
+    stroke: currentColor;
+    stroke-width: 1.8;
+    fill: none;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    pointer-events: none;
+  }
+  .pi-toolbar-action-label {
+    display: inline;
   }
   .pi-guide-language-select {
     min-height: 2.75rem;
@@ -487,6 +483,9 @@
   .pi-translate-attribution {
     color: var(--pi-muted);
     font-size: .82rem;
+  }
+  .pi-translate-attribution--mobile {
+    display: none;
   }
   .pi-google-translate-engine {
     position: fixed;
@@ -510,6 +509,55 @@
     width: 1px !important;
     height: 1px !important;
     opacity: 0.01;
+  }
+  .pi-guide-overview {
+    margin: 0 0 1rem;
+    padding: 1rem 1.1rem;
+    border: 1px solid var(--pi-border);
+    border-radius: 20px;
+    background: rgba(255, 255, 255, 0.86);
+    box-shadow: 0 12px 24px rgba(15, 23, 42, 0.04);
+  }
+  .pi-guide-overview h2 {
+    margin: 0 0 .85rem;
+    font-size: 1rem;
+  }
+  .pi-guide-overview ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: .7rem;
+  }
+  .pi-guide-overview li {
+    min-width: 0;
+  }
+  .pi-guide-overview a {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .6rem;
+    min-height: 2.75rem;
+    padding: .8rem .95rem;
+    border: 1px solid rgba(17, 94, 89, 0.12);
+    border-radius: 16px;
+    background: #fff;
+    color: var(--pi-ink);
+    text-decoration: none;
+    font-weight: 600;
+  }
+  .pi-guide-overview a:hover,
+  .pi-guide-overview a:focus-visible {
+    border-color: rgba(17, 94, 89, 0.26);
+    background: var(--pi-accent-soft);
+    outline: none;
+  }
+  .pi-guide-overview-count {
+    flex: 0 0 auto;
+    color: var(--pi-muted);
+    font-size: .85rem;
+    font-weight: 700;
   }
   iframe.goog-te-banner-frame,
   iframe.VIpgJd-ZVi9od-ORHb-OEVmcd,
@@ -567,15 +615,92 @@
       width: 100%;
     }
     .pi-guide-toolbar {
-      padding: .8rem .9rem;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-items: center;
+      gap: .45rem;
+      padding: .5rem;
+      border-radius: 16px;
     }
-    .pi-toolbar-language,
+    .pi-toolbar-language {
+      grid-column: 1;
+      display: flex;
+      flex-wrap: nowrap;
+      align-items: center;
+      min-width: 0;
+      width: auto;
+      gap: 0;
+      flex: initial;
+    }
     .pi-toolbar-actions {
-      width: 100%;
+      grid-column: 2;
+      display: flex;
+      flex-wrap: nowrap;
+      align-items: center;
+      justify-content: flex-end;
+      width: auto;
+      min-width: 0;
+      gap: .35rem;
+      flex: initial;
     }
-    .pi-guide-language-select,
-    .pi-toolbar-actions .pi-btn {
+    .pi-pdf-progress-copy {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+    .pi-pdf-progress {
+      grid-column: 1 / -1;
+      min-width: 0;
+      margin-top: .1rem;
+    }
+    .pi-guide-language-select {
+      flex: 1 1 auto;
       width: 100%;
+      min-width: 0;
+      max-width: none;
+      min-height: 2.75rem;
+      padding-block: .55rem;
+      padding-inline: .75rem 2rem;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .pi-toolbar-actions .pi-btn {
+      position: relative;
+      flex: 0 0 2.75rem;
+      width: 2.75rem;
+      min-width: 2.75rem;
+      height: 2.75rem;
+      min-height: 2.75rem;
+      padding: 0;
+      gap: 0;
+      border-radius: 999px;
+    }
+    .pi-toolbar-action-label,
+    .pi-toolbar-label,
+    .pi-translation-status {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      clip-path: inset(50%);
+      white-space: nowrap;
+      border: 0;
+    }
+    .pi-translate-attribution--toolbar {
+      display: none;
+    }
+    .pi-translate-attribution--mobile {
+      display: block;
+      margin: -.6rem .65rem .75rem;
+      color: var(--pi-muted);
+      font-size: .7rem;
+      text-align: end;
+    }
+    .pi-guide-overview ul {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
     }
     .pi-nav {
       position: static;
@@ -583,149 +708,6 @@
       max-height: none;
       overflow: visible;
     }
-  }
-  .pi-print-kicker {
-    margin: 0 0 2mm;
-    font-size: 9pt;
-    letter-spacing: .12em;
-    text-transform: uppercase;
-    color: #475569;
-    font-weight: 700;
-  }
-  .pi-print-title {
-    margin: 0;
-    font-size: 20pt;
-    line-height: 1.08;
-  }
-  .pi-print-header-grid {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) 48mm;
-    gap: 6mm;
-    align-items: start;
-  }
-  .pi-print-cover {
-    width: 100%;
-    max-height: 42mm;
-    object-fit: cover;
-    border-radius: 3mm;
-    display: block;
-  }
-  .pi-print-address {
-    margin: 2mm 0 0;
-    font-size: 10.5pt;
-    color: #334155;
-  }
-  .pi-print-meta-grid {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 2.5mm 5mm;
-    margin-top: 2.5mm;
-  }
-  .pi-print-meta-item {
-    break-inside: avoid;
-  }
-  .pi-print-map-url,
-  .pi-print-link-url {
-    overflow-wrap: anywhere;
-    word-break: break-word;
-  }
-  .pi-print-section {
-    margin: 0 0 5mm;
-    break-inside: auto;
-  }
-  .pi-print-section + .pi-print-section {
-    margin-top: 5mm;
-  }
-  .pi-print-section-title {
-    margin: 0 0 2mm;
-    padding-bottom: 1.5mm;
-    border-bottom: 1px solid #cbd5e1;
-    font-size: 13pt;
-    break-after: avoid;
-  }
-  .pi-print-blocks {
-    display: grid;
-    gap: 3mm;
-  }
-  .pi-print-block {
-    border: 1px solid #d8dee6;
-    border-radius: 3mm;
-    padding: 3mm;
-    background: #fff;
-    break-inside: avoid;
-    margin-bottom: 2.5mm;
-  }
-  .pi-print-block:last-child {
-    margin-bottom: 0;
-  }
-  .pi-print-block-warning {
-    border-left: 3mm solid #92400e;
-    background: #fffaf0;
-  }
-  .pi-print-step-head {
-    display: flex;
-    gap: 3mm;
-    align-items: flex-start;
-    margin-bottom: 2mm;
-  }
-  .pi-print-step-number {
-    width: 8mm;
-    height: 8mm;
-    border-radius: 999px;
-    background: #0f766e;
-    color: #fff;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 9pt;
-    font-weight: 700;
-    flex: 0 0 auto;
-  }
-  .pi-print-block-title {
-    margin: 0;
-    font-size: 10.5pt;
-    line-height: 1.35;
-  }
-  .pi-print-body :first-child {
-    margin-top: 0;
-  }
-  .pi-print-body :last-child {
-    margin-bottom: 0;
-  }
-  .pi-print-caption {
-    margin-top: 1.5mm;
-    color: #475569;
-    font-size: 9pt;
-  }
-  .pi-print-image {
-    display: block;
-    max-width: 100%;
-    width: auto;
-    max-height: 55mm;
-    margin-top: 2.5mm;
-    object-fit: contain;
-    border-radius: 2mm;
-    break-inside: avoid;
-  }
-  .pi-print-image-block {
-    display: grid;
-    grid-template-columns: 60mm minmax(0, 1fr);
-    gap: 4mm;
-    align-items: start;
-  }
-  .pi-print-image-figure {
-    margin: 0;
-  }
-  .pi-print-image-content {
-    min-width: 0;
-  }
-  .pi-print-link {
-    margin-top: 2mm;
-    font-size: 9pt;
-  }
-  .pi-print-link a {
-    color: inherit;
-    text-decoration: underline;
   }
 </style>
 <style id="property-instruction-pdf-export-css">
@@ -964,11 +946,82 @@
     font-size: 11px;
     line-height: 1.35;
   }
-  [data-property-instruction-export] .pi-export-map-note {
-    margin: 10px 0 0;
-    color: #475569;
-    font-size: 13px;
-    line-height: 1.4;
+  [data-property-instruction-export] .pi-export-page-one-extras {
+    margin: 16px 0 0;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+    gap: 14px;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+  [data-property-instruction-export] .pi-export-contents,
+  [data-property-instruction-export] .pi-export-quick-access {
+    padding: 16px;
+    border: 1px solid #d7dee5;
+    border-radius: 18px;
+    background: #fff;
+  }
+  [data-property-instruction-export] .pi-export-panel-title {
+    margin: 0 0 10px;
+    font-size: 17px;
+    line-height: 1.2;
+  }
+  [data-property-instruction-export] .pi-export-contents-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: grid;
+    gap: 7px;
+  }
+  [data-property-instruction-export] .pi-export-contents-list li {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
+  }
+  [data-property-instruction-export] .pi-export-contents-link {
+    color: #0f172a;
+    text-decoration: none;
+    font-weight: 600;
+    flex: 1 1 auto;
+  }
+  [data-property-instruction-export] .pi-export-contents-page {
+    flex: 0 0 auto;
+    color: #64748b;
+    font-size: 12px;
+    font-weight: 700;
+  }
+  [data-property-instruction-export] .pi-export-qr-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+  [data-property-instruction-export] .pi-export-qr-card {
+    display: grid;
+    gap: 8px;
+    align-content: start;
+  }
+  [data-property-instruction-export] .pi-export-qr-link,
+  [data-property-instruction-export] .pi-export-qr-label {
+    margin: 0;
+    font-size: 12px;
+    line-height: 1.35;
+    color: #0f172a;
+    text-decoration: none;
+    font-weight: 600;
+  }
+  [data-property-instruction-export] .pi-export-qr-frame {
+    width: 124px;
+    height: 124px;
+    min-height: 124px;
+    border-radius: 14px;
+    border: 1px solid #d7dee5;
+    background: #fff;
+    overflow: hidden;
+  }
+  [data-property-instruction-export] .pi-export-qr-image {
+    width: 124px;
+    height: 124px;
   }
   [data-property-instruction-export] .pi-export-map-placeholder,
   [data-property-instruction-export] .pi-export-image-placeholder {
@@ -988,9 +1041,6 @@
     margin: 0 0 18px;
     page-break-inside: auto;
     break-inside: auto;
-  }
-  [data-property-instruction-export] .pi-export-section-cards {
-    display: block;
   }
   [data-property-instruction-export] .pi-export-section-title {
     margin: 0 0 10px;
@@ -1027,6 +1077,12 @@
     break-after: avoid;
   }
   [data-property-instruction-export] .pi-export-document[dir="rtl"] .pi-export-card-head {
+    flex-direction: row-reverse;
+  }
+  [data-property-instruction-export] .pi-export-document[dir="rtl"] .pi-export-page-one-extras {
+    direction: rtl;
+  }
+  [data-property-instruction-export] .pi-export-document[dir="rtl"] .pi-export-contents-list li {
     flex-direction: row-reverse;
   }
   [data-property-instruction-export] .pi-export-step-badge {
@@ -1162,77 +1218,6 @@
       min-height: 260px;
     }
   }
-  @media print {
-    @page {
-      size: A4 portrait;
-      margin: 12mm 13mm;
-    }
-    html,
-    body,
-    .page-content-wrapper,
-    .page_content,
-    .pi-page {
-      min-height: 0 !important;
-      height: auto !important;
-    }
-    .pi-page {
-      background: #fff;
-      color: #111827;
-      padding: 0;
-      font-size: 10pt;
-    }
-    .pi-shell {
-      width: 100%;
-    }
-    .pi-screen-layout {
-      display: none !important;
-    }
-    .pi-print-layout {
-      display: block !important;
-      position: static !important;
-      left: auto !important;
-      top: auto !important;
-      opacity: 1 !important;
-      visibility: visible !important;
-      pointer-events: auto !important;
-    }
-    .pi-print-layout,
-    .pi-print-section,
-    .pi-print-blocks {
-      width: 100%;
-    }
-    .pi-print-blocks {
-      display: block;
-    }
-    .pi-print-meta-grid {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-    .pi-print-block,
-    .pi-print-image,
-    .pi-print-step-head {
-      break-inside: avoid;
-    }
-    .pi-print-section-title {
-      break-after: avoid;
-    }
-    .pi-print-block-warning {
-      print-color-adjust: exact;
-      -webkit-print-color-adjust: exact;
-    }
-    .pi-print-layout a {
-      color: inherit;
-    }
-    .pi-print-layout .pi-print-body,
-    .pi-print-layout .pi-print-caption,
-    .pi-print-layout .pi-print-link,
-    .pi-print-layout .pi-value {
-      orphans: 3;
-      widows: 3;
-    }
-    .pi-print-image-block {
-      grid-template-columns: 55mm minmax(0, 1fr);
-    }
-  }
 </style>
 {% endblock %}
 
@@ -1339,66 +1324,15 @@
   </div>
 {% endmacro %}
 
-{% macro render_print_block(block) %}
-  {% if block.hide_in_print %}
-  {% else %}
-  <div class="pi-print-block pi-print-block-{{ block.block_type | lower | replace(' ', '-') }}">
-    {% if block.block_type == "Image" %}
-    <div class="pi-print-image-block">
-      <figure class="pi-print-image-figure">
-        <img class="pi-print-image" src="{{ block.image }}" alt="{{ block.image_alt }}">
-      </figure>
-      <div class="pi-print-image-content">
-        {% if block.title %}<h3 class="pi-print-block-title">{{ block.title }}</h3>{% endif %}
-        {% if block.safe_body %}
-        <div class="pi-print-body">{{ block.safe_body }}</div>
-        {% endif %}
-        {% if block.caption %}
-        <div class="pi-print-caption">{{ block.caption }}</div>
-        {% endif %}
-        {% if block.link_url %}
-        <div class="pi-print-link">
-          <a href="{{ block.link_url }}" target="_blank" rel="noopener noreferrer nofollow">{{ block.display_link_label }}</a>
-        </div>
-        {% endif %}
-      </div>
-    </div>
-    {% elif block.block_type == "Step" %}
-    <div class="pi-print-step-head">
-      <span class="pi-print-step-number">{{ block.display_step_number }}</span>
-      {% if block.title %}<h3 class="pi-print-block-title">{{ block.title }}</h3>{% endif %}
-    </div>
-    {% elif block.title %}
-    <h3 class="pi-print-block-title">{{ block.title }}</h3>
-    {% endif %}
-
-    {% if block.safe_body %}
-    <div class="pi-print-body">{{ block.safe_body }}</div>
-    {% endif %}
-
-    {% if block.image and block.block_type != "Image" %}
-    <img class="pi-print-image" src="{{ block.image }}" alt="{{ block.image_alt }}">
-    {% endif %}
-
-    {% if block.caption and block.block_type != "Image" %}
-    <div class="pi-print-caption">{{ block.caption }}</div>
-    {% endif %}
-
-    {% if block.link_url %}
-    <div class="pi-print-link">
-      <a href="{{ block.link_url }}" target="_blank" rel="noopener noreferrer nofollow">{{ block.display_link_label }}</a>
-    </div>
-    {% endif %}
-  </div>
-  {% endif %}
-{% endmacro %}
-
 {% block page_content %}
 <div
   class="pi-page"
   lang="{{ selected_language_code or 'en' }}"
   data-guide-root
-  data-guide-identity="{{ route or slug or title }}">
+  data-guide-identity="{{ route or slug or title }}"
+  data-guide-show-wifi-qr="{{ 1 if show_wifi_qr_in_pdf else 0 }}"
+  data-guide-wifi-security-type="{{ wifi_security_type or 'WPA' }}"
+  data-guide-wifi-hidden-network="{{ 1 if wifi_hidden_network else 0 }}">
   <div class="pi-shell">
     <section class="pi-guide-toolbar" data-guide-toolbar aria-label="Guide tools">
       <div class="pi-toolbar-language">
@@ -1425,21 +1359,85 @@
           data-guide-show-original
           hidden
           aria-hidden="true"
-        >Show original</button>
+        >
+          <svg class="pi-toolbar-action-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24">
+            <path d="M3 12a9 9 0 1 0 3-6.7"></path>
+            <path d="M3 4v6h6"></path>
+          </svg>
+          <span class="pi-toolbar-action-label">Show original</span>
+        </button>
         <button
           type="button"
           class="pi-btn pi-btn-secondary pi-pdf-download"
           data-pdf-filename="{{ pdf_download_filename }}"
           data-guide-identity="{{ route or slug or title }}"
-        >Download PDF</button>
-        <button type="button" class="pi-btn pi-btn-secondary property-instruction-print">Print guide</button>
+        >
+          <svg class="pi-toolbar-action-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24">
+            <path d="M12 3v12"></path>
+            <path d="m7 10 5 5 5-5"></path>
+            <path d="M5 21h14"></path>
+          </svg>
+          <span class="pi-toolbar-action-label">Download PDF</span>
+        </button>
+        <button type="button" class="pi-btn pi-btn-secondary property-instruction-print">
+          <svg class="pi-toolbar-action-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24">
+            <path d="M6 9V3h12v6"></path>
+            <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+            <path d="M6 14h12v7H6z"></path>
+          </svg>
+          <span class="pi-toolbar-action-label">Print guide</span>
+        </button>
+      </div>
+      <div
+        class="pi-pdf-progress"
+        data-pdf-progress
+        aria-live="polite"
+        hidden>
+        <div class="pi-pdf-progress-copy">
+          <span data-pdf-progress-label></span>
+          <span data-pdf-progress-eta></span>
+        </div>
+        <progress
+          data-pdf-progress-bar
+          role="progressbar"
+          max="100"
+          value="0"
+          aria-valuemin="0"
+          aria-valuemax="100"
+          aria-valuenow="0"></progress>
       </div>
       {% if google_translate and google_translate.enabled %}
-      <small class="pi-translate-attribution">Powered by Google Translate</small>
+      <small class="pi-translate-attribution pi-translate-attribution--toolbar">Powered by Google Translate</small>
       <div id="{{ google_translate.container_id }}" class="pi-google-translate-engine" aria-hidden="true"></div>
       {% endif %}
       <p class="pi-action-status sr-only" aria-live="polite"></p>
+      <a data-pdf-download-anchor hidden aria-hidden="true" tabindex="-1"></a>
+      <div class="sr-only" aria-hidden="true" data-guide-copy-bank>
+        <span data-guide-progress-copy="wait_translation">Waiting for translation</span>
+        <span data-guide-progress-copy="prepare_dependencies">Loading PDF tools</span>
+        <span data-guide-progress-copy="prepare_assets">Preparing photographs, maps and QR codes</span>
+        <span data-guide-progress-copy="build_layout">Building and paginating layout</span>
+        <span data-guide-progress-copy="render_page">Rendering page</span>
+        <span data-guide-progress-copy="of_total">of</span>
+        <span data-guide-progress-copy="assemble_pdf">Encoding and assembling PDF</span>
+        <span data-guide-progress-copy="pdf_ready">PDF ready</span>
+        <span data-guide-progress-copy="starting_download">Starting download…</span>
+        <span data-guide-progress-copy="download_started">Download started</span>
+        <span data-guide-progress-copy="about_remaining">About</span>
+        <span data-guide-progress-copy="seconds_remaining">seconds remaining</span>
+        <span data-guide-progress-copy="in_this_guide">In this guide</span>
+        <span data-guide-progress-copy="quick_access">Quick access</span>
+        <span data-guide-progress-copy="cancelled_language_change">PDF generation was cancelled because the language changed.</span>
+        <span data-guide-progress-copy="translation_unavailable">Translation is temporarily unavailable.</span>
+        <span data-guide-progress-copy="pdf_generation_failed">The PDF could not be generated. Please try again.</span>
+        <span data-guide-progress-copy="prepare_print_preview">Preparing print preview…</span>
+        <span data-guide-progress-copy="opening_print_dialog">Opening print dialog…</span>
+        <span data-guide-progress-copy="assembling_guide">Assembling guide</span>
+      </div>
     </section>
+    {% if google_translate and google_translate.enabled %}
+    <small class="pi-translate-attribution pi-translate-attribution--mobile">Powered by Google Translate</small>
+    {% endif %}
     <div class="pi-screen-layout" data-guide-screen>
       <article class="pi-hero">
         {% if cover_image %}
@@ -1498,6 +1496,22 @@
           </div>
         </div>
       </article>
+
+      {% if has_sections %}
+      <nav class="pi-guide-overview" aria-label="In this guide" data-guide-overview>
+        <h2 data-guide-contents-title>In this guide</h2>
+        <ul>
+          {% for section in sections %}
+          <li>
+            <a href="#{{ section.anchor }}" data-guide-overview-link="{{ section.anchor }}">
+              <span>{{ section.section }}</span>
+              <span class="pi-guide-overview-count">{{ section.blocks | length }}</span>
+            </a>
+          </li>
+          {% endfor %}
+        </ul>
+      </nav>
+      {% endif %}
 
       {% if screen_map_embed_url %}
       <section
@@ -1558,66 +1572,6 @@
         <p data-guide-empty-state data-guide-signature data-guide-translation-kind="translatable">No published instruction content is available for this property yet.</p>
       </div>
       {% endif %}
-    </div>
-    <div class="pi-print-layout" aria-hidden="true">
-      <header class="pi-print-header">
-        <div class="pi-print-header-grid">
-          <div>
-            <p class="pi-print-kicker">Estaex Guest Guide</p>
-            <h1 class="pi-print-title">{{ title }}</h1>
-            {% if address %}
-            <p class="pi-print-address">{{ address }}</p>
-            {% endif %}
-          </div>
-          {% if cover_image %}
-          <div>
-            <img class="pi-print-cover" src="{{ cover_image }}" alt="{{ title }} cover image">
-          </div>
-          {% endif %}
-        </div>
-        <div class="pi-print-meta-grid">
-          {% if check_in_time %}
-          <div class="pi-print-meta-item"><span class="pi-label">Check-In</span><span class="pi-value">{{ check_in_time }}</span></div>
-          {% endif %}
-          {% if check_out_time %}
-          <div class="pi-print-meta-item"><span class="pi-label">Check-Out</span><span class="pi-value">{{ check_out_time }}</span></div>
-          {% endif %}
-          {% if wifi_name %}
-          <div class="pi-print-meta-item"><span class="pi-label">Wi-Fi Name</span><span class="pi-value notranslate" translate="no">{{ wifi_name }}</span></div>
-          {% endif %}
-          {% if wifi_password_public %}
-          <div class="pi-print-meta-item"><span class="pi-label">Wi-Fi Password</span><span class="pi-value notranslate" translate="no">{{ wifi_password_public }}</span></div>
-          {% endif %}
-          {% if emergency_contact %}
-          <div class="pi-print-meta-item"><span class="pi-label">Emergency Contact</span><span class="pi-value">{{ emergency_contact }}</span></div>
-          {% endif %}
-          {% if last_reviewed_on %}
-          <div class="pi-print-meta-item"><span class="pi-label">Last Reviewed</span><span class="pi-value">{{ last_reviewed_on }}</span></div>
-          {% endif %}
-          {% if screen_map_external_url %}
-          <div class="pi-print-meta-item pi-print-map-url"><span class="pi-label">Property Location</span><a class="pi-value" href="{{ screen_map_external_url }}" target="_blank" rel="noopener noreferrer nofollow">Open in Google Maps</a></div>
-          {% endif %}
-        </div>
-      </header>
-
-      {% if has_sections %}
-        {% for section in sections %}
-        <section class="pi-print-section">
-          <h2 class="pi-print-section-title">{{ section.section }}</h2>
-          <div class="pi-print-blocks">
-            {% for block in section.blocks %}
-            {{ render_print_block(block) }}
-            {% endfor %}
-          </div>
-        </section>
-        {% endfor %}
-      {% else %}
-      <section class="pi-print-section">
-        <div class="pi-empty">
-          <p>No published instruction content is available for this property yet.</p>
-        </div>
-      </section>
-  {% endif %}
     </div>
   </div>
 </div>

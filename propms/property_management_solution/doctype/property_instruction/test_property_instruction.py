@@ -40,6 +40,12 @@ EXPORT_SCRIPT_PATH = os.path.abspath(
 		"property_instruction_export.js",
 	)
 )
+PROPERTY_DOCTYPE_PATH = os.path.abspath(
+	os.path.join(
+		os.path.dirname(__file__),
+		"property_instruction.json",
+	)
+)
 BLOCK_DOCTYPE_PATH = os.path.abspath(
 	os.path.join(
 		os.path.dirname(__file__),
@@ -218,6 +224,10 @@ class PropertyInstructionTestMixin:
 		with open(EXPORT_SCRIPT_PATH) as export_script_file:
 			return export_script_file.read()
 
+	def get_property_instruction_schema(self):
+		with open(PROPERTY_DOCTYPE_PATH) as doctype_file:
+			return json.load(doctype_file)
+
 	def get_block_doctype_json(self):
 		with open(BLOCK_DOCTYPE_PATH) as block_doctype_file:
 			return json.load(block_doctype_file)
@@ -385,6 +395,38 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 		self.assertEqual(embed_field["depends_on"], 'eval:doc.block_type')
 		self.assertEqual(embed_field["mandatory_depends_on"], 'eval:doc.block_type == "Map"')
 		self.assertIn("Required for Map blocks. Optional for Step/Text/Image/Warning/Link.", embed_field["description"])
+
+	def test_property_instruction_wifi_qr_fields_exist_in_schema(self):
+		schema = self.get_property_instruction_schema()
+		fields_by_name = {field["fieldname"]: field for field in schema["fields"]}
+		self.assertIn("show_wifi_qr_in_pdf", fields_by_name)
+		self.assertIn("wifi_security_type", fields_by_name)
+		self.assertIn("wifi_hidden_network", fields_by_name)
+		self.assertEqual(fields_by_name["show_wifi_qr_in_pdf"]["default"], "0")
+		self.assertEqual(fields_by_name["wifi_security_type"]["default"], "WPA")
+		self.assertEqual(fields_by_name["wifi_security_type"]["options"], "WPA\nWEP\nOpen")
+		self.assertEqual(fields_by_name["wifi_security_type"]["depends_on"], "eval:doc.show_wifi_qr_in_pdf")
+		self.assertEqual(fields_by_name["wifi_hidden_network"]["depends_on"], "eval:doc.show_wifi_qr_in_pdf")
+
+	def test_wifi_security_type_normalization_uses_canonical_values(self):
+		self.assertEqual(self.make_instruction(title="WiFi WPA", wifi_security_type="WPA").get_normalized_wifi_security_type(), "WPA")
+		self.assertEqual(self.make_instruction(title="WiFi WEP", wifi_security_type="WEP").get_normalized_wifi_security_type(), "WEP")
+		self.assertEqual(self.make_instruction(title="WiFi Open Canonical", wifi_security_type="Open").get_normalized_wifi_security_type(), "Open")
+		self.assertEqual(self.make_instruction(title="WiFi Open Lowercase", wifi_security_type="open").get_normalized_wifi_security_type(), "Open")
+		self.assertEqual(self.make_instruction(title="WiFi Open Uppercase", wifi_security_type="OPEN").get_normalized_wifi_security_type(), "Open")
+		self.assertEqual(self.make_instruction(title="WiFi invalid", wifi_security_type="unknown").get_normalized_wifi_security_type(), "WPA")
+
+	def test_open_wifi_network_is_exposed_as_open_without_password_requirement(self):
+		doc = self.make_instruction(
+			show_wifi_qr_in_pdf=1,
+			show_wifi_password_publicly=1,
+			wifi_security_type="OPEN",
+			wifi_password=None,
+		)
+		source = self.get_export_script_source()
+		self.assertEqual(doc.get_normalized_wifi_security_type(), "Open")
+		self.assertIn('securityType === "OPEN"', source)
+		self.assertIn('return "WIFI:T:nopass;S:"', source)
 
 	def test_map_block_accepts_valid_google_embed_and_excludes_raw_html_from_context(self):
 		embed_html = '<iframe src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d2484.0!2d-0.249!3d51.399!2m3!1f0!2f0!3f0!3m2!1i1024!2i768"></iframe>'
@@ -712,6 +754,35 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 		self.assertIn('iframe.VIpgJd-ZVi9od-ORHb-OEVmcd', html)
 		self.assertIn('.VIpgJd-ZVi9od-xl07Ob-OEVmcd', html)
 		self.assertIn('.VIpgJd-ZVi9od-SmfZ-OEVmcd', html)
+		self.assertEqual(html.count('class="pi-toolbar-action-icon"'), 3)
+		self.assertEqual(html.count('class="pi-toolbar-action-label"'), 3)
+		self.assertIn('class="pi-translate-attribution pi-translate-attribution--toolbar"', html)
+		self.assertIn('class="pi-translate-attribution pi-translate-attribution--mobile"', html)
+		self.assertLess(
+			html.index('data-guide-toolbar'),
+			html.index('class="pi-translate-attribution pi-translate-attribution--mobile"')
+		)
+		self.assertLess(
+			html.index('class="pi-translate-attribution pi-translate-attribution--mobile"'),
+			html.index('data-guide-screen')
+		)
+
+	def test_template_uses_compact_mobile_icon_toolbar_rules(self):
+		html = self.render_instruction(self.make_instruction())
+		self.assertIn("grid-template-columns: minmax(0, 1fr) auto;", html)
+		self.assertIn(".pi-toolbar-actions .pi-btn {", html)
+		self.assertIn("flex: 0 0 2.75rem;", html)
+		self.assertIn("width: 2.75rem;", html)
+		self.assertIn("height: 2.75rem;", html)
+		self.assertIn(".pi-toolbar-action-label,", html)
+		self.assertIn(".pi-toolbar-label,", html)
+		self.assertIn(".pi-translation-status {", html)
+		self.assertIn("clip-path: inset(50%);", html)
+		self.assertIn(".pi-pdf-progress {", html)
+		self.assertIn("grid-column: 1 / -1;", html)
+		self.assertIn(".pi-translate-attribution--toolbar {", html)
+		self.assertIn(".pi-translate-attribution--mobile {", html)
+		self.assertIn("text-align: end;", html)
 
 	def test_template_includes_empty_state_hook_when_no_sections(self):
 		doc = self.make_instruction(instruction_blocks=[])
@@ -758,6 +829,9 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 
 	def test_export_script_uses_per_page_html2canvas_and_direct_jspdf(self):
 		source = self.get_export_script_source()
+		ensure_original_snapshot_start = source.index("function ensureOriginalSnapshotCaptured()")
+		ensure_original_snapshot_end = source.index("function sleep(", ensure_original_snapshot_start)
+		ensure_original_snapshot_source = source[ensure_original_snapshot_start:ensure_original_snapshot_end]
 		self.assertIn("function buildPdfExportDocument(model)", source)
 		self.assertIn('querySelectorAll("[data-pdf-page]")', source)
 		self.assertIn("function ensureCaptureFrame()", source)
@@ -772,6 +846,7 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 		self.assertIn("populatePageFooters", source)
 		self.assertNotIn("window.scrollTo(", source)
 		self.assertIn("schedulePdfLibraryWarmup()", source)
+		self.assertNotIn("schedulePdfLibraryWarmup();", ensure_original_snapshot_source)
 		self.assertIn("getCurrentSnapshotIfReady(warmupLanguage, warmupGeneration)", source)
 		self.assertIn("captureSemanticSnapshot", source)
 		self.assertIn("waitForGuideTranslationReadiness", source)
@@ -815,6 +890,7 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 	def test_export_script_does_not_use_legacy_cloned_print_layout(self):
 		source = self.get_export_script_source()
 		self.assertNotIn(".pi-print-layout", source)
+		self.assertNotIn("render_print_block", self.render_instruction(self.make_instruction()))
 		self.assertNotIn("html2" + "pdf__overlay", source)
 		self.assertNotIn("data-pdf-token", source)
 
@@ -884,6 +960,7 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 	def test_export_script_records_pdf_performance_and_ignores_non_current_pages(self):
 		source = self.get_export_script_source()
 		self.assertIn("window.__propertyInstructionPdfPerformance", source)
+		self.assertIn("window.__propertyInstructionPdfLifecycle", source)
 		self.assertIn("translationReadyMs", source)
 		self.assertIn("pageCaptureMs", source)
 		self.assertIn("frameCreatedAt", source)
@@ -891,9 +968,20 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 		self.assertIn("frameFontsReadyMs", source)
 		self.assertIn("pageDomReplacementMs", source)
 		self.assertIn("captureTarget = await prepareCaptureFramePage(pageNode, performanceState)", source)
-		self.assertIn('node.setAttribute("data-html2canvas-ignore", "true")', source)
 		self.assertIn("destroyCaptureFrame(captureFrame)", source)
 		self.assertIn("prepareCaptureClone(clonedDocument)", source)
+		self.assertNotIn("function applyCaptureIgnoreAttributes(", source)
+		self.assertNotIn("function clearCaptureIgnoreAttributes(", source)
+		self.assertIn("canvas.width = 1;", source)
+		self.assertIn("await sleep(isSafariFamily() ? 16 : 0);", source)
+
+	def test_export_script_preserves_toolbar_icon_buttons_during_progress_updates(self):
+		source = self.get_export_script_source()
+		self.assertIn("function setToolbarButtonLabel(button, labelText)", source)
+		self.assertIn('var labelNode = button.querySelector(".pi-toolbar-action-label");', source)
+		self.assertIn("labelNode.textContent = String(labelText || \"\");", source)
+		self.assertIn("setToolbarButtonLabel(downloadButton, currentLabel + \"…\");", source)
+		self.assertIn("setToolbarButtonLabel(triggerElement, originalLabel);", source)
 
 	def test_export_script_builds_translated_filenames_and_custom_toolbar_sync(self):
 		source = self.get_export_script_source()
@@ -912,6 +1000,74 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 		self.assertIn("normalize(\"NFKC\")", source)
 		self.assertIn('setTranslationStatus("Restoring original…")', source)
 		self.assertIn("applyCustomLanguageSelection(SOURCE_LANGUAGE)", source)
+
+	def test_export_script_includes_progress_contents_and_qr_support(self):
+		source = self.get_export_script_source()
+		html = self.render_instruction(
+			self.make_instruction(
+				title="QR Guide",
+				show_wifi_password_publicly=1,
+				show_wifi_qr_in_pdf=1,
+				wifi_security_type="WEP",
+				wifi_hidden_network=1,
+			)
+		)
+		self.assertIn("QRCODE_LIBRARY_URL", source)
+		self.assertIn("function ensureQrCodeLibrary()", source)
+		self.assertIn("function buildWifiQrPayload(model)", source)
+		self.assertIn("function createQrPngDataUri(payload)", source)
+		self.assertIn("window.qrcodegen.QrCode.Ecc.MEDIUM", source)
+		self.assertIn('canvas.toDataURL("image/png")', source)
+		self.assertIn("function buildQuickAccessEntries(model)", source)
+		self.assertIn("function attachBlockQrEntries(model, remainingEntries, qrImageCache)", source)
+		self.assertIn("function summarizeDiagnosticImageSource(source, role, extra)", source)
+		self.assertIn("function triggerAutomaticPdfDownload(blob, filename)", source)
+		self.assertIn("data-pdf-internal-target", source)
+		self.assertIn("populatePdfContentsDestinations(exportState)", source)
+		self.assertIn("recordProgressHistory(", source)
+		self.assertIn("getAverageProgressHistory(", source)
+		self.assertIn("data-pdf-progress", html)
+		self.assertIn("data-pdf-download-anchor", html)
+		self.assertNotIn("Save PDF", html)
+		self.assertIn("data-guide-contents-title", html)
+		self.assertIn('data-guide-show-wifi-qr="1"', html)
+		self.assertIn('data-guide-wifi-security-type="WEP"', html)
+		self.assertIn('data-guide-wifi-hidden-network="1"', html)
+
+	def test_export_script_uses_single_export_controller_and_card_qr_placement(self):
+		source = self.get_export_script_source()
+		html = self.render_instruction(self.make_instruction(title="Save Guide"))
+		self.assertIn("pdfExportController.activePromise", source)
+		self.assertIn("setGuidePdfActionButtonsDisabled(true)", source)
+		self.assertIn("function getOrCreateGuidePdfArtifact(triggerElement)", source)
+		self.assertIn("function performGuidePdfArtifactGeneration(triggerElement)", source)
+		self.assertIn("setPdfExportControlsDisabled(true)", source)
+		self.assertIn("function createReadyPdfObjectUrl(blob)", source)
+		self.assertIn("function triggerAutomaticPdfDownload(blob, filename)", source)
+		self.assertIn("window.addEventListener(\"pagehide\", clearReadyPdfObjectUrl);", source)
+		self.assertIn("window.addEventListener(\"beforeunload\", clearReadyPdfObjectUrl);", source)
+		self.assertIn("5 * 60 * 1000", source)
+		self.assertIn("pdfPreparationState.artifactCache = {};", source)
+		self.assertNotIn("isSafariFamily()) {", source)
+		self.assertIn("blockModel.qrEntries", source)
+		self.assertIn('blockId: linkEntry.blockId || ""', source)
+		self.assertIn("pi-export-card-qr-panel", source)
+		self.assertIn("data-pdf-section-item", source)
+		self.assertIn("pageImageBlobs.push(jpegBlob)", source)
+		self.assertIn("PDF pagination dropped export content", source)
+		self.assertNotIn("pi-export-section--quick-links", source)
+		self.assertIn("data-pdf-download-anchor", html)
+		self.assertNotIn("data-pdf-save-link", html)
+		self.assertNotIn("Save PDF", html)
+
+	def test_export_script_does_not_classify_render_failures_as_translation_timeouts(self):
+		source = self.get_export_script_source()
+		self.assertIn('getGuideCopyText("translation_unavailable", "Translation is temporarily unavailable.")', source)
+		self.assertIn('getGuideCopyText("pdf_generation_failed", "The PDF could not be generated. Please try again.")', source)
+		self.assertNotIn(
+			'setTranslationAbortReason(error && error.message ? error.message : "Unable to prepare PDF", "translation-timeout-unknown");',
+			source,
+		)
 
 	def test_export_script_validates_image_clipping_separately_from_ratio(self):
 		source = self.get_export_script_source()
@@ -1013,11 +1169,49 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 		self.assertIn("function syncStickyToolbarOffset()", source)
 		self.assertIn("function ensureStickyToolbarObservers()", source)
 		self.assertIn("function ensureSectionNavObserver()", source)
+		self.assertIn("function getActiveGuideSectionId(sectionNodes, activationY, atDocumentBottom)", source)
+		self.assertIn("function syncActiveSectionNavigation()", source)
+		self.assertIn("window.addEventListener(\"scroll\", scheduleActiveSectionNavigationSync, { passive: true });", source)
 		self.assertIn('shell.style.setProperty("--pi-toolbar-bottom-offset"', source)
 		self.assertIn("new ResizeObserver", source)
 		self.assertIn('linkNode.setAttribute("aria-current", "location")', source)
+		self.assertNotIn("rootMargin: \"-20% 0px -60% 0px\"", source)
 		self.assertIn("--pi-toolbar-bottom-offset", html)
 		self.assertIn("scroll-margin-top: calc(var(--pi-toolbar-bottom-offset) + 1rem);", html)
+
+	def test_export_script_prints_generated_page_images_in_iframe(self):
+		source = self.get_export_script_source()
+		html = self.render_instruction(self.make_instruction())
+		self.assertIn("function printGeneratedGuide(printButton)", source)
+		self.assertIn("function prepareGeneratedPrintFrame(printState, artifact)", source)
+		self.assertIn("function createPrintFrame()", source)
+		self.assertIn("artifact.pageImageBlobs", source)
+		self.assertIn("printState.frame.contentWindow.print()", source)
+		self.assertIn('frame.style.width = PRINT_PAGE_WIDTH_PT + "pt";', source)
+		self.assertIn('frame.style.height = PRINT_PAGE_HEIGHT_PT + "pt";', source)
+		self.assertIn('width:\' + PRINT_PAGE_WIDTH_PT + \'pt;height:\' + PRINT_PAGE_HEIGHT_PT + \'pt;', source)
+		self.assertIn("var PRINT_PAGE_WIDTH_PT = 594;", source)
+		self.assertIn("var PRINT_PAGE_HEIGHT_PT = 840;", source)
+		self.assertIn("break-inside:avoid;page-break-inside:avoid;", source)
+		self.assertNotIn('height:297mm', source)
+		self.assertNotIn('break-before:page', source)
+		self.assertNotIn('page-break-before:always', source)
+		self.assertNotIn('page-break-after:always', source)
+		self.assertNotIn('break-after:page', source)
+		self.assertIn("validatePrintFrameLayout(frameDocument)", source)
+		self.assertIn('throw new Error("print-page-overflow")', source)
+		self.assertIn('throw new Error("print-forced-break-detected")', source)
+		self.assertIn('failureCode: "print-forced-break-detected"', source)
+		self.assertIn("expectedBodyHeight", source)
+		self.assertIn("breakBefore", source)
+		self.assertIn("pageBreakBefore", source)
+		self.assertIn("marginTop", source)
+		self.assertIn("marginBottom", source)
+		self.assertIn('setPrintLifecycle("print-returned"', source)
+		self.assertIn('window.addEventListener("pagehide", cleanupActivePrintFrame);', source)
+		self.assertIn('window.addEventListener("beforeunload", cleanupActivePrintFrame);', source)
+		self.assertNotIn("window.print()", source)
+		self.assertEqual(html.count("property-instruction-print"), 1)
 
 	def test_export_script_projects_map_marker_separately_from_center(self):
 		source = self.get_export_script_source()
@@ -1045,10 +1239,12 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 
 	def test_export_script_uses_language_neutral_progress_copy(self):
 		source = self.get_export_script_source()
-		self.assertNotIn("Preparing PDF", source)
-		self.assertNotIn("Waiting for translation", source)
-		self.assertNotIn("Rendering PDF", source)
-		self.assertIn('downloadButton.textContent = currentLabel + "…";', source)
+		html = self.render_instruction(self.make_instruction())
+		self.assertIn("getGuideCopyText(", source)
+		self.assertIn('data-guide-progress-copy="wait_translation"', html)
+		self.assertIn('data-guide-progress-copy="prepare_assets"', html)
+		self.assertIn('data-guide-progress-copy="render_page"', html)
+		self.assertIn('setToolbarButtonLabel(downloadButton, currentLabel + "…");', source)
 		self.assertIn('statusElement.textContent = statusMessage || "…";', source)
 
 	def test_noindex_present_when_google_translate_disabled(self):

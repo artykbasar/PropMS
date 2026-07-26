@@ -37,6 +37,11 @@ SECTION_OPTIONS = [
 ]
 
 MAP_TYPES = {"roadmap", "satellite"}
+WIFI_SECURITY_TYPES = {
+	"WPA": "WPA",
+	"WEP": "WEP",
+	"OPEN": "Open",
+}
 DEFAULT_MAP_ZOOM = 16
 MIN_MAP_ZOOM = 0
 MAX_MAP_ZOOM = 21
@@ -129,6 +134,7 @@ class PropertyInstruction(WebsiteGenerator):
 		self.set_route_from_slug()
 		self.validate_unique_slug_and_route()
 		self.normalize_map_fields()
+		self.normalize_wifi_qr_fields()
 		self.normalize_blocks()
 		self.validate_links()
 		super().validate()
@@ -261,6 +267,8 @@ class PropertyInstruction(WebsiteGenerator):
 		map_static_image_url = self.get_public_pdf_image_src(property_map.static_image_url)
 		google_translate = self.get_google_translate_settings()
 		wifi_password_public = self.get_public_wifi_password()
+		wifi_security_type = self.get_normalized_wifi_security_type()
+		show_wifi_qr_in_pdf = bool(cint(self.show_wifi_qr_in_pdf or 0))
 		return frappe._dict(
 			title=self.title,
 			page_title=self.title,
@@ -285,6 +293,9 @@ class PropertyInstruction(WebsiteGenerator):
 			check_out_time=self.format_display_time(self.check_out_time),
 			wifi_name=self.wifi_name,
 			wifi_password_public=wifi_password_public,
+			show_wifi_qr_in_pdf=show_wifi_qr_in_pdf,
+			wifi_security_type=wifi_security_type,
+			wifi_hidden_network=bool(cint(self.wifi_hidden_network or 0)),
 			emergency_contact=self.emergency_contact,
 			emergency_contact_translation_protected=self.should_protect_identifier_value(self.emergency_contact),
 			last_reviewed_on=self.last_reviewed_on,
@@ -403,6 +414,15 @@ class PropertyInstruction(WebsiteGenerator):
 		if zoom < MIN_MAP_ZOOM or zoom > MAX_MAP_ZOOM:
 			return DEFAULT_MAP_ZOOM
 		return zoom
+
+	def normalize_wifi_qr_fields(self):
+		self.show_wifi_qr_in_pdf = cint(self.show_wifi_qr_in_pdf or 0)
+		self.wifi_hidden_network = cint(self.wifi_hidden_network or 0)
+		self.wifi_security_type = self.get_normalized_wifi_security_type()
+
+	def get_normalized_wifi_security_type(self):
+		security_type = (self.wifi_security_type or "WPA").strip().upper()
+		return WIFI_SECURITY_TYPES.get(security_type, "WPA")
 
 	def get_map_embed_api_key(self):
 		return frappe.conf.get("google_maps_embed_api_key") or os.environ.get("GOOGLE_MAPS_EMBED_API_KEY")

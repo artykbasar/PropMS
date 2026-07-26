@@ -30,6 +30,9 @@
   "wifi_name",
   "wifi_password",
   "show_wifi_password_publicly",
+  "show_wifi_qr_in_pdf",
+  "wifi_security_type",
+  "wifi_hidden_network",
   "section_instruction_blocks",
   "instruction_blocks"
  ],
@@ -166,6 +169,26 @@
    "fieldname": "show_wifi_password_publicly",
    "fieldtype": "Check",
    "label": "Show Wi-Fi Password Publicly"
+  },
+  {
+   "default": "0",
+   "fieldname": "show_wifi_qr_in_pdf",
+   "fieldtype": "Check",
+   "label": "Show Wi-Fi QR In PDF"
+  },
+  {
+   "default": "WPA",
+   "depends_on": "eval:doc.show_wifi_qr_in_pdf",
+   "fieldname": "wifi_security_type",
+   "fieldtype": "Select",
+   "label": "Wi-Fi Security Type",
+   "options": "WPA\nWEP\nOpen"
+  },
+  {
+   "depends_on": "eval:doc.show_wifi_qr_in_pdf",
+   "fieldname": "wifi_hidden_network",
+   "fieldtype": "Check",
+   "label": "Wi-Fi Hidden Network"
   },
   {
    "fieldname": "section_instruction_blocks",
