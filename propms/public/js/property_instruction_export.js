@@ -23,9 +23,6 @@
   var PDF_EXPORT_TIMEOUT_MS = 240000;
   var PDF_EXPORT_IMAGE_RATIO_TOLERANCE = 0.02;
   var PDF_EXPORT_IMAGE_CLIP_TOLERANCE = 1.5;
-  var PRINT_PAGE_WIDTH_PT = 594;
-  var PRINT_PAGE_HEIGHT_PT = 840;
-  var PRINT_PAGE_LAYOUT_SETTLE_MS = 40;
   var PDF_EXPORT_FONT_LOADS = [
     '400 16px "PropMS PDF Inter"',
     '500 16px "PropMS PDF Inter"',
@@ -101,8 +98,450 @@
     readySize: 0,
     readyObjectUrlRevokeTimer: 0
   };
-  var activePrintController = null;
   var instructionBlockMapModels = null;
+  var PRINT_TAB_DELAY_MS = 1000;
+  var PRINT_TAB_BLOB_TTL_MS = 10 * 60 * 1000;
+  var printGuideReadyDialog = null;
+  var printGuideController = {
+    activeBlobUrl: "",
+    activeBlobCacheKey: "",
+    activeBlobUrlTimer: 0,
+    pendingArtifact: null,
+    pendingTriggerButton: null,
+    launchInProgress: false
+  };
+
+  function hashSafeTraceValue(value) {
+    var input = String(value || "");
+    var hash = 2166136261;
+    for (var index = 0; index < input.length; index += 1) {
+      hash ^= input.charCodeAt(index);
+      hash += (hash << 1) + (hash << 4) + (hash << 7) + (hash << 8) + (hash << 24);
+    }
+    return (hash >>> 0).toString(16);
+  }
+
+  function getSafeTraceId(value, prefix) {
+    return String(prefix || "trace") + "-" + hashSafeTraceValue(value || "");
+  }
+
+  function trimTraceCollection(collection, limit) {
+    if (!Array.isArray(collection)) {
+      return [];
+    }
+    if (collection.length <= limit) {
+      return collection;
+    }
+    return collection.slice(collection.length - limit);
+  }
+
+  function getPrintGuideDiagnostics() {
+    window.__propertyInstructionTabPrintDiagnostics = window.__propertyInstructionTabPrintDiagnostics || {
+      createdAt: Date.now(),
+      platform: {
+        browserFamily: getBrowserFamily(),
+        osFamily: /Android/i.test(String((navigator && navigator.userAgent) || "")) ? "Android" : (
+          /iPad|iPhone|iPod/i.test(String((navigator && navigator.userAgent) || "")) ? "iOS" : "Other"
+        )
+      },
+      events: []
+    };
+    return window.__propertyInstructionTabPrintDiagnostics;
+  }
+
+  function recordPrintGuideDiagnostic(eventName, extraDetails) {
+    var diagnostics = getPrintGuideDiagnostics();
+    diagnostics.events.push(Object.assign({
+      event: String(eventName || "event"),
+      at: Date.now()
+    }, extraDetails || {}));
+    diagnostics.events = trimTraceCollection(diagnostics.events, 120);
+  }
+
+  function resetPrintGuidePendingState() {
+    printGuideController.pendingArtifact = null;
+    printGuideController.pendingTriggerButton = null;
+  }
+
+  function clearPrintGuideBlobUrl(reason) {
+    if (printGuideController.activeBlobUrlTimer) {
+      window.clearTimeout(printGuideController.activeBlobUrlTimer);
+      printGuideController.activeBlobUrlTimer = 0;
+    }
+    if (printGuideController.activeBlobUrl && window.URL && window.URL.revokeObjectURL) {
+      window.URL.revokeObjectURL(printGuideController.activeBlobUrl);
+      recordPrintGuideDiagnostic("blob-cleaned", {
+        cleanupReason: String(reason || "manual-reset")
+      });
+    }
+    printGuideController.activeBlobUrl = "";
+    printGuideController.activeBlobCacheKey = "";
+  }
+
+  function schedulePrintGuideBlobCleanup(reason) {
+    if (!printGuideController.activeBlobUrl) {
+      return;
+    }
+    if (printGuideController.activeBlobUrlTimer) {
+      window.clearTimeout(printGuideController.activeBlobUrlTimer);
+    }
+    var cleanupReason = String(reason || "timeout");
+    recordPrintGuideDiagnostic("blob-cleanup-scheduled", {
+      cleanupReason: cleanupReason
+    });
+    printGuideController.activeBlobUrlTimer = window.setTimeout(function () {
+      clearPrintGuideBlobUrl(cleanupReason);
+    }, PRINT_TAB_BLOB_TTL_MS);
+  }
+
+  function getPrintGuideBlobUrlForArtifact(artifact) {
+    if (!artifact || !artifact.pdfBlob || !window.URL || !window.URL.createObjectURL) {
+      return "";
+    }
+    var cacheKey = String(artifact.cacheKey || "");
+    if (
+      printGuideController.activeBlobUrl &&
+      cacheKey &&
+      printGuideController.activeBlobCacheKey === cacheKey
+    ) {
+      schedulePrintGuideBlobCleanup("timeout");
+      return printGuideController.activeBlobUrl;
+    }
+    clearPrintGuideBlobUrl("artifact-replaced");
+    printGuideController.activeBlobUrl = window.URL.createObjectURL(artifact.pdfBlob);
+    printGuideController.activeBlobCacheKey = cacheKey;
+    schedulePrintGuideBlobCleanup("timeout");
+    return printGuideController.activeBlobUrl;
+  }
+
+  function getCurrentCompletedPdfArtifact(triggerElement) {
+    syncTranslationLanguageState();
+    var guideIdentity = getGuideIdentity(triggerElement);
+    var currentLanguage = translationState.requestedLanguage || SOURCE_LANGUAGE;
+    var currentGeneration = translationState.generation || 0;
+    var snapshot = captureSemanticSnapshot();
+    var snapshotHash = getSnapshotHash(snapshot);
+    var cacheKey = getPreparedStateKey(
+      guideIdentity,
+      currentLanguage,
+      currentGeneration,
+      snapshotHash
+    );
+    var artifact = getCachedPdfArtifact(cacheKey);
+    if (
+      !artifact ||
+      !artifact.pdfBlob ||
+      !(artifact.pdfBlob instanceof Blob) ||
+      Number(artifact.pdfBlob.size || 0) <= 0 ||
+      Number(artifact.pageCount || 0) <= 0 ||
+      String(artifact.cacheKey || "") !== String(cacheKey)
+    ) {
+      return null;
+    }
+    artifact.artifactCacheHit = true;
+    return artifact;
+  }
+
+  function setPrintGuideLaunchInProgress(disabled) {
+    printGuideController.launchInProgress = !!disabled;
+    var printButton = getPrintButton();
+    if (!printButton) {
+      return;
+    }
+    if (disabled) {
+      printButton.disabled = true;
+      printButton.classList.add("is-disabled");
+      printButton.setAttribute("aria-disabled", "true");
+      return;
+    }
+    if (!pdfExportController.activePromise) {
+      printButton.disabled = false;
+      printButton.classList.remove("is-disabled");
+      printButton.removeAttribute("aria-disabled");
+    }
+  }
+
+  function openPdfTabWaitingDocument(printTab) {
+    if (!printTab) {
+      return;
+    }
+    try {
+      printTab.document.open();
+      printTab.document.write("<!doctype html><html><head><meta charset=\"utf-8\"><title>Opening printable guide…</title></head><body><p>Opening printable guide…</p></body></html>");
+      printTab.document.close();
+    } catch (error) {
+      recordPrintGuideDiagnostic("print-tab-write-failed", {
+        errorName: String(error && error.name || "Error")
+      });
+    }
+  }
+
+  function navigatePdfTabAndSchedulePrint(printTab, artifact, interactionCount) {
+    if (!printTab || !artifact || !artifact.pdfBlob) {
+      return false;
+    }
+    var blobUrl = getPrintGuideBlobUrlForArtifact(artifact);
+    if (!blobUrl) {
+      return false;
+    }
+    try {
+      printTab.location.replace(blobUrl);
+      recordPrintGuideDiagnostic("pdf-tab-navigated", {
+        artifactCacheHit: !!artifact.artifactCacheHit,
+        pageCount: artifact.pageCount || 0,
+        pdfBlobSize: artifact.pdfBlob.size || 0,
+        interactionCount: Number(interactionCount || 1),
+        printDelayMs: PRINT_TAB_DELAY_MS
+      });
+    } catch (error) {
+      recordPrintGuideDiagnostic("pdf-tab-navigation-failed", {
+        errorName: String(error && error.name || "Error")
+      });
+      try {
+        if (printTab.close) {
+          printTab.close();
+        }
+      } catch (closeError) {
+        // Ignore close failures on browser-owned tabs.
+      }
+      setPrintGuideLaunchInProgress(false);
+      return false;
+    }
+    window.setTimeout(function () {
+      try {
+        if (printTab.focus) {
+          printTab.focus();
+        }
+      } catch (error) {
+        recordPrintGuideDiagnostic("print-focus-failed", {
+          errorName: String(error && error.name || "Error")
+        });
+      }
+      recordPrintGuideDiagnostic("print-called", {
+        artifactCacheHit: !!artifact.artifactCacheHit,
+        pageCount: artifact.pageCount || 0,
+        interactionCount: Number(interactionCount || 1),
+        printDelayMs: PRINT_TAB_DELAY_MS
+      });
+      try {
+        printTab.print();
+        recordPrintGuideDiagnostic("print-returned", {
+          interactionCount: Number(interactionCount || 1)
+        });
+      } catch (error) {
+        recordPrintGuideDiagnostic("print-threw", {
+          errorName: String(error && error.name || "Error")
+        });
+      } finally {
+        window.setTimeout(function () {
+          setPrintGuideLaunchInProgress(false);
+        }, 0);
+      }
+    }, PRINT_TAB_DELAY_MS);
+    return true;
+  }
+
+  function ensurePrintGuideReadyDialog() {
+    if (printGuideReadyDialog) {
+      return;
+    }
+    if (!document.getElementById("pi-print-ready-dialog-styles")) {
+      var style = document.createElement("style");
+      style.id = "pi-print-ready-dialog-styles";
+      style.textContent = [
+        "[data-guide-print-ready-dialog]{border:0;padding:0;background:transparent;max-width:min(28rem,calc(100vw - 32px));width:min(28rem,calc(100vw - 32px));margin:auto;inset:0;}",
+        "[data-guide-print-ready-dialog]::backdrop{background:rgba(15,23,42,.46);backdrop-filter:blur(2px);}",
+        ".pi-print-ready-card{display:grid;gap:.9rem;padding:1.25rem;background:var(--pi-card,#fff);color:var(--pi-ink,#1f2933);border:1px solid var(--pi-border,#d7dee5);border-radius:24px;box-shadow:0 18px 40px rgba(15,23,42,.12);font:inherit;}",
+        ".pi-print-ready-hero{display:grid;justify-items:center;gap:.6rem;text-align:center;}",
+        ".pi-print-ready-icon{display:grid;place-items:center;width:4.5rem;height:4.5rem;border-radius:22px;background:var(--pi-accent-soft,#dff4f2);color:var(--pi-accent,#115e59);}",
+        ".pi-print-ready-icon svg{width:2rem;height:2rem;display:block;stroke:currentColor;stroke-width:1.8;fill:none;stroke-linecap:round;stroke-linejoin:round;pointer-events:none;}",
+        ".pi-print-ready-kicker{margin:0;font:700 .84rem/1.2 inherit;letter-spacing:.06em;text-transform:uppercase;color:var(--pi-accent,#115e59);}",
+        ".pi-print-ready-error{margin:0;color:#b91c1c;text-align:center;}",
+        ".pi-print-ready-error[hidden]{display:none;}",
+        ".pi-print-ready-actions{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr);gap:.65rem;align-items:center;}",
+        ".pi-print-ready-actions .pi-btn{width:100%;min-height:2.9rem;}",
+        ".pi-print-ready-actions .pi-btn-primary{background:var(--pi-accent,#115e59);color:#fff;border:1px solid transparent;}",
+        ".pi-print-ready-actions .pi-btn-secondary{background:transparent;color:var(--pi-accent,#115e59);border:1px solid var(--pi-border,#d7dee5);}",
+        "@media (max-width: 768px){[data-guide-print-ready-dialog]{width:calc(100vw - 32px);margin:auto;}.pi-print-ready-card{padding:1rem;}.pi-print-ready-actions{grid-template-columns:1fr;}.pi-print-ready-actions .pi-btn{min-height:2.9rem;}}",
+        "@media (prefers-reduced-motion:no-preference){[data-guide-print-ready-dialog][open] .pi-print-ready-card{animation:piPrintReadyFade .18s ease-out;}}",
+        "@keyframes piPrintReadyFade{from{transform:translateY(6px);opacity:0;}to{transform:translateY(0);opacity:1;}}"
+      ].join("");
+      document.head.appendChild(style);
+    }
+    var dialog = document.createElement("dialog");
+    dialog.setAttribute("data-guide-print-ready-dialog", "true");
+    dialog.setAttribute("data-guide-ui-exclude", "true");
+    dialog.setAttribute("role", "dialog");
+    dialog.setAttribute("aria-modal", "true");
+    dialog.setAttribute("aria-labelledby", "pi-print-ready-kicker");
+    dialog.innerHTML =
+      '<form method="dialog" class="pi-print-ready-card">' +
+      '<div class="pi-print-ready-hero">' +
+      '<div class="pi-print-ready-icon" aria-hidden="true">' +
+      '<svg class="pi-toolbar-action-icon" focusable="false" viewBox="0 0 24 24"><path d="M6 9V3h12v6"></path><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><path d="M6 14h12v7H6z"></path></svg>' +
+      '</div>' +
+      '<p id="pi-print-ready-kicker" class="pi-print-ready-kicker" data-guide-print-ready-kicker>Now ready to print</p>' +
+      '</div>' +
+      '<p class="pi-print-ready-error" data-guide-print-ready-error aria-live="polite" hidden></p>' +
+      '<div class="pi-print-ready-actions">' +
+      '<button type="button" class="pi-btn pi-btn-primary" data-guide-print-ready-confirm>Print now</button>' +
+      '<button type="button" class="pi-btn pi-btn-secondary" data-guide-print-ready-cancel>Cancel</button>' +
+      '</div>' +
+      '</form>';
+    dialog.addEventListener("cancel", function (event) {
+      event.preventDefault();
+      closePrintGuideReadyDialog("cancelled");
+    });
+    dialog.addEventListener("click", function (event) {
+      if (event.target === dialog) {
+        closePrintGuideReadyDialog("cancelled");
+      }
+    });
+    document.body.appendChild(dialog);
+    printGuideReadyDialog = dialog;
+  }
+
+  function openPrintGuideReadyDialog(artifact, triggerButton, errorMessage) {
+    ensurePrintGuideReadyDialog();
+    if (!printGuideReadyDialog) {
+      return;
+    }
+    printGuideController.pendingArtifact = artifact;
+    printGuideController.pendingTriggerButton = triggerButton || null;
+    var errorNode = printGuideReadyDialog.querySelector("[data-guide-print-ready-error]");
+    var confirmButton = printGuideReadyDialog.querySelector("[data-guide-print-ready-confirm]");
+    if (errorNode) {
+      errorNode.textContent = String(errorMessage || "");
+      errorNode.hidden = !errorMessage;
+    }
+    if (confirmButton) {
+      confirmButton.disabled = false;
+      confirmButton.removeAttribute("aria-disabled");
+    }
+    recordPrintGuideDiagnostic("ready-dialog-opened", {
+      artifactCacheHit: !!(artifact && artifact.artifactCacheHit),
+      pageCount: artifact && artifact.pageCount ? artifact.pageCount : 0,
+      pdfBlobSize: artifact && artifact.pdfBlob ? artifact.pdfBlob.size || 0 : 0,
+      readyDialogRequired: true
+    });
+    if (typeof printGuideReadyDialog.showModal === "function") {
+      printGuideReadyDialog.showModal();
+    } else {
+      printGuideReadyDialog.setAttribute("open", "open");
+    }
+    window.setTimeout(function () {
+      if (confirmButton && confirmButton.focus) {
+        confirmButton.focus();
+      }
+    }, 0);
+  }
+
+  function closePrintGuideReadyDialog(resultName) {
+    if (!printGuideReadyDialog) {
+      return;
+    }
+    if (resultName === "cancelled") {
+      recordPrintGuideDiagnostic("ready-dialog-cancelled", {
+        artifactCacheHit: !!(printGuideController.pendingArtifact && printGuideController.pendingArtifact.artifactCacheHit)
+      });
+      resetPrintGuidePendingState();
+    }
+    if (typeof printGuideReadyDialog.close === "function") {
+      printGuideReadyDialog.close();
+    } else {
+      printGuideReadyDialog.removeAttribute("open");
+    }
+    if (resultName === "cancelled") {
+      var triggerButton = printGuideController.pendingTriggerButton;
+      window.setTimeout(function () {
+        if (triggerButton && triggerButton.focus) {
+          triggerButton.focus();
+        }
+      }, 0);
+    }
+  }
+
+  async function printGeneratedGuide(printButton) {
+    if (!printButton || printGuideController.launchInProgress) {
+      return null;
+    }
+    recordPrintGuideDiagnostic("print-requested", {
+      interactionCount: 1
+    });
+    var completedArtifact = getCurrentCompletedPdfArtifact(printButton);
+    recordPrintGuideDiagnostic("artifact-ready-at-click", {
+      artifactCacheHit: !!completedArtifact,
+      pageCount: completedArtifact && completedArtifact.pageCount ? completedArtifact.pageCount : 0,
+      pdfBlobSize: completedArtifact && completedArtifact.pdfBlob ? completedArtifact.pdfBlob.size || 0 : 0,
+      interactionCount: 1,
+      readyDialogRequired: !completedArtifact
+    });
+    if (completedArtifact) {
+      var cachedPrintTab = window.open("", "_blank");
+      if (!cachedPrintTab) {
+        recordPrintGuideDiagnostic("print-tab-blocked", {
+          artifactCacheHit: true,
+          pageCount: completedArtifact.pageCount || 0,
+          pdfBlobSize: completedArtifact.pdfBlob ? completedArtifact.pdfBlob.size || 0 : 0,
+          popupBlocked: true,
+          interactionCount: 1
+        });
+        openPrintGuideReadyDialog(
+          completedArtifact,
+          printButton,
+          "The browser blocked the printable PDF tab. Allow pop-ups for this site, then select Print now again."
+        );
+        return null;
+      }
+      setPrintGuideLaunchInProgress(true);
+      recordPrintGuideDiagnostic("print-tab-opened", {
+        artifactCacheHit: true,
+        pageCount: completedArtifact.pageCount || 0,
+        pdfBlobSize: completedArtifact.pdfBlob ? completedArtifact.pdfBlob.size || 0 : 0,
+        interactionCount: 1,
+        readyDialogRequired: false
+      });
+      openPdfTabWaitingDocument(cachedPrintTab);
+      if (!navigatePdfTabAndSchedulePrint(cachedPrintTab, completedArtifact, 1)) {
+        openPrintGuideReadyDialog(
+          completedArtifact,
+          printButton,
+          "The printable PDF tab could not be opened. Select Print now to try again."
+        );
+        return null;
+      }
+      return completedArtifact;
+    }
+
+    var generationStartedAt = Date.now();
+    var awaitingExistingGeneration = !!pdfExportController.activePromise;
+    recordPrintGuideDiagnostic("generation-started", {
+      artifactCacheHit: false,
+      interactionCount: 1,
+      readyDialogRequired: true,
+      existingGenerationAwaited: awaitingExistingGeneration
+    });
+    if (pdfExportController.activePromise) {
+      recordPrintGuideDiagnostic("existing-generation-awaited", {
+        interactionCount: 1
+      });
+    }
+    var artifact = await getOrCreateGuidePdfArtifact(printButton);
+    if (!artifact || !artifact.pdfBlob || !artifact.pageCount) {
+      return null;
+    }
+    artifact.artifactCacheHit = !!artifact.artifactCacheHit;
+    recordPrintGuideDiagnostic("generation-completed", {
+      artifactCacheHit: false,
+      generationDurationMs: Math.max(0, Date.now() - generationStartedAt),
+      pageCount: artifact.pageCount || 0,
+      pdfBlobSize: artifact.pdfBlob.size || 0,
+      interactionCount: 1,
+      readyDialogRequired: true
+    });
+    openPrintGuideReadyDialog(artifact, printButton, "");
+    return artifact;
+  }
 
   function getGoogleWidgetState() {
     window.__propertyInstructionGoogleWidgetState = window.__propertyInstructionGoogleWidgetState || {};
@@ -1699,32 +2138,35 @@
     });
   }
 
-  function invalidatePreparedPdfArtifacts() {
+  function invalidatePreparedPdfArtifacts(reason) {
     translationState.preparationPromise = null;
     translationState.preparationKey = "";
     pdfPreparationState.preparedState = null;
     pdfPreparationState.warmupPromise = null;
     pdfPreparationState.artifactCache = {};
     clearReadyPdfObjectUrl();
+    clearPrintGuideBlobUrl(reason || "manual-reset");
+    resetPrintGuidePendingState();
+    closePrintGuideReadyDialog("invalidated");
     window.__propertyInstructionLastPdfBlob = null;
     window.__propertyInstructionLastPdfLanguage = "";
   }
 
-  function clearTranslationReadyState() {
+  function clearTranslationReadyState(reason) {
     translationState.readyLanguage = "";
     translationState.readySnapshot = null;
     translationState.sectionReadiness = {};
     translationState.stablePassTimestamps = [];
     translationState.stableGeneration = 0;
     translationState.readyAt = 0;
-    invalidatePreparedPdfArtifacts();
+    invalidatePreparedPdfArtifacts(reason || "semantic-state-changed");
   }
 
   function resetTranslationGeneration(nextLanguage) {
     translationState.generation += 1;
     translationState.requestedLanguage = nextLanguage || SOURCE_LANGUAGE;
     translationState.lastLanguageSelectedAt = Date.now();
-    clearTranslationReadyState();
+    clearTranslationReadyState("language-changed");
     translationState.lastMutationAt = Date.now();
     initializeTranslationDiagnostics();
     schedulePdfPreparationWarmup(document.querySelector(".pi-pdf-download"));
@@ -1806,7 +2248,7 @@
       translationState.mutationTimestamps = translationState.mutationTimestamps.slice(-120);
       translationState.readySnapshot = null;
       translationState.readyLanguage = "";
-      invalidatePreparedPdfArtifacts();
+      invalidatePreparedPdfArtifacts("semantic-state-changed");
       syncTranslationLanguageState();
       updateTranslationDiagnostics({
         firstTranslationMutationAt: translationState.firstMutationAt,
@@ -5640,6 +6082,7 @@
       );
       var immediateCachedArtifact = getCachedPdfArtifact(immediateCacheKey);
       if (immediateCachedArtifact && immediateCachedArtifact.pdfBlob) {
+        immediateCachedArtifact.artifactCacheHit = true;
         recordPdfPerformance(performanceState, "warmRepeatedDownloadMs", clickStartedAt);
         recordPdfPerformance(performanceState, "totalMs", performanceState.startedAt);
         window.__propertyInstructionLastPdfBlob = immediateCachedArtifact.pdfBlob;
@@ -5658,6 +6101,7 @@
       var cacheKey = getPreparedStateKey(guideIdentity, exportLanguage, exportGeneration, snapshotHash);
       var cachedArtifact = getCachedPdfArtifact(cacheKey);
       if (cachedArtifact && cachedArtifact.pdfBlob) {
+        cachedArtifact.artifactCacheHit = true;
         recordPdfPerformance(performanceState, "warmRepeatedDownloadMs", clickStartedAt);
         recordPdfPerformance(performanceState, "totalMs", performanceState.startedAt);
         window.__propertyInstructionLastPdfBlob = cachedArtifact.pdfBlob;
@@ -5801,6 +6245,7 @@
         pageCount: renderResult.pageCount,
         languageCode: guideModel.languageCode || SOURCE_LANGUAGE,
         cacheKey: cacheKey,
+        artifactCacheHit: false,
         performance: Object.assign({}, performanceState)
       };
       cachePdfArtifact(cacheKey, artifact);
@@ -5882,10 +6327,11 @@
     }
     syncTranslationLanguageState();
     pdfExportController.activeLanguage = translationState.requestedLanguage || SOURCE_LANGUAGE;
-    pdfExportController.activePromise = performGuidePdfArtifactGeneration(triggerElement).finally(function () {
-      pdfExportController.activePromise = null;
-      pdfExportController.activeLanguage = "";
-    });
+    pdfExportController.activePromise = performGuidePdfArtifactGeneration(triggerElement)
+      .finally(function () {
+        pdfExportController.activePromise = null;
+        pdfExportController.activeLanguage = "";
+      });
     return pdfExportController.activePromise;
   }
 
@@ -5926,345 +6372,6 @@
     return artifact;
   }
 
-  function setPrintLifecycle(stageName, extraDetails) {
-    var diagnostics = window.__propertyInstructionPrintDiagnostics || {
-      lifecycle: "idle",
-      artifactCacheHit: false,
-      pageCount: 0,
-      pageImageByteLengths: [],
-      iframeCreatedAt: 0,
-      imagesReadyAt: 0,
-      firstLayoutMeasuredAt: 0,
-      finalLayoutMeasuredAt: 0,
-      pageDimensions: [],
-      bodyDimensions: {},
-      expectedBodyHeight: 0,
-      overflowDetected: false,
-      printCalledAt: 0,
-      printReturnedAt: 0,
-      cleanupTimestamp: 0,
-      afterPrintAt: 0,
-      failureCode: ""
-    };
-    diagnostics.lifecycle = String(stageName || "idle");
-    if (extraDetails) {
-      Object.keys(extraDetails).forEach(function (key) {
-        diagnostics[key] = extraDetails[key];
-      });
-    }
-    window.__propertyInstructionPrintDiagnostics = diagnostics;
-    return diagnostics;
-  }
-
-  function createPrintFrame() {
-    cleanupActivePrintFrame();
-    var frame = document.createElement("iframe");
-    frame.setAttribute("aria-hidden", "true");
-    frame.setAttribute("tabindex", "-1");
-    frame.style.position = "fixed";
-    frame.style.left = PDF_EXPORT_OFFSCREEN_LEFT + "px";
-    frame.style.top = "0";
-    frame.style.width = PRINT_PAGE_WIDTH_PT + "pt";
-    frame.style.height = PRINT_PAGE_HEIGHT_PT + "pt";
-    frame.style.border = "0";
-    frame.style.opacity = "0";
-    frame.style.pointerEvents = "none";
-    frame.style.background = "#ffffff";
-    document.body.appendChild(frame);
-    setPrintLifecycle("waiting-for-artifact", {
-      iframeCreatedAt: Date.now()
-    });
-    return {
-      frame: frame,
-      objectUrls: [],
-      cleanupTimer: 0,
-      cleaned: false
-    };
-  }
-
-  function cleanupPrintFrame(printState) {
-    if (!printState || printState.cleaned) {
-      return;
-    }
-    printState.cleaned = true;
-    if (printState.cleanupTimer) {
-      window.clearTimeout(printState.cleanupTimer);
-      printState.cleanupTimer = 0;
-    }
-    (printState.objectUrls || []).forEach(function (objectUrl) {
-      if (objectUrl && window.URL && window.URL.revokeObjectURL) {
-        window.URL.revokeObjectURL(objectUrl);
-      }
-    });
-    if (printState.frame && printState.frame.parentNode) {
-      printState.frame.parentNode.removeChild(printState.frame);
-    }
-    if (activePrintController === printState) {
-      activePrintController = null;
-    }
-  }
-
-  function cleanupActivePrintFrame() {
-    if (activePrintController) {
-      cleanupPrintFrame(activePrintController);
-    }
-  }
-
-  function collectPrintLayoutDiagnostics(frameDocument) {
-    var pageNodes = Array.prototype.slice.call(frameDocument.querySelectorAll(".pi-generated-print-page"));
-    var pageDimensions = pageNodes.map(function (pageNode, index) {
-      var imageNode = pageNode.querySelector("img");
-      var pageRect = pageNode.getBoundingClientRect();
-      var imageRect = imageNode ? imageNode.getBoundingClientRect() : null;
-      var computedStyle = frameDocument.defaultView
-        ? frameDocument.defaultView.getComputedStyle(pageNode)
-        : null;
-      return {
-        pageNumber: index + 1,
-        clientWidth: pageNode.clientWidth,
-        clientHeight: pageNode.clientHeight,
-        scrollWidth: pageNode.scrollWidth,
-        scrollHeight: pageNode.scrollHeight,
-        offsetTop: pageNode.offsetTop,
-        breakBefore: computedStyle ? String(computedStyle.breakBefore || "") : "",
-        pageBreakBefore: computedStyle ? String(computedStyle.pageBreakBefore || "") : "",
-        marginTop: computedStyle ? String(computedStyle.marginTop || "") : "",
-        marginBottom: computedStyle ? String(computedStyle.marginBottom || "") : "",
-        imageRect: imageRect ? {
-          left: imageRect.left,
-          top: imageRect.top,
-          right: imageRect.right,
-          bottom: imageRect.bottom,
-          width: imageRect.width,
-          height: imageRect.height
-        } : null,
-        pageRect: {
-          left: pageRect.left,
-          top: pageRect.top,
-          right: pageRect.right,
-          bottom: pageRect.bottom,
-          width: pageRect.width,
-          height: pageRect.height
-        }
-      };
-    });
-    var expectedBodyHeight = pageDimensions.length
-      ? Math.round(pageDimensions.length * pageDimensions[0].pageRect.height)
-      : 0;
-    return {
-      pageDimensions: pageDimensions,
-      bodyDimensions: {
-        scrollWidth: frameDocument.body.scrollWidth,
-        scrollHeight: frameDocument.body.scrollHeight,
-        clientWidth: frameDocument.body.clientWidth,
-        clientHeight: frameDocument.body.clientHeight
-      },
-      expectedBodyHeight: expectedBodyHeight
-    };
-  }
-
-  function validatePrintFrameLayout(frameDocument) {
-    var diagnostics = collectPrintLayoutDiagnostics(frameDocument);
-    var hasOverflow = false;
-    var forcedBreakDetected = false;
-    var bodyHeightDelta = Math.abs(
-      Number(diagnostics.bodyDimensions.scrollHeight || 0) - Number(diagnostics.expectedBodyHeight || 0)
-    );
-    diagnostics.pageDimensions.forEach(function (pageInfo) {
-      var imageRect = pageInfo.imageRect;
-      var pageRect = pageInfo.pageRect;
-      if (pageInfo.scrollWidth > pageInfo.clientWidth + 1 || pageInfo.scrollHeight > pageInfo.clientHeight + 1) {
-        hasOverflow = true;
-        return;
-      }
-      if (imageRect && (
-        imageRect.left < pageRect.left - 1
-        || imageRect.top < pageRect.top - 1
-        || imageRect.right > pageRect.right + 1
-        || imageRect.bottom > pageRect.bottom + 1
-      )) {
-        hasOverflow = true;
-      }
-      if (pageInfo.pageNumber > 1 && (
-        String(pageInfo.breakBefore || "").toLowerCase() !== "auto"
-        || String(pageInfo.pageBreakBefore || "").toLowerCase() !== "auto"
-        || String(pageInfo.marginTop || "") !== "0px"
-        || String(pageInfo.marginBottom || "") !== "0px"
-      )) {
-        forcedBreakDetected = true;
-      }
-    });
-    diagnostics.overflowDetected = hasOverflow;
-    diagnostics.forcedBreakDetected = forcedBreakDetected;
-    diagnostics.bodyHeightDelta = bodyHeightDelta;
-    if (forcedBreakDetected || bodyHeightDelta > 2) {
-      setPrintLifecycle("failed", {
-        failureCode: "print-forced-break-detected",
-        pageDimensions: diagnostics.pageDimensions,
-        bodyDimensions: diagnostics.bodyDimensions,
-        expectedBodyHeight: diagnostics.expectedBodyHeight,
-        overflowDetected: hasOverflow
-      });
-      throw new Error("print-forced-break-detected");
-    }
-    if (hasOverflow) {
-      setPrintLifecycle("failed", {
-        failureCode: "print-page-overflow",
-        pageDimensions: diagnostics.pageDimensions,
-        bodyDimensions: diagnostics.bodyDimensions,
-        expectedBodyHeight: diagnostics.expectedBodyHeight,
-        overflowDetected: true
-      });
-      throw new Error("print-page-overflow");
-    }
-    return diagnostics;
-  }
-
-  async function prepareGeneratedPrintFrame(printState, artifact) {
-    if (!printState || !printState.frame || !artifact) {
-      throw new Error("The print layout could not be prepared. Please try again.");
-    }
-    var frameDocument = printState.frame.contentDocument;
-    if (!frameDocument) {
-      throw new Error("The print layout could not be prepared. Please try again.");
-    }
-    frameDocument.open();
-    frameDocument.write(
-      '<!doctype html><html><head><meta charset="utf-8"><title>Print guide</title><style>' +
-      '@page{size:A4 portrait;margin:0;}' +
-      'html,body{margin:0;padding:0;background:#fff;}' +
-      'body{width:100%;}' +
-      '*{box-sizing:border-box;}' +
-      '.pi-generated-print-page{display:block;width:' + PRINT_PAGE_WIDTH_PT + 'pt;height:' + PRINT_PAGE_HEIGHT_PT + 'pt;margin:0 auto;padding:0;overflow:hidden;break-inside:avoid;page-break-inside:avoid;print-color-adjust:exact;-webkit-print-color-adjust:exact;}' +
-      '.pi-generated-print-page img{display:block;width:100%;height:100%;object-fit:contain;object-position:center;image-rendering:auto;}' +
-      "</style></head><body></body></html>"
-    );
-    frameDocument.close();
-    var imagePromises = [];
-    (artifact.pageImageBlobs || []).forEach(function (blob) {
-      var objectUrl = window.URL.createObjectURL(blob);
-      printState.objectUrls.push(objectUrl);
-      var pageNode = frameDocument.createElement("div");
-      pageNode.className = "pi-generated-print-page";
-      var imageNode = frameDocument.createElement("img");
-      imageNode.src = objectUrl;
-      pageNode.appendChild(imageNode);
-      frameDocument.body.appendChild(pageNode);
-      imagePromises.push(new Promise(function (resolve, reject) {
-        function finalizeLoaded() {
-          if (!imageNode.naturalWidth || !imageNode.naturalHeight) {
-            reject(new Error("The print layout could not be prepared. Please try again."));
-            return;
-          }
-          if (typeof imageNode.decode === "function") {
-            imageNode.decode().catch(function () {
-              return null;
-            }).finally(resolve);
-            return;
-          }
-          resolve();
-        }
-        imageNode.addEventListener("load", finalizeLoaded, { once: true });
-        imageNode.addEventListener("error", function () {
-          reject(new Error("The print layout could not be prepared. Please try again."));
-        }, { once: true });
-      }));
-    });
-    await Promise.all(imagePromises);
-    setPrintLifecycle("preparing-pages", {
-      pageCount: artifact.pageCount || 0,
-      pageImageByteLengths: (artifact.pageImageBlobs || []).map(function (blob) {
-        return blob && blob.size ? blob.size : 0;
-      }),
-      imagesReadyAt: Date.now()
-    });
-    await waitForTwoAnimationFrames();
-    var firstDiagnostics = collectPrintLayoutDiagnostics(frameDocument);
-    setPrintLifecycle("validating-layout", {
-      firstLayoutMeasuredAt: Date.now(),
-      pageDimensions: firstDiagnostics.pageDimensions,
-      bodyDimensions: firstDiagnostics.bodyDimensions,
-      expectedBodyHeight: firstDiagnostics.expectedBodyHeight
-    });
-    await sleep(PRINT_PAGE_LAYOUT_SETTLE_MS);
-    await waitForTwoAnimationFrames();
-    var finalDiagnostics = validatePrintFrameLayout(frameDocument);
-    setPrintLifecycle("validating-layout", {
-      finalLayoutMeasuredAt: Date.now(),
-      pageDimensions: finalDiagnostics.pageDimensions,
-      bodyDimensions: finalDiagnostics.bodyDimensions,
-      expectedBodyHeight: finalDiagnostics.expectedBodyHeight,
-      overflowDetected: false
-    });
-    return frameDocument;
-  }
-
-  async function printGeneratedGuide(printButton) {
-    if (!printButton) {
-      return null;
-    }
-    var statusElement = document.querySelector(".pi-action-status");
-    var printState = createPrintFrame();
-    activePrintController = printState;
-    var artifact = null;
-    setGuidePdfActionButtonsDisabled(true);
-    try {
-      updateExportProgress(printButton, statusElement, null, null, "wait-translation");
-      artifact = await getOrCreateGuidePdfArtifact(printButton);
-      if (!artifact || !artifact.pageImageBlobs || !artifact.pageImageBlobs.length) {
-        throw new Error("The print layout could not be prepared. Please try again.");
-      }
-      updateExportProgress(printButton, statusElement, null, null, "prepare-print-preview");
-      if (statusElement) {
-        statusElement.textContent = getGuideCopyText("prepare_print_preview", "Preparing print preview…");
-      }
-      await prepareGeneratedPrintFrame(printState, artifact);
-      setPrintLifecycle("opening-print-dialog");
-      updateExportProgress(printButton, statusElement, null, null, "open-print-dialog");
-      if (statusElement) {
-        statusElement.textContent = getGuideCopyText("opening_print_dialog", "Opening print dialog…");
-      }
-      if (printState.frame.contentWindow) {
-        printState.frame.contentWindow.addEventListener("afterprint", function () {
-          setPrintLifecycle("completed", {
-            afterPrintAt: Date.now()
-          });
-          cleanupPrintFrame(printState);
-        }, { once: true });
-      }
-      printState.cleanupTimer = window.setTimeout(function () {
-        setPrintLifecycle("cleanup-timeout-completed", {
-          cleanupTimestamp: Date.now()
-        });
-        cleanupPrintFrame(printState);
-      }, 5 * 60 * 1000);
-      printState.frame.contentWindow.focus();
-      setPrintLifecycle("print-called", {
-        printCalledAt: Date.now()
-      });
-      printState.frame.contentWindow.print();
-      setPrintLifecycle("print-returned", {
-        printReturnedAt: Date.now()
-      });
-      return artifact;
-    } catch (error) {
-      cleanupPrintFrame(printState);
-      setPrintLifecycle("failed", {
-        failureCode: String(error && error.message || "print-layout-preparation-failed")
-      });
-      if (statusElement) {
-        statusElement.textContent = "The print layout could not be prepared. Please try again.";
-      }
-      setTranslationStatus(statusElement ? statusElement.textContent : "");
-      return null;
-    } finally {
-      setGuidePdfActionButtonsDisabled(false);
-      window.setTimeout(function () {
-        resetPdfProgressUi();
-      }, 1200);
-    }
-  }
-
   document.addEventListener("click", async function (event) {
     const copyButton = event.target.closest(".pi-copy-button");
     if (copyButton) {
@@ -6299,6 +6406,83 @@
           statusElement.textContent = "";
         }
       }, 2000);
+      return;
+    }
+
+    const printGuideReadyConfirmButton = event.target.closest("[data-guide-print-ready-confirm]");
+    if (printGuideReadyConfirmButton) {
+      event.preventDefault();
+      var readyArtifact = printGuideController.pendingArtifact;
+      var readyTriggerButton = printGuideController.pendingTriggerButton;
+      if (!readyArtifact) {
+        return;
+      }
+      if (printGuideController.launchInProgress) {
+        return;
+      }
+      var readyTab = window.open("", "_blank");
+      if (!readyTab) {
+        recordPrintGuideDiagnostic("print-now-selected", {
+          artifactCacheHit: !!readyArtifact.artifactCacheHit,
+          pageCount: readyArtifact.pageCount || 0,
+          pdfBlobSize: readyArtifact.pdfBlob ? readyArtifact.pdfBlob.size || 0 : 0,
+          interactionCount: 2
+        });
+        recordPrintGuideDiagnostic("print-tab-blocked", {
+          artifactCacheHit: !!readyArtifact.artifactCacheHit,
+          pageCount: readyArtifact.pageCount || 0,
+          pdfBlobSize: readyArtifact.pdfBlob ? readyArtifact.pdfBlob.size || 0 : 0,
+          popupBlocked: true,
+          interactionCount: 2
+        });
+        var readyErrorNode = printGuideReadyDialog ? printGuideReadyDialog.querySelector("[data-guide-print-ready-error]") : null;
+        if (readyErrorNode) {
+          readyErrorNode.textContent = "The browser blocked the printable PDF tab. Allow pop-ups for this site, then select Print now again.";
+          readyErrorNode.hidden = false;
+        }
+        var readyConfirmButton = printGuideReadyDialog ? printGuideReadyDialog.querySelector("[data-guide-print-ready-confirm]") : null;
+        if (readyConfirmButton) {
+          readyConfirmButton.disabled = false;
+          readyConfirmButton.removeAttribute("aria-disabled");
+          readyConfirmButton.focus();
+        }
+        return;
+      }
+      setPrintGuideLaunchInProgress(true);
+      printGuideReadyConfirmButton.disabled = true;
+      printGuideReadyConfirmButton.setAttribute("aria-disabled", "true");
+      recordPrintGuideDiagnostic("print-now-selected", {
+        artifactCacheHit: !!readyArtifact.artifactCacheHit,
+        pageCount: readyArtifact.pageCount || 0,
+        pdfBlobSize: readyArtifact.pdfBlob ? readyArtifact.pdfBlob.size || 0 : 0,
+        interactionCount: 2
+      });
+      recordPrintGuideDiagnostic("print-tab-opened", {
+        artifactCacheHit: !!readyArtifact.artifactCacheHit,
+        pageCount: readyArtifact.pageCount || 0,
+        pdfBlobSize: readyArtifact.pdfBlob ? readyArtifact.pdfBlob.size || 0 : 0,
+        interactionCount: 2,
+        readyDialogRequired: true
+      });
+      openPdfTabWaitingDocument(readyTab);
+      closePrintGuideReadyDialog("confirmed");
+      resetPrintGuidePendingState();
+      if (!navigatePdfTabAndSchedulePrint(readyTab, readyArtifact, 2)) {
+        setPrintGuideLaunchInProgress(false);
+        openPrintGuideReadyDialog(
+          readyArtifact,
+          readyTriggerButton,
+          "The printable PDF tab could not be opened. Select Print now to try again."
+        );
+      }
+      return;
+    }
+
+    const printGuideReadyCancelButton = event.target.closest("[data-guide-print-ready-cancel]");
+    if (printGuideReadyCancelButton) {
+      event.preventDefault();
+      closePrintGuideReadyDialog("cancelled");
+      resetPrintGuidePendingState();
       return;
     }
 
@@ -6339,6 +6523,7 @@
   ensureStickyToolbarObservers();
   ensureSectionNavObserver();
   scheduleStickyToolbarOffsetSync();
+  ensurePrintGuideReadyDialog();
 
   document.addEventListener("pointerenter", function (event) {
     if (event.target && event.target.closest) {
@@ -6369,8 +6554,12 @@
 
   window.addEventListener("pagehide", clearReadyPdfObjectUrl);
   window.addEventListener("beforeunload", clearReadyPdfObjectUrl);
-  window.addEventListener("pagehide", cleanupActivePrintFrame);
-  window.addEventListener("beforeunload", cleanupActivePrintFrame);
+  window.addEventListener("pagehide", function () {
+    clearPrintGuideBlobUrl("pagehide");
+  });
+  window.addEventListener("beforeunload", function () {
+    clearPrintGuideBlobUrl("beforeunload");
+  });
 
   if (getGuideScreen()) {
     try {
