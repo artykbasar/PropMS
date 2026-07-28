@@ -37,7 +37,7 @@
 
 	<script>
 		window.frappe = {};
-		window._version_number = "{{ build_version }}";
+		window._version_number = "{{ asset_version or build_version or '' }}";
 		frappe.ready_events = [];
 		frappe.ready = function(fn) {
 			frappe.ready_events.push(fn);
