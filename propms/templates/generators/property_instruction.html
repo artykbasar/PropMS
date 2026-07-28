@@ -196,6 +196,57 @@
     font-size: .92rem;
     margin: 0;
   }
+  .pi-pdf-action-feedback {
+    flex: 1 0 100%;
+    display: grid;
+    gap: .75rem;
+    padding: .9rem 1rem;
+    border: 1px solid var(--pi-border);
+    border-radius: 18px;
+    background: rgba(255, 255, 255, .92);
+    box-sizing: border-box;
+  }
+  .pi-pdf-action-feedback[hidden] {
+    display: none;
+  }
+  .pi-pdf-action-feedback.is-error {
+    border-color: rgba(185, 28, 28, .24);
+    background: rgba(254, 242, 242, .96);
+  }
+  .pi-pdf-action-feedback.is-success {
+    border-color: rgba(17, 94, 89, .2);
+    background: rgba(240, 253, 250, .96);
+  }
+  .pi-pdf-action-feedback-body {
+    display: grid;
+    gap: .35rem;
+  }
+  .pi-pdf-action-feedback-message {
+    margin: 0;
+    color: var(--pi-ink);
+    font-size: .95rem;
+    line-height: 1.45;
+  }
+  .pi-pdf-action-feedback-code {
+    margin: 0;
+    color: var(--pi-muted);
+    font-size: .82rem;
+    letter-spacing: .02em;
+  }
+  .pi-pdf-action-feedback-code[hidden] {
+    display: none;
+  }
+  .pi-pdf-action-feedback-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .65rem;
+  }
+  .pi-pdf-action-feedback-actions[hidden] {
+    display: none;
+  }
+  .pi-pdf-action-feedback-actions .pi-btn {
+    min-height: 2.65rem;
+  }
   .pi-btn {
     display: inline-flex;
     align-items: center;
@@ -784,6 +835,9 @@
     direction: rtl;
     text-align: right;
   }
+  [data-property-instruction-export] .pi-export-measure-host {
+    contain: layout style;
+  }
   [data-property-instruction-export] .pi-export-card-body,
   [data-property-instruction-export] .pi-export-card-caption,
   [data-property-instruction-export] .pi-export-card-link,
@@ -918,6 +972,7 @@
     padding: 18px;
     border: 1px solid #d7dee5;
     border-radius: 18px;
+    overflow: hidden;
     page-break-inside: avoid;
     break-inside: avoid;
     background: #ffffff;
@@ -928,6 +983,11 @@
   }
   [data-property-instruction-export] .pi-export-map-image-frame {
     margin: 10px 0 0;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
+    overflow: hidden;
     border-radius: 14px;
   }
   [data-property-instruction-export] .pi-export-map-image {
@@ -1042,6 +1102,9 @@
     page-break-inside: auto;
     break-inside: auto;
   }
+  [data-property-instruction-export] .pi-export-document[data-pdf-layout-mode="adaptive"] .pi-export-section {
+    margin-bottom: 14px;
+  }
   [data-property-instruction-export] .pi-export-section-title {
     margin: 0 0 10px;
     padding-bottom: 7px;
@@ -1051,14 +1114,55 @@
     page-break-after: avoid;
     break-after: avoid;
   }
+  [data-property-instruction-export] .pi-export-document[data-pdf-layout-mode="adaptive"] .pi-export-section-title {
+    margin-bottom: 8px;
+    padding-bottom: 6px;
+  }
+  [data-property-instruction-export] .pi-export-section-title--continued {
+    font-size: 18px;
+    color: #334155;
+  }
+  [data-property-instruction-export] .pi-export-row {
+    margin: 0 0 12px;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+  [data-property-instruction-export] .pi-export-document[data-pdf-layout-mode="adaptive"] .pi-export-row {
+    margin-bottom: 10px;
+  }
+  [data-property-instruction-export] .pi-export-row--two-up {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    align-items: stretch;
+  }
+  [data-property-instruction-export] .pi-export-row--full {
+    display: block;
+  }
+  [data-property-instruction-export] .pi-export-row--parking {
+    display: grid;
+    grid-template-columns: minmax(0, .8fr) minmax(0, 1.2fr);
+    gap: 14px;
+    align-items: start;
+  }
+  [data-property-instruction-export] .pi-export-row--parking[data-pdf-row-variant="parking-map-right-actions-stack"] {
+    grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr);
+  }
   [data-property-instruction-export] .pi-export-card {
     margin: 0 0 12px;
     padding: 14px 16px;
     border: 1px solid #d7dee5;
     border-radius: 18px;
     background: #fff;
+    box-sizing: border-box;
     page-break-inside: avoid;
     break-inside: avoid;
+  }
+  [data-property-instruction-export] .pi-export-card,
+  [data-property-instruction-export] .pi-export-card *,
+  [data-property-instruction-export] .pi-export-parking-map,
+  [data-property-instruction-export] .pi-export-parking-map * {
+    box-sizing: border-box;
   }
   [data-property-instruction-export] .pi-export-card--warning {
     border-color: #f0d48c;
@@ -1068,16 +1172,49 @@
     border-color: #cde7e4;
     background: #f7fffd;
   }
-  [data-property-instruction-export] .pi-export-card-head {
+  [data-property-instruction-export] .pi-export-row .pi-export-card,
+  [data-property-instruction-export] .pi-export-row .pi-export-parking-map {
+    margin: 0;
+  }
+  [data-property-instruction-export] .pi-export-card--adaptive {
     display: flex;
-    align-items: flex-start;
-    gap: 10px;
+    flex-direction: column;
+    overflow: hidden;
+    --pi-export-adaptive-type-scale: 1;
+    --pi-export-adaptive-title-size: 17px;
+    --pi-export-adaptive-body-size: 14px;
+    --pi-export-adaptive-caption-size: 13px;
+    --pi-export-adaptive-link-size: 14px;
+    --pi-export-adaptive-title-line-height: 1.28;
+    --pi-export-adaptive-body-line-height: 1.45;
+    --pi-export-adaptive-caption-line-height: 1.4;
+    --pi-export-adaptive-link-line-height: 1.35;
+    --pi-export-adaptive-badge-size: 38px;
+    --pi-export-card-header-height: auto;
+    --pi-export-card-layout-gap-extra: 0px;
+    --pi-export-card-paragraph-gap-extra: 0px;
+    --pi-export-card-flex-spacer: 0px;
+    --pi-export-card-media-region-extra: 0px;
+    --pi-export-card-trailing-space: 0px;
+  }
+  [data-property-instruction-export] .pi-export-card--adaptive-half {
+    min-height: 0;
+  }
+  [data-property-instruction-export] .pi-export-card--adaptive-full {
+    width: 100%;
+  }
+  [data-property-instruction-export] .pi-export-card-head {
+    display: grid;
+    grid-template-columns: 38px minmax(0, 1fr);
+    column-gap: 14px;
+    align-items: start;
     margin: 0 0 10px;
+    min-height: var(--pi-export-card-header-height, auto);
     page-break-after: avoid;
     break-after: avoid;
   }
   [data-property-instruction-export] .pi-export-document[dir="rtl"] .pi-export-card-head {
-    flex-direction: row-reverse;
+    direction: rtl;
   }
   [data-property-instruction-export] .pi-export-document[dir="rtl"] .pi-export-page-one-extras {
     direction: rtl;
@@ -1086,36 +1223,78 @@
     flex-direction: row-reverse;
   }
   [data-property-instruction-export] .pi-export-step-badge {
-    width: 28px;
-    height: 28px;
-    min-width: 28px;
+    width: var(--pi-export-adaptive-badge-size, 38px);
+    height: var(--pi-export-adaptive-badge-size, 38px);
+    min-width: var(--pi-export-adaptive-badge-size, 38px);
     border-radius: 999px;
     background: #115e59;
     color: #fff;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 13px;
+    display: grid;
+    place-items: center;
+    font-size: 15px;
     font-weight: 700;
     line-height: 1;
+    font-variant-numeric: tabular-nums;
+    grid-column: 1;
+  }
+  [data-property-instruction-export] .pi-export-step-badge > span {
+    display: block;
+    line-height: 1;
+    transform: translateY(0.5px);
   }
   [data-property-instruction-export] .pi-export-card-title {
     margin: 0;
-    font-size: 17px;
-    line-height: 1.3;
+    font-size: var(--pi-export-adaptive-title-size, 17px);
+    line-height: var(--pi-export-adaptive-title-line-height, 1.28);
+    min-width: 0;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    grid-column: 2;
   }
   [data-property-instruction-export] .pi-export-card-layout {
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: calc(12px + var(--pi-export-card-layout-gap-extra, 0px));
+    flex: 1 1 auto;
+    height: 100%;
+    padding-bottom: var(--pi-export-card-trailing-space, 0px);
+    box-sizing: border-box;
+    min-width: 0;
+    min-height: 0;
+    max-width: 100%;
   }
   [data-property-instruction-export] .pi-export-card-text {
     min-width: 0;
-    flex: 1 1 auto;
+    min-height: 0;
+    max-width: 100%;
+    flex: 0 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+  [data-property-instruction-export] .pi-export-card-body-region,
+  [data-property-instruction-export] .pi-export-card-footer-region {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+    max-width: 100%;
+  }
+  [data-property-instruction-export] .pi-export-card-flex-spacer {
+    flex: 0 0 var(--pi-export-card-flex-spacer, 0px);
+    min-height: var(--pi-export-card-flex-spacer, 0px);
+    max-height: var(--pi-export-card-flex-spacer, 0px);
   }
   [data-property-instruction-export] .pi-export-card-media {
     min-width: 0;
+    min-height: 0;
+    max-width: 100%;
     flex: 0 0 auto;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    min-height: var(--pi-export-card-media-region-extra, 0px);
   }
   [data-property-instruction-export] .pi-export-card--portrait-side .pi-export-card-layout {
     flex-direction: row;
@@ -1135,12 +1314,262 @@
   [data-property-instruction-export] .pi-export-card--landscape-stacked .pi-export-card-layout {
     flex-direction: column;
   }
+  [data-property-instruction-export] .pi-export-card--adaptive-layout-half-compact .pi-export-card-layout,
+  [data-property-instruction-export] .pi-export-card--adaptive-layout-half-landscape-stacked .pi-export-card-layout,
+  [data-property-instruction-export] .pi-export-card--adaptive-layout-half-portrait-stacked .pi-export-card-layout,
+  [data-property-instruction-export] .pi-export-card--adaptive-layout-half-portrait-stacked-compact .pi-export-card-layout,
+  [data-property-instruction-export] .pi-export-card--adaptive-layout-wide-stacked .pi-export-card-layout {
+    flex-direction: column;
+  }
+  [data-property-instruction-export] .pi-export-card--adaptive-layout-half-portrait-side .pi-export-card-layout,
+  [data-property-instruction-export] .pi-export-card--adaptive-layout-half-portrait-side-narrow .pi-export-card-layout,
+  [data-property-instruction-export] .pi-export-card--adaptive-layout-half-portrait-side-wide .pi-export-card-layout,
+  [data-property-instruction-export] .pi-export-card--adaptive-layout-wide-horizontal .pi-export-card-layout {
+    flex-direction: row;
+    align-items: stretch;
+  }
+  [data-property-instruction-export] .pi-export-card--adaptive-layout-half-portrait-side .pi-export-card-text,
+  [data-property-instruction-export] .pi-export-card--adaptive-layout-half-portrait-side-narrow .pi-export-card-text,
+  [data-property-instruction-export] .pi-export-card--adaptive-layout-half-portrait-side-wide .pi-export-card-text,
+  [data-property-instruction-export] .pi-export-card--adaptive-layout-wide-horizontal .pi-export-card-text,
+  [data-property-instruction-export] .pi-export-card--adaptive-layout-parking-map-right .pi-export-card-text,
+  [data-property-instruction-export] .pi-export-card--adaptive-layout-parking-map-right-compact .pi-export-card-text {
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+  [data-property-instruction-export] .pi-export-document[dir="rtl"] .pi-export-card--adaptive-layout-half-portrait-side .pi-export-card-layout,
+  [data-property-instruction-export] .pi-export-document[dir="rtl"] .pi-export-card--adaptive-layout-half-portrait-side-narrow .pi-export-card-layout,
+  [data-property-instruction-export] .pi-export-document[dir="rtl"] .pi-export-card--adaptive-layout-half-portrait-side-wide .pi-export-card-layout,
+  [data-property-instruction-export] .pi-export-document[dir="rtl"] .pi-export-card--adaptive-layout-wide-horizontal .pi-export-card-layout {
+    flex-direction: row-reverse;
+  }
+  [data-property-instruction-export] .pi-export-card--adaptive-layout-half-portrait-side .pi-export-card-media {
+    flex: 0 0 42%;
+    align-self: stretch;
+    justify-content: var(--pi-export-card-media-justify, flex-start);
+  }
+  [data-property-instruction-export] .pi-export-card--adaptive-layout-half-portrait-side .pi-export-card-text {
+    flex: 1 1 58%;
+  }
+  [data-property-instruction-export] .pi-export-card--adaptive-layout-half-portrait-side-narrow .pi-export-card-media {
+    flex: 0 0 36%;
+    align-self: stretch;
+    justify-content: var(--pi-export-card-media-justify, flex-start);
+  }
+  [data-property-instruction-export] .pi-export-card--adaptive-layout-half-portrait-side-narrow .pi-export-card-text {
+    flex: 1 1 64%;
+  }
+  [data-property-instruction-export] .pi-export-card--adaptive-layout-half-portrait-side-wide .pi-export-card-media {
+    flex: 0 0 48%;
+    align-self: stretch;
+    justify-content: var(--pi-export-card-media-justify, flex-start);
+  }
+  [data-property-instruction-export] .pi-export-card--adaptive-layout-half-portrait-side-wide .pi-export-card-text {
+    flex: 1 1 52%;
+  }
+  [data-property-instruction-export] .pi-export-card--adaptive-layout-half-portrait-side .pi-export-card-image-frame {
+    aspect-ratio: 3 / 4;
+    max-height: 240px;
+  }
+  [data-property-instruction-export] .pi-export-card--adaptive-layout-half-portrait-side-narrow .pi-export-card-image-frame,
+  [data-property-instruction-export] .pi-export-card--adaptive-layout-half-portrait-side-wide .pi-export-card-image-frame {
+    aspect-ratio: 3 / 4;
+    max-height: 244px;
+  }
+  [data-property-instruction-export] .pi-export-card--adaptive-layout-half-portrait-stacked .pi-export-card-image-frame {
+    aspect-ratio: 4 / 5;
+    max-height: 236px;
+  }
+  [data-property-instruction-export] .pi-export-card--adaptive-layout-half-portrait-stacked-compact .pi-export-card-image-frame {
+    aspect-ratio: 4 / 5;
+    max-height: 196px;
+  }
+  [data-property-instruction-export] .pi-export-card--adaptive-layout-half-compact .pi-export-card-image-frame {
+    aspect-ratio: 16 / 10;
+    max-height: 168px;
+  }
+  [data-property-instruction-export] .pi-export-card--adaptive-layout-half-landscape-stacked .pi-export-card-image-frame {
+    aspect-ratio: 16 / 10;
+    max-height: 208px;
+  }
+  [data-property-instruction-export] .pi-export-card--adaptive-layout-wide-horizontal .pi-export-card-media {
+    flex: 0 0 58%;
+    align-self: stretch;
+    justify-content: var(--pi-export-card-media-justify, flex-start);
+  }
+  [data-property-instruction-export] .pi-export-card--adaptive-layout-wide-horizontal.pi-export-card--adaptive-portrait .pi-export-card-media {
+    flex-basis: 34%;
+  }
+  [data-property-instruction-export] .pi-export-card--adaptive-layout-wide-horizontal.pi-export-card--adaptive-square .pi-export-card-media {
+    flex-basis: 42%;
+  }
+  [data-property-instruction-export] .pi-export-card--adaptive-layout-wide-horizontal .pi-export-card-text {
+    flex: 1 1 42%;
+  }
+  [data-property-instruction-export] .pi-export-card--adaptive-layout-wide-horizontal .pi-export-card-image-frame {
+    aspect-ratio: 16 / 10;
+    max-height: 220px;
+  }
+  [data-property-instruction-export] .pi-export-card--adaptive-layout-wide-horizontal.pi-export-card--adaptive-portrait .pi-export-card-image-frame {
+    aspect-ratio: 3 / 4;
+    max-height: 260px;
+  }
+  [data-property-instruction-export] .pi-export-card--adaptive-layout-wide-horizontal.pi-export-card--adaptive-square .pi-export-card-image-frame {
+    aspect-ratio: 1 / 1;
+  }
+  [data-property-instruction-export] .pi-export-card--adaptive-layout-wide-stacked .pi-export-card-image-frame {
+    aspect-ratio: 16 / 9;
+    max-height: 220px;
+  }
+  [data-property-instruction-export] .pi-export-card--adaptive-layout-wide-stacked.pi-export-card--adaptive-portrait .pi-export-card-image-frame {
+    aspect-ratio: 4 / 5;
+    max-height: 260px;
+  }
+  [data-property-instruction-export] .pi-export-card--adaptive-layout-parking-map-right .pi-export-card-layout,
+  [data-property-instruction-export] .pi-export-card--adaptive-layout-parking-map-right-compact .pi-export-card-layout {
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  [data-property-instruction-export] .pi-export-card--adaptive-layout-parking-map-right,
+  [data-property-instruction-export] .pi-export-card--adaptive-layout-parking-map-right-compact {
+    padding: 10px 14px;
+  }
+  [data-property-instruction-export] .pi-export-document[dir="rtl"] .pi-export-card--adaptive-layout-parking-map-right .pi-export-card-layout,
+  [data-property-instruction-export] .pi-export-document[dir="rtl"] .pi-export-card--adaptive-layout-parking-map-right-compact .pi-export-card-layout {
+    flex-direction: row-reverse;
+  }
+  [data-property-instruction-export] .pi-export-card--adaptive-layout-parking-map-right .pi-export-card-media,
+  [data-property-instruction-export] .pi-export-card--adaptive-layout-parking-map-right-compact .pi-export-card-media {
+    flex: 0 0 47%;
+    display: grid;
+    grid-template-rows: auto auto;
+    align-content: start;
+    row-gap: 10px;
+  }
+  [data-property-instruction-export] .pi-export-card--adaptive-layout-parking-map-right .pi-export-card-text,
+  [data-property-instruction-export] .pi-export-card--adaptive-layout-parking-map-right-compact .pi-export-card-text {
+    flex: 1 1 53%;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    column-gap: 12px;
+    row-gap: 6px;
+    align-content: start;
+  }
+  [data-property-instruction-export] .pi-export-card--adaptive-layout-parking-map-right .pi-export-card-head,
+  [data-property-instruction-export] .pi-export-card--adaptive-layout-parking-map-right-compact .pi-export-card-head,
+  [data-property-instruction-export] .pi-export-card--adaptive-layout-parking-map-right .pi-export-card-body,
+  [data-property-instruction-export] .pi-export-card--adaptive-layout-parking-map-right-compact .pi-export-card-body {
+    grid-column: 1 / -1;
+  }
+  [data-property-instruction-export] .pi-export-card--adaptive-layout-parking-map-right .pi-export-map-image-frame--block {
+    aspect-ratio: 4 / 3;
+    max-height: 300px;
+  }
+  [data-property-instruction-export] .pi-export-card--adaptive-layout-parking-map-right-compact .pi-export-map-image-frame--block {
+    aspect-ratio: 16 / 10;
+    max-height: 250px;
+  }
+  [data-property-instruction-export] .pi-export-card--adaptive-layout-parking-map-right .pi-export-qr-grid,
+  [data-property-instruction-export] .pi-export-card--adaptive-layout-parking-map-right-compact .pi-export-qr-grid {
+    grid-template-columns: minmax(0, 1fr);
+    justify-items: start;
+    gap: 6px;
+  }
+  [data-property-instruction-export] .pi-export-card--adaptive-layout-parking-map-right .pi-export-qr-frame,
+  [data-property-instruction-export] .pi-export-card--adaptive-layout-parking-map-right-compact .pi-export-qr-frame {
+    width: 96px;
+    min-width: 96px;
+    height: 96px;
+  }
+  [data-property-instruction-export] .pi-export-card--adaptive-layout-parking-map-right .pi-export-card-qr-panel,
+  [data-property-instruction-export] .pi-export-card--adaptive-layout-parking-map-right-compact .pi-export-card-qr-panel {
+    grid-column: 2;
+    margin-top: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    align-self: start;
+  }
+  [data-property-instruction-export] .pi-export-card--adaptive-layout-parking-map-right .pi-export-card-qr-panel .pi-export-qr-link,
+  [data-property-instruction-export] .pi-export-card--adaptive-layout-parking-map-right-compact .pi-export-card-qr-panel .pi-export-qr-link {
+    display: none;
+  }
+  [data-property-instruction-export] .pi-export-card--adaptive-layout-parking-map-right .pi-export-card-link,
+  [data-property-instruction-export] .pi-export-card--adaptive-layout-parking-map-right-compact .pi-export-card-link {
+    grid-column: 1;
+    margin: 0;
+    align-self: start;
+  }
+  [data-property-instruction-export] .pi-export-parking-media-actions {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    column-gap: 12px;
+    row-gap: 8px;
+    align-items: start;
+    min-width: 0;
+  }
+  [data-property-instruction-export] .pi-export-document[dir="rtl"] .pi-export-parking-media-actions {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+  [data-property-instruction-export] .pi-export-parking-media-actions .pi-export-card-link {
+    margin: 0;
+    align-self: center;
+  }
+  [data-property-instruction-export] .pi-export-parking-media-actions .pi-export-card-qr-panel {
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    align-self: start;
+  }
+  [data-property-instruction-export] .pi-export-parking-media-actions .pi-export-card-qr-panel .pi-export-qr-link {
+    display: none;
+  }
+  [data-property-instruction-export] .pi-export-parking-media-actions .pi-export-qr-grid {
+    grid-template-columns: minmax(0, 1fr);
+    justify-items: start;
+    gap: 6px;
+  }
+  [data-property-instruction-export] .pi-export-parking-media-actions .pi-export-qr-frame {
+    width: 96px;
+    min-width: 96px;
+    height: 96px;
+  }
+  [data-property-instruction-export] .pi-export-card--adaptive-layout-parking-map-right .pi-export-card-body p,
+  [data-property-instruction-export] .pi-export-card--adaptive-layout-parking-map-right-compact .pi-export-card-body p {
+    margin-bottom: 6px;
+  }
+  [data-property-instruction-export] .pi-export-card--adaptive-layout-parking-map-right .pi-export-card-body ul,
+  [data-property-instruction-export] .pi-export-card--adaptive-layout-parking-map-right .pi-export-card-body ol,
+  [data-property-instruction-export] .pi-export-card--adaptive-layout-parking-map-right-compact .pi-export-card-body ul,
+  [data-property-instruction-export] .pi-export-card--adaptive-layout-parking-map-right-compact .pi-export-card-body ol {
+    margin: 0;
+  }
+  [data-property-instruction-export] .pi-export-card--adaptive-layout-parking-map-right.pi-export-card--adaptive-parking-list-columns .pi-export-card-body ul,
+  [data-property-instruction-export] .pi-export-card--adaptive-layout-parking-map-right.pi-export-card--adaptive-parking-list-columns .pi-export-card-body ol,
+  [data-property-instruction-export] .pi-export-card--adaptive-layout-parking-map-right-compact.pi-export-card--adaptive-parking-list-columns .pi-export-card-body ul,
+  [data-property-instruction-export] .pi-export-card--adaptive-layout-parking-map-right-compact.pi-export-card--adaptive-parking-list-columns .pi-export-card-body ol {
+    columns: 2;
+    column-gap: 18px;
+  }
+  [data-property-instruction-export] .pi-export-card--adaptive-layout-parking-map-right.pi-export-card--adaptive-parking-list-columns .pi-export-card-body li,
+  [data-property-instruction-export] .pi-export-card--adaptive-layout-parking-map-right-compact.pi-export-card--adaptive-parking-list-columns .pi-export-card-body li {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
   [data-property-instruction-export] .pi-export-card-body {
     page-break-before: avoid;
     break-before: avoid;
+    font-size: var(--pi-export-adaptive-body-size, 14px);
+    line-height: var(--pi-export-adaptive-body-line-height, 1.45);
+    min-width: 0;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    word-break: break-word;
   }
   [data-property-instruction-export] .pi-export-card-body p {
-    margin: 0 0 10px;
+    margin: 0 0 calc(10px + var(--pi-export-card-paragraph-gap-extra, 0px));
   }
   [data-property-instruction-export] .pi-export-card-body p:last-child {
     margin-bottom: 0;
@@ -1148,9 +1577,32 @@
   [data-property-instruction-export] .pi-export-card-image-frame {
     margin: 0;
     border-radius: 14px;
+    overflow: hidden;
+    min-width: 0;
+    min-height: 0;
+    max-width: 100%;
+    max-height: 100%;
+  }
+  [data-property-instruction-export] .pi-export-card-image-frame[data-pdf-media-frame-policy="shrink-wrap-natural"] {
+    width: auto;
+    max-width: 100%;
+    margin-inline: auto;
+    background: transparent;
   }
   [data-property-instruction-export] .pi-export-card-image {
     border-radius: 14px;
+  }
+  [data-property-instruction-export] .pi-export-card--adaptive .pi-export-card-image,
+  [data-property-instruction-export] .pi-export-card--adaptive .pi-export-map-image--block,
+  [data-property-instruction-export] .pi-export-parking-map--adaptive .pi-export-map-image {
+    width: auto;
+    height: auto;
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    object-position: center;
+    display: block;
+    flex: 0 0 auto;
   }
   [data-property-instruction-export] .pi-export-parking-map {
     margin: 0 0 12px;
@@ -1160,18 +1612,139 @@
     background: #fcfdfd;
     break-inside: avoid;
   }
+  [data-property-instruction-export] .pi-export-parking-map--adaptive {
+    display: flex;
+    align-items: flex-start;
+    padding: 14px;
+  }
+  [data-property-instruction-export] .pi-export-parking-map--adaptive[data-pdf-parking-variant="parking-map-right-actions-stack"] {
+    display: grid;
+    grid-template-rows: auto auto;
+    align-content: start;
+    gap: 10px;
+  }
+  [data-property-instruction-export] .pi-export-parking-map--adaptive .pi-export-map-image-frame {
+    width: 100%;
+    aspect-ratio: 4 / 5;
+    min-height: 260px;
+  }
+  [data-property-instruction-export] .pi-export-parking-map--adaptive[data-pdf-parking-variant="parking-map-right-actions-stack"] .pi-export-map-image-frame {
+    aspect-ratio: 16 / 11;
+    min-height: 220px;
+  }
+  [data-property-instruction-export] .pi-export-parking-map-actions {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    column-gap: 12px;
+    row-gap: 8px;
+    align-items: start;
+    min-width: 0;
+  }
+  [data-property-instruction-export] .pi-export-document[dir="rtl"] .pi-export-parking-map-actions {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+  [data-property-instruction-export] .pi-export-parking-map-actions .pi-export-card-link {
+    margin: 0;
+    align-self: center;
+  }
+  [data-property-instruction-export] .pi-export-parking-map-actions .pi-export-card-qr-panel {
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    align-self: start;
+  }
+  [data-property-instruction-export] .pi-export-parking-map-actions .pi-export-card-qr-panel .pi-export-qr-link {
+    display: none;
+  }
+  [data-property-instruction-export] .pi-export-parking-map-actions .pi-export-qr-grid {
+    grid-template-columns: minmax(0, 1fr);
+    justify-items: start;
+    gap: 6px;
+  }
+  [data-property-instruction-export] .pi-export-parking-map-actions .pi-export-qr-frame {
+    width: 96px;
+    min-width: 96px;
+    height: 96px;
+  }
+  [data-property-instruction-export] .pi-export-card--adaptive-parking-text .pi-export-qr-grid {
+    grid-template-columns: minmax(0, 1fr);
+    justify-items: start;
+  }
+  [data-property-instruction-export] .pi-export-card--adaptive-parking-text .pi-export-card-layout {
+    gap: 8px;
+  }
+  [data-property-instruction-export] .pi-export-card--adaptive-parking-text .pi-export-card-text {
+    gap: 6px;
+  }
+  [data-property-instruction-export] .pi-export-card--adaptive-parking-text .pi-export-card-footer-region {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    column-gap: 12px;
+    row-gap: 8px;
+    align-items: end;
+  }
+  [data-property-instruction-export] .pi-export-card--adaptive-parking-text .pi-export-card-head {
+    margin-bottom: 8px;
+  }
+  [data-property-instruction-export] .pi-export-card--adaptive-parking-text .pi-export-card-link {
+    margin: 0;
+    grid-column: 1;
+    align-self: end;
+  }
+  [data-property-instruction-export] .pi-export-card--adaptive-parking-text .pi-export-qr-frame {
+    width: 96px;
+    min-width: 96px;
+    height: 96px;
+  }
+  [data-property-instruction-export] .pi-export-card--adaptive-parking-text .pi-export-card-qr-panel {
+    grid-column: 2;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    align-self: end;
+  }
+  [data-property-instruction-export] .pi-export-card--adaptive-parking-text .pi-export-card-qr-panel .pi-export-qr-link {
+    display: none;
+  }
+  [data-property-instruction-export] .pi-export-card--adaptive-parking-list-columns .pi-export-card-body ul,
+  [data-property-instruction-export] .pi-export-card--adaptive-parking-list-columns .pi-export-card-body ol {
+    columns: 2;
+    column-gap: 18px;
+  }
+  [data-property-instruction-export] .pi-export-card--adaptive-parking-list-columns .pi-export-card-body li {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
   [data-property-instruction-export] .pi-export-map-image-frame--parking {
     margin: 0;
   }
   [data-property-instruction-export] .pi-export-card-caption {
     margin: 8px 0 0;
     color: #475569;
-    font-size: 13px;
+    font-size: var(--pi-export-adaptive-caption-size, 13px);
+    line-height: var(--pi-export-adaptive-caption-line-height, 1.4);
+    min-width: 0;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    word-break: break-word;
   }
   [data-property-instruction-export] .pi-export-card-link {
     margin: 10px 0 0;
-    font-size: 14px;
+    font-size: var(--pi-export-adaptive-link-size, 14px);
+    line-height: var(--pi-export-adaptive-link-line-height, 1.35);
     font-weight: 600;
+    min-width: 0;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+  [data-property-instruction-export] .pi-export-card-link a,
+  [data-property-instruction-export] .pi-export-card-caption a,
+  [data-property-instruction-export] .pi-export-card-body a {
+    overflow-wrap: anywhere;
+    word-break: break-word;
   }
   [data-property-instruction-export] .pi-export-empty {
     margin: 0;
@@ -1410,6 +1983,17 @@
       <small class="pi-translate-attribution pi-translate-attribution--toolbar">Powered by Google Translate</small>
       <div id="{{ google_translate.container_id }}" class="pi-google-translate-engine" aria-hidden="true"></div>
       {% endif %}
+      <div class="pi-pdf-action-feedback" data-guide-pdf-feedback hidden>
+        <div class="pi-pdf-action-feedback-body">
+          <p class="pi-pdf-action-feedback-message" data-guide-pdf-feedback-message></p>
+          <p class="pi-pdf-action-feedback-code" data-guide-pdf-feedback-code hidden></p>
+        </div>
+        <div class="pi-pdf-action-feedback-actions" data-guide-pdf-feedback-actions hidden>
+          <button type="button" class="pi-btn pi-btn-secondary" data-guide-pdf-feedback-retry>Retry</button>
+          <button type="button" class="pi-btn pi-btn-secondary" data-guide-pdf-feedback-download hidden>Download PDF</button>
+          <button type="button" class="pi-btn pi-btn-secondary" data-guide-pdf-feedback-open hidden>Open PDF</button>
+        </div>
+      </div>
       <p class="pi-action-status sr-only" aria-live="polite"></p>
       <a data-pdf-download-anchor hidden aria-hidden="true" tabindex="-1"></a>
       <div class="sr-only" aria-hidden="true" data-guide-copy-bank>
@@ -1426,6 +2010,7 @@
         <span data-guide-progress-copy="about_remaining">About</span>
         <span data-guide-progress-copy="seconds_remaining">seconds remaining</span>
         <span data-guide-progress-copy="in_this_guide">In this guide</span>
+        <span data-guide-progress-copy="continued_suffix">continued</span>
         <span data-guide-progress-copy="quick_access">Quick access</span>
         <span data-guide-progress-copy="cancelled_language_change">PDF generation was cancelled because the language changed.</span>
         <span data-guide-progress-copy="translation_unavailable">Translation is temporarily unavailable.</span>
@@ -1578,7 +2163,7 @@
 <script type="application/json" id="pi-instruction-block-maps-data">
   {{ (instruction_block_maps.values() | list if instruction_block_maps is defined and instruction_block_maps else []) | tojson }}
 </script>
-<script src="/assets/propms/js/property_instruction_export.js?ver={{ build_version }}"></script>
+<script src="/assets/propms/js/property_instruction_export.js?v={{ asset_version or build_version or '' }}"></script>
 {% if google_translate and google_translate.enabled %}
 <script>
   (function () {

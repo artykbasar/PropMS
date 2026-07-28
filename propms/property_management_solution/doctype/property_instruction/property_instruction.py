@@ -18,7 +18,7 @@ from urllib.request import HTTPRedirectHandler, Request, build_opener
 import frappe
 from frappe import _
 from frappe.model.naming import make_autoname
-from frappe.utils import cint, formatdate, get_bench_path, sanitize_html, validate_url
+from frappe.utils import cint, formatdate, get_bench_path, get_build_version, sanitize_html, validate_url
 from frappe.website.website_generator import WebsiteGenerator
 from markupsafe import Markup
 from werkzeug.datastructures import Headers
@@ -250,6 +250,12 @@ class PropertyInstruction(WebsiteGenerator):
 		context.web_include_css = self.get_guest_guide_web_assets(getattr(context, "web_include_css", None), "css")
 		context.web_include_js = self.get_guest_guide_web_assets(getattr(context, "web_include_js", None), "js")
 		context.update(page_context)
+		context.asset_version = (
+			getattr(context, "asset_version", None)
+			or getattr(context, "build_version", None)
+			or get_build_version()
+		)
+		context.build_version = context.asset_version
 		context.metatags = frappe._dict(context.get("metatags") or {})
 		context.metatags["robots"] = NOINDEX_ROBOTS_CONTENT
 		if not getattr(context, "boot", None):
