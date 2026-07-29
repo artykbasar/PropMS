@@ -12,7 +12,7 @@ from datetime import timedelta
 from html.parser import HTMLParser
 from ipaddress import ip_address
 from urllib.error import HTTPError
-from urllib.parse import parse_qs, quote, urlencode, urljoin, urlparse, urlunparse
+from urllib.parse import parse_qs, quote, unquote, urlencode, urljoin, urlparse, urlunparse
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 import frappe
@@ -1163,14 +1163,30 @@ def validate_public_pdf_image_url(url):
 	return parsed
 
 
+def is_current_site_file_url(parsed):
+	hostname = normalize_host_name(parsed.hostname or "")
+	current_site = normalize_host_name(getattr(frappe.local, "site", "") or "")
+	request = getattr(frappe.local, "request", None)
+	request_host = normalize_host_name((getattr(request, "host", "") or "").split(":", 1)[0])
+	local_hosts = {
+		current_site,
+		request_host,
+		"development.localhost",
+		"localhost",
+		"127.0.0.1",
+	}
+	return hostname in {host for host in local_hosts if host}
+
+
 def resolve_local_public_image(path):
+	decoded_path = unquote(path or "")
 	for prefix, base_parts in (
 		("/files/", ("public", "files")),
 		("/private/files/", ("private", "files")),
 	):
-		if not path.startswith(prefix):
+		if not decoded_path.startswith(prefix):
 			continue
-		relative_path = os.path.normpath(path[len(prefix) :]).lstrip(os.sep)
+		relative_path = os.path.normpath(decoded_path[len(prefix) :]).lstrip(os.sep)
 		base_path = os.path.abspath(frappe.get_site_path(*base_parts))
 		file_path = os.path.abspath(os.path.join(base_path, relative_path))
 		if not file_path.startswith(base_path + os.sep) and file_path != base_path:
@@ -1262,11 +1278,11 @@ def fetch_remote_public_image(url):
 
 def resolve_public_pdf_image_target(url):
 	parsed = validate_public_pdf_image_url(url)
-	local_image = None
-	if parsed.path.startswith(PUBLIC_SITE_IMAGE_PREFIXES):
+	if parsed.path.startswith(PUBLIC_SITE_IMAGE_PREFIXES) and is_current_site_file_url(parsed):
 		local_image = resolve_local_public_image(parsed.path)
-	if local_image:
-		return local_image
+		if local_image:
+			return local_image
+		frappe.throw(_("Requested guest guide image was not found."))
 	return fetch_remote_public_image(url)
 
 
