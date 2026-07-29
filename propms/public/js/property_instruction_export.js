@@ -1392,6 +1392,151 @@
     return text || String(fallbackText || "");
   }
 
+  function getGuideImageUnavailableText() {
+    return getGuideCopyText("image_unavailable", "Unavailable image");
+  }
+
+  function trimWarningCollection(items, maxLength) {
+    return trimTraceCollection(items || [], maxLength || 20);
+  }
+
+  function describeMediaSourceType(sourceUrl) {
+    var value = String(sourceUrl || "").trim();
+    if (!value) {
+      return "unknown";
+    }
+    if (isDataUrl(value)) {
+      return "inline";
+    }
+    try {
+      var parsed = new URL(value, window.location.href);
+      var hostname = String(parsed.hostname || "").toLowerCase();
+      if (
+        hostname === String(window.location.hostname || "").toLowerCase()
+        || hostname === "development.localhost"
+        || hostname === "localhost"
+        || hostname === "127.0.0.1"
+      ) {
+        return "local";
+      }
+      return "remote";
+    } catch (error) {
+      return value.charAt(0) === "/" ? "local" : "unknown";
+    }
+  }
+
+  function resolveMediaFailureReason(error) {
+    var message = String(error && error.message || "");
+    var statusMatch = message.match(/Unable to prepare PDF image:\s*(\d{3})/i);
+    if (statusMatch) {
+      return {
+        code: "http-" + statusMatch[1],
+        status: Number(statusMatch[1])
+      };
+    }
+    if (/not found/i.test(message)) {
+      return {
+        code: "not-found",
+        status: null
+      };
+    }
+    if (/non-image/i.test(message)) {
+      return {
+        code: "non-image-response",
+        status: null
+      };
+    }
+    return {
+      code: "load-failed",
+      status: null
+    };
+  }
+
+  function buildMediaReferenceLabel(mediaDescriptor) {
+    if (!mediaDescriptor) {
+      return "guide image";
+    }
+    if (mediaDescriptor.mediaRole === "cover-image") {
+      return "cover image";
+    }
+    if (mediaDescriptor.mediaRole === "property-map") {
+      return "property overview map";
+    }
+    if (mediaDescriptor.mediaRole === "parking-map") {
+      return "Parking map";
+    }
+    if (mediaDescriptor.mediaRole === "block-map") {
+      return mediaDescriptor.sectionTitle
+        ? (mediaDescriptor.sectionTitle + " map")
+        : "instruction map";
+    }
+    if (mediaDescriptor.stepNumber) {
+      return "step " + mediaDescriptor.stepNumber + " image";
+    }
+    if (mediaDescriptor.blockTitle) {
+      return mediaDescriptor.blockTitle + " image";
+    }
+    if (mediaDescriptor.sectionTitle) {
+      return mediaDescriptor.sectionTitle + " image";
+    }
+    return "guide image";
+  }
+
+  function buildRequiredMediaUnavailableError(mediaDescriptor, reason) {
+    var label = buildMediaReferenceLabel(mediaDescriptor);
+    var error = new Error("A required guide image is unavailable for " + label + ".");
+    error.code = "required-media-unavailable";
+    error.mediaRole = mediaDescriptor && mediaDescriptor.mediaRole ? mediaDescriptor.mediaRole : "image";
+    error.section = mediaDescriptor && mediaDescriptor.sectionTitle ? mediaDescriptor.sectionTitle : "";
+    error.blockId = mediaDescriptor && mediaDescriptor.blockId ? mediaDescriptor.blockId : "";
+    error.stepNumber = mediaDescriptor && mediaDescriptor.stepNumber ? mediaDescriptor.stepNumber : "";
+    error.reasonCode = reason && reason.code ? reason.code : "load-failed";
+    error.sourceType = mediaDescriptor && mediaDescriptor.sourceType ? mediaDescriptor.sourceType : "unknown";
+    return error;
+  }
+
+  function resolveMediaFailurePolicy(options) {
+    var mediaRole = String(options && options.mediaRole || "image");
+    var required = !!(options && options.required);
+    var sourceType = String(options && options.sourceType || "unknown");
+    return {
+      mediaRole: mediaRole,
+      required: required,
+      sourceType: sourceType,
+      placeholderAllowed: !required,
+      placeholderClass: mediaRole.indexOf("map") !== -1
+        ? "pi-export-map-placeholder"
+        : "pi-export-image-placeholder",
+      placeholderText: getGuideImageUnavailableText()
+    };
+  }
+
+  function buildOptionalMediaWarning(mediaDescriptor, reason, policy) {
+    return {
+      role: mediaDescriptor && mediaDescriptor.mediaRole ? mediaDescriptor.mediaRole : "instruction-image",
+      section: mediaDescriptor && mediaDescriptor.sectionTitle ? mediaDescriptor.sectionTitle : "",
+      sectionAnchor: mediaDescriptor && mediaDescriptor.sectionAnchor ? mediaDescriptor.sectionAnchor : "",
+      step: mediaDescriptor && mediaDescriptor.stepNumber ? mediaDescriptor.stepNumber : "",
+      blockId: mediaDescriptor && mediaDescriptor.blockId ? mediaDescriptor.blockId : "",
+      title: mediaDescriptor && mediaDescriptor.blockTitle ? mediaDescriptor.blockTitle : "",
+      reason: reason && reason.code ? reason.code : "load-failed",
+      sourceType: mediaDescriptor && mediaDescriptor.sourceType ? mediaDescriptor.sourceType : "unknown",
+      fallbackUsed: !!(policy && policy.placeholderAllowed)
+    };
+  }
+
+  function applyOptionalMediaFallback(mediaDescriptor, policy, warning) {
+    if (!mediaDescriptor || !mediaDescriptor.target || !policy || !policy.placeholderAllowed) {
+      return;
+    }
+    mediaDescriptor.target.mediaUnavailable = {
+      role: mediaDescriptor.mediaRole,
+      placeholderClass: policy.placeholderClass,
+      placeholderText: policy.placeholderText,
+      warning: warning
+    };
+  }
+
   function initializePdfInteractionDiagnostics() {
     window.__propertyInstructionPdfInteractionDiagnostics = {
       events: []
@@ -3748,8 +3893,10 @@
     var frame = documentNode.createElement("div");
     frame.className = options.frameClassName || "pi-export-image-frame";
     frame.setAttribute("data-export-image-frame", options.imageRole || "image");
-
-    var resolvedSourceUrl = resolveExportImageUrl(options.src);
+    frame.setAttribute("data-export-image-role", options.imageRole || "image");
+    var resolvedSourceUrl = options.placeholderOnly
+      ? buildInlinePlaceholderImageDataUri(options.placeholderText || getGuideImageUnavailableText())
+      : resolveExportImageUrl(options.src);
     var img = documentNode.createElement("img");
     img.className = options.className;
     img.alt = options.alt || "";
@@ -3760,6 +3907,9 @@
     img.setAttribute("data-export-image-original-src", String(options.src || ""));
     img.setAttribute("data-export-image-resolved-src", resolvedSourceUrl);
     img.setAttribute("data-export-image-fetch-src", resolvedSourceUrl);
+    if (options.placeholderOnly) {
+      img.setAttribute("data-export-image-placeholder", "1");
+    }
     img.removeAttribute("width");
     img.removeAttribute("height");
     img.style.width = "auto";
@@ -3773,6 +3923,22 @@
     img.__exportPlaceholderClass = options.placeholderClass || "pi-export-image-placeholder";
     img.__exportPlaceholderText = options.placeholderText || "";
     return frame;
+  }
+
+  function buildInlinePlaceholderImageDataUri(text) {
+    var safeText = String(text || getGuideImageUnavailableText())
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+    var svg = [
+      '<svg xmlns="http://www.w3.org/2000/svg" width="640" height="400" viewBox="0 0 640 400">',
+      '<rect x="1" y="1" width="638" height="398" rx="18" ry="18" fill="#f8fafc" stroke="#cbd5e1" stroke-width="2" stroke-dasharray="10 8"/>',
+      '<text x="320" y="200" text-anchor="middle" dominant-baseline="middle" fill="#64748b" font-family="Inter, Arial, sans-serif" font-size="28">',
+      safeText,
+      '</text>',
+      '</svg>'
+    ].join("");
+    return "data:image/svg+xml;charset=UTF-8," + encodeURIComponent(svg);
   }
 
   function blobToDataUri(blob) {
@@ -5198,6 +5364,8 @@
     var headerHeightDelta = Math.abs(Number(details && details.headerHeightDelta || 0));
     var relationship = String(details && details.contentMediaRelationship || "none");
     var alignmentMode = String(details && details.mediaVerticalAlignmentMode || "natural");
+    var hasMapContent = !!(details && details.hasMapContent);
+    var hasQrContent = !!(details && details.hasQrContent);
 
     function isCenteredMode() {
       return alignmentMode === "content-group-centred" || alignmentMode === "balanced-between-header-and-card-bottom";
@@ -5255,7 +5423,11 @@
       }
     } else if (relationship === "side") {
       var insetGap = Math.abs(bottomBlank - topBlank);
-      if (isCenteredMode()) {
+      if (hasMapContent || hasQrContent) {
+        // Composite map/QR cards intentionally reserve asymmetric text/footer space
+        // beside the media frame, so the plain photo-card side-balance heuristic is
+        // not a reliable blocker for them.
+      } else if (isCenteredMode()) {
         if (insetGap > PDF_ADAPTIVE_MEDIA_BALANCE_GAP_BLOCKER_PX && frameToRegionCenterDeltaY > 18) {
           blockers.push(bottomBlank > topBlank ? "media-top-heavy" : "media-bottom-heavy");
         } else if (insetGap > PDF_ADAPTIVE_MEDIA_BALANCE_GAP_WARNING_PX && frameToRegionCenterDeltaY > 10) {
@@ -5361,6 +5533,8 @@
     var mediaReferenceRect = getAdaptiveMediaReferenceRect(cardNode) || mediaFrameRect;
     var selectedLayout = String(cardNode.getAttribute("data-pdf-selected-variant") || "");
     var contentMediaRelationship = getAdaptiveContentMediaRelationship(selectedLayout);
+    var hasMapContent = !!cardNode.querySelector("img[data-export-image-role='map']");
+    var hasQrContent = !!cardNode.querySelector(".pi-export-card-qr-panel, .pi-export-qr-panel");
     var naturalRatio = imageNode.naturalWidth / imageNode.naturalHeight;
     var frameRatio = mediaFrameInner && mediaFrameInner.height
       ? (mediaFrameInner.width / mediaFrameInner.height)
@@ -5433,7 +5607,9 @@
       titleToMediaGapDelta: gapAxis === "vertical" ? Math.abs(measuredTitleToMediaGap - projectedTitleToMediaGap) : 0,
       headerHeightDelta: compareHeaderHeight ? Math.abs(measuredHeaderHeight - projectedHeaderHeight) : 0,
       contentMediaRelationship: contentMediaRelationship,
-      mediaVerticalAlignmentMode: String(cardNode.getAttribute("data-pdf-media-vertical-alignment") || "natural")
+      mediaVerticalAlignmentMode: String(cardNode.getAttribute("data-pdf-media-vertical-alignment") || "natural"),
+      hasMapContent: hasMapContent,
+      hasQrContent: hasQrContent
     });
     return {
       fitPolicy: String(imageNode.getAttribute("data-export-media-fit-policy") || "contain"),
@@ -7813,6 +7989,30 @@
       }
 
       var planResult = planAdaptiveSectionRows(cardPlans);
+      if (cardPlans.length && !planResult.rows.length) {
+        var noValidRowPlan = {
+          sectionAnchor: sectionAnchor,
+          cardPlans: cardPlans.map(function (cardPlan) {
+            return {
+              blockId: String(cardPlan.blockId || ""),
+              orientation: String(cardPlan.orientation || ""),
+              textLength: Number(cardPlan.textLength || 0),
+              hasMap: !!cardPlan.hasMap,
+              isWarning: !!cardPlan.isWarning,
+              wideCandidates: Number(cardPlan.wideCandidates ? cardPlan.wideCandidates.length : 0),
+              halfCandidates: Number(cardPlan.halfCandidates ? cardPlan.halfCandidates.length : 0),
+              candidateDiagnostics: (cardPlan.candidateDiagnostics || []).slice(0, 12)
+            };
+          })
+        };
+        window.__propertyInstructionLastPdfDiagnostics = Object.assign({}, window.__propertyInstructionLastPdfDiagnostics || {}, {
+          adaptiveNoValidRowPlan: noValidRowPlan
+        });
+        var noValidRowPlanError = new Error("adaptive-no-valid-row-plan:" + JSON.stringify(noValidRowPlan));
+        noValidRowPlanError.code = "adaptive-no-valid-row-plan";
+        noValidRowPlanError.adaptiveNoValidRowPlan = noValidRowPlan;
+        throw noValidRowPlanError;
+      }
       summary.sectionPlans.push({
         anchor: sectionAnchor,
         score: Number((planResult.score || 0).toFixed(2)),
@@ -9041,7 +9241,11 @@
           className: "pi-export-cover",
           frameClassName: "pi-export-image-frame pi-export-cover-frame",
           imageRole: "cover",
-          placeholderClass: "pi-export-image-placeholder"
+          placeholderClass: "pi-export-image-placeholder",
+          placeholderOnly: !!(model.coverImage && model.coverImage.mediaUnavailable),
+          placeholderText: model.coverImage && model.coverImage.mediaUnavailable
+            ? String((model.coverImage.mediaUnavailable || {}).placeholderText || getGuideImageUnavailableText())
+            : ""
         }, pendingImages);
       setPdfSemantic(heroImage, "image", "cover-image", { imageKind: "photo" });
       heroMedia.appendChild(heroImage);
@@ -9071,7 +9275,11 @@
             className: "pi-export-map-image",
             frameClassName: "pi-export-image-frame pi-export-map-image-frame",
             imageRole: "map",
-            placeholderClass: "pi-export-map-placeholder"
+            placeholderClass: "pi-export-map-placeholder",
+            placeholderOnly: !!(model.map && model.map.mediaUnavailable),
+            placeholderText: model.map && model.map.mediaUnavailable
+              ? String((model.map.mediaUnavailable || {}).placeholderText || getGuideImageUnavailableText())
+              : ""
           }, pendingImages);
         setPdfSemantic(overviewMapImage, "image", "property-map", { imageKind: "map" });
         mapSection.appendChild(overviewMapImage);
@@ -9156,7 +9364,11 @@
               className: "pi-export-map-image pi-export-map-image--parking",
               frameClassName: "pi-export-image-frame pi-export-map-image-frame pi-export-map-image-frame--parking",
               imageRole: "map",
-              placeholderClass: "pi-export-map-placeholder"
+              placeholderClass: "pi-export-map-placeholder",
+              placeholderOnly: !!(model.parkingMap && model.parkingMap.mediaUnavailable),
+              placeholderText: model.parkingMap && model.parkingMap.mediaUnavailable
+                ? String((model.parkingMap.mediaUnavailable || {}).placeholderText || getGuideImageUnavailableText())
+                : ""
             }, pendingImages);
           setPdfSemantic(parkingMapImage, "image", "parking-map", { imageKind: "map" });
           parkingMap.appendChild(parkingMapImage);
@@ -9253,14 +9465,18 @@
           bodyRegion.appendChild(body);
         }
 
-        if (blockModel.imageSrc) {
+        if (blockModel.imageSrc || blockModel.mediaUnavailable) {
           var cardImage = createManagedImage(document, {
               src: blockModel.imageSrc,
               alt: blockModel.imageAlt || blockModel.title || sectionModel.title,
               className: "pi-export-card-image",
               frameClassName: "pi-export-image-frame pi-export-card-image-frame",
               imageRole: "card",
-              placeholderClass: "pi-export-image-placeholder"
+              placeholderClass: "pi-export-image-placeholder",
+              placeholderOnly: !!blockModel.mediaUnavailable,
+              placeholderText: blockModel.mediaUnavailable
+                ? String((blockModel.mediaUnavailable || {}).placeholderText || getGuideImageUnavailableText())
+                : ""
             }, pendingImages);
           setPdfSemantic(cardImage, "image", "card-image", { imageKind: "photo" });
           mediaColumn.appendChild(cardImage);
@@ -9273,7 +9489,11 @@
               className: "pi-export-map-image pi-export-map-image--block",
               frameClassName: "pi-export-image-frame pi-export-map-image-frame pi-export-map-image-frame--block",
               imageRole: "map",
-              placeholderClass: "pi-export-map-placeholder"
+              placeholderClass: "pi-export-map-placeholder",
+              placeholderOnly: !!blockModel.mapMediaUnavailable,
+              placeholderText: blockModel.mapMediaUnavailable
+                ? String((blockModel.mapMediaUnavailable || {}).placeholderText || getGuideImageUnavailableText())
+                : ""
             }, pendingImages);
           setPdfSemantic(blockMap, "image", "block-map", { imageKind: "map" });
           mediaColumn.appendChild(blockMap);
@@ -9991,23 +10211,81 @@
 
   function collectModelImageSources(model) {
     var imageSources = [];
-    function pushSource(sourceUrl) {
-      if (!sourceUrl) {
+
+    function pushDescriptor(descriptor) {
+      if (!descriptor || !descriptor.sourceUrl) {
         return;
       }
-      var resolvedUrl = resolveExportImageUrl(sourceUrl);
-      if (!resolvedUrl || imageSources.indexOf(resolvedUrl) !== -1) {
+      var resolvedUrl = resolveExportImageUrl(descriptor.sourceUrl);
+      if (!resolvedUrl) {
         return;
       }
-      imageSources.push(resolvedUrl);
+      imageSources.push(Object.assign({}, descriptor, {
+        resolvedUrl: resolvedUrl,
+        sourceType: describeMediaSourceType(resolvedUrl)
+      }));
     }
 
     if (model.coverImage && model.coverImage.src) {
-      pushSource(model.coverImage.src);
+      pushDescriptor({
+        mediaRole: "cover-image",
+        required: true,
+        sourceUrl: model.coverImage.src,
+        target: model.coverImage,
+        targetKey: "coverImage"
+      });
     }
+
+    if (model.map && model.map.imageSrc) {
+      pushDescriptor({
+        mediaRole: "property-map",
+        required: true,
+        sourceUrl: model.map.imageSrc,
+        target: model.map,
+        targetKey: "propertyMap"
+      });
+    }
+
+    if (model.parkingMap && model.parkingMap.imageSrc) {
+      pushDescriptor({
+        mediaRole: "parking-map",
+        required: true,
+        sourceUrl: model.parkingMap.imageSrc,
+        target: model.parkingMap,
+        targetKey: "parkingMap"
+      });
+    }
+
     (model.sections || []).forEach(function (sectionModel) {
       (sectionModel.blocks || []).forEach(function (blockModel) {
-        pushSource(blockModel.imageSrc);
+        if (blockModel.imageSrc) {
+          pushDescriptor({
+            mediaRole: "instruction-image",
+            required: false,
+            sourceUrl: blockModel.imageSrc,
+            target: blockModel,
+            targetKey: "imageSrc",
+            sectionAnchor: sectionModel.anchor || "",
+            sectionTitle: sectionModel.title || "",
+            blockId: blockModel.id || "",
+            blockTitle: blockModel.title || "",
+            stepNumber: blockModel.stepNumber || ""
+          });
+        }
+        if (blockModel.mapImageSrc) {
+          pushDescriptor({
+            mediaRole: "block-map",
+            required: true,
+            sourceUrl: blockModel.mapImageSrc,
+            target: blockModel,
+            targetKey: "mapImageSrc",
+            sectionAnchor: sectionModel.anchor || "",
+            sectionTitle: sectionModel.title || "",
+            blockId: blockModel.id || "",
+            blockTitle: blockModel.title || "",
+            stepNumber: blockModel.stepNumber || ""
+          });
+        }
       });
     });
 
@@ -10020,11 +10298,53 @@
 
   async function prewarmImageDataCacheForModel(model, exportImageDataCache) {
     var imageSources = collectModelImageSources(model);
-    await Promise.all(imageSources.map(function (resolvedUrl) {
-      return getExportImageDataUri(resolvedUrl, exportImageDataCache);
+    var uniqueSources = {};
+    var uniqueEntries = [];
+    imageSources.forEach(function (descriptor) {
+      if (descriptor && descriptor.resolvedUrl && !uniqueSources[descriptor.resolvedUrl]) {
+        uniqueSources[descriptor.resolvedUrl] = true;
+        uniqueEntries.push(descriptor.resolvedUrl);
+      }
+    });
+    var fetchResults = {};
+    await Promise.all(uniqueEntries.map(async function (resolvedUrl) {
+      try {
+        await getExportImageDataUri(resolvedUrl, exportImageDataCache);
+        fetchResults[resolvedUrl] = {
+          ok: true
+        };
+      } catch (error) {
+        fetchResults[resolvedUrl] = {
+          ok: false,
+          error: error
+        };
+      }
     }));
+
+    var optionalMediaWarnings = [];
+    imageSources.forEach(function (descriptor) {
+      var result = descriptor && descriptor.resolvedUrl ? fetchResults[descriptor.resolvedUrl] : null;
+      if (!result || result.ok) {
+        return;
+      }
+      var reason = resolveMediaFailureReason(result.error);
+      var policy = resolveMediaFailurePolicy({
+        mediaRole: descriptor.mediaRole,
+        required: descriptor.required,
+        sourceType: descriptor.sourceType
+      });
+      if (policy.placeholderAllowed) {
+        var warning = buildOptionalMediaWarning(descriptor, reason, policy);
+        applyOptionalMediaFallback(descriptor, policy, warning);
+        optionalMediaWarnings.push(warning);
+        return;
+      }
+      throw buildRequiredMediaUnavailableError(descriptor, reason);
+    });
+
     return {
-      uniqueImageCount: imageSources.length
+      uniqueImageCount: uniqueEntries.length,
+      optionalMediaWarnings: trimWarningCollection(optionalMediaWarnings, 20)
     };
   }
 
@@ -10433,6 +10753,9 @@
   async function prepareGuideModelAssets(model, exportImageDataCache, mapImageCache) {
     var preparedModel = deepCloneModel(model);
     var imageDiagnostics = await prewarmImageDataCacheForModel(preparedModel, exportImageDataCache);
+    var optionalMediaWarnings = Array.isArray(imageDiagnostics && imageDiagnostics.optionalMediaWarnings)
+      ? imageDiagnostics.optionalMediaWarnings.slice()
+      : [];
     var mapStartedAt = Date.now();
     var mapRenderPlan = {
       propertyMap: !!(preparedModel.map && Number.isFinite(preparedModel.map.latitude) && Number.isFinite(preparedModel.map.longitude)),
@@ -10545,6 +10868,7 @@
     return {
       model: preparedModel,
       imageDiagnostics: imageDiagnostics,
+      optionalMediaWarnings: optionalMediaWarnings,
       mapPreparationMs: Date.now() - mapStartedAt,
       mapDiagnostics: mapDiagnostics,
       qrGenerationMs: Date.now() - qrStartedAt,
@@ -10605,7 +10929,10 @@
         qrGenerationMs: preparedAssets.qrGenerationMs,
         mapDiagnostics: preparedAssets.mapDiagnostics,
         qrDiagnostics: preparedAssets.qrDiagnostics,
-        imageWarmDiagnostics: preparedAssets.imageDiagnostics
+        imageWarmDiagnostics: preparedAssets.imageDiagnostics,
+        optionalMediaWarnings: Array.isArray(preparedAssets.optionalMediaWarnings)
+          ? preparedAssets.optionalMediaWarnings.slice()
+          : []
       };
       pdfPreparationState.preparedState = preparedState;
       getPdfPerformanceState().translationReadyToExportPreparedMs =
@@ -10995,7 +11322,10 @@
       var clampedWidth = Math.min(width, canvas.width - left);
       var clampedHeight = Math.min(height, canvas.height - top);
       var region = analyzeCanvasRegion(canvasContext, canvas, left, top, clampedWidth, clampedHeight);
-      var painted = region.variance > 12 && region.nonWhiteCoverage > 0.05;
+      var isPlaceholder = img.getAttribute("data-export-image-placeholder") === "1";
+      var painted = isPlaceholder
+        ? (region.nonWhiteCoverage > 0.02 && region.variance > 0.1)
+        : (region.variance > 12 && region.nonWhiteCoverage > 0.05);
       diagnostics.push({
         image: summarizeDiagnosticImageSource(
           img.getAttribute("data-export-image-resolved-src") || img.currentSrc || img.src || "",
@@ -11016,6 +11346,7 @@
         },
         variance: region.variance,
         nonWhiteCoverage: region.nonWhiteCoverage,
+        placeholder: isPlaceholder,
         painted: painted
       });
 
@@ -13072,9 +13403,23 @@
       var prepareStartedAt = Date.now();
       var preparedState = await preparePdfDependenciesForSnapshot(settledSnapshot, triggerElement);
       recordPdfGenerationDuration("preparePdfDependenciesForSnapshotMs", Date.now() - prepareStartedAt);
+      if (Array.isArray(preparedState.optionalMediaWarnings) && preparedState.optionalMediaWarnings.length) {
+        var generationDiagnostics = getPdfGenerationDiagnostics();
+        generationDiagnostics.optionalMediaWarnings = trimWarningCollection(
+          (generationDiagnostics.optionalMediaWarnings || []).concat(preparedState.optionalMediaWarnings),
+          20
+        );
+        generationDiagnostics.warnings = trimWarningCollection(
+          generationDiagnostics.warnings.concat(preparedState.optionalMediaWarnings.map(function (warning) {
+            return Object.assign({ kind: "optional-media-missing" }, warning);
+          })),
+          80
+        );
+      }
       recordPdfGenerationStage("libraries-completed", {
         mapPreparationMs: Number(preparedState.mapPreparationMs || 0),
-        qrGenerationMs: Number((preparedState.qrDiagnostics && preparedState.qrDiagnostics.durationMs) || 0)
+        qrGenerationMs: Number((preparedState.qrDiagnostics && preparedState.qrDiagnostics.durationMs) || 0),
+        optionalMediaWarnings: Number((preparedState.optionalMediaWarnings || []).length || 0)
       });
       exportImageDataCache = preparedState.imageDataCache || exportImageDataCache;
       recordPdfPerformance(
@@ -13141,19 +13486,19 @@
       exportState.inlineImageDiagnostics = inlineImageDiagnostics;
       await waitForImages(exportState.exportRoot);
       recordPdfGenerationStage("assets-completed");
-      if (isAdaptivePdfLayoutEnabled()) {
-          recordPdfGenerationStage("adaptive-layout-started");
-          applyAdaptiveSectionRows(exportState);
-          recordPdfGenerationStage("adaptive-layout-completed", {
-            pageCount: exportState && exportState.exportPages ? exportState.exportPages.querySelectorAll(".pi-export-page").length : 0
-          });
-      }
       updateExportProgress(triggerElement, statusElement, null, null, "prepare-layout");
       var sizingDiagnostics = applyExportImageSizing(exportState.exportRoot);
       recordPdfGenerationStage("browser-fonts-started");
       await waitForFonts();
       recordPdfGenerationStage("browser-fonts-completed");
       await waitForTwoAnimationFrames();
+      if (isAdaptivePdfLayoutEnabled()) {
+        recordPdfGenerationStage("adaptive-layout-started");
+        applyAdaptiveSectionRows(exportState);
+        recordPdfGenerationStage("adaptive-layout-completed", {
+          pageCount: exportState && exportState.exportPages ? exportState.exportPages.querySelectorAll(".pi-export-page").length : 0
+        });
+      }
       recordPdfGenerationStage("adaptive-final-sizing-started");
       var prePaginationRatioDiagnostics = validateImageAspectRatios(exportState.exportRoot);
       var prePaginationClipDiagnostics = validateExportImageClipping(exportState.exportRoot);
@@ -13320,6 +13665,9 @@
         layoutDiagnostics: layoutDiagnostics,
         mapDiagnostics: preparedState.mapDiagnostics || {},
         qrDiagnostics: preparedState.qrDiagnostics || {},
+        optionalMediaWarnings: Array.isArray(preparedState.optionalMediaWarnings)
+          ? preparedState.optionalMediaWarnings.slice()
+          : [],
         performance: performanceState
       });
       stopExportMutationGuard(mutationGuardState);
@@ -13369,6 +13717,8 @@
       if (statusElement) {
         if (error && /Selected translation changed during PDF export/.test(String(error.message || ""))) {
           statusElement.textContent = getGuideCopyText("cancelled_language_change", "PDF generation was cancelled because the language changed.");
+        } else if (error && error.code === "required-media-unavailable") {
+          statusElement.textContent = String(error.message || "A required guide image is unavailable.");
         } else if ((translationState.diagnostics || {}).abortCode && String((translationState.diagnostics || {}).abortCode).indexOf("translation") === 0) {
           statusElement.textContent = getGuideCopyText("translation_unavailable", "Translation is temporarily unavailable.");
         } else {

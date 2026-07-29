@@ -20,6 +20,7 @@ from propms.property_management_solution.doctype.property_instruction.property_i
 	PUBLIC_PDF_IMAGE_MAX_BYTES,
 	apply_guest_guide_noindex_headers,
 	fetch_remote_public_image,
+	resolve_local_public_image,
 	resolve_public_pdf_image_target,
 	validate_public_pdf_image_url,
 )
@@ -1700,6 +1701,16 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 		self.assertIn('pdf.addFont(fontEntry.file, fontEntry.family, fontEntry.style);', source)
 		self.assertIn('VECTOR_PDF_FONT_FAMILY_ARABIC', source)
 
+	def test_export_script_allows_optional_instruction_image_placeholders_without_remote_fallback(self):
+		source = self.get_export_script_source()
+		self.assertIn('function resolveMediaFailurePolicy(options)', source)
+		self.assertIn('mediaRole: "instruction-image"', source)
+		self.assertIn("placeholderAllowed: !required", source)
+		self.assertIn("optionalMediaWarnings", source)
+		self.assertIn("buildRequiredMediaUnavailableError", source)
+		self.assertIn("placeholderOnly: !!blockModel.mediaUnavailable", source)
+		self.assertIn("buildInlinePlaceholderImageDataUri", source)
+
 	def test_vector_renderer_preserves_media_frame_and_qr_panel_geometry(self):
 		source = self.get_export_script_source()
 		self.assertIn('function getVectorFrameStyleDescriptor(node, scaleMetrics)', source)
@@ -1830,11 +1841,96 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 		self.assertEqual(image_response["filename"], "test-guide-image.png")
 		self.assertEqual(image_response["content"], PNG_BYTES)
 
+	def test_resolve_local_public_image_decodes_encoded_public_filenames(self):
+		cases = [
+			("/files/example%20image.jpeg", "example image.jpeg"),
+			("/files/example%20(1).jpeg", "example (1).jpeg"),
+			("/files/door%23one.png", "door#one.png"),
+			("/files/caf%C3%A9.jpeg", "café.jpeg"),
+			("/files/subfolder/image%20one.webp", "subfolder/image one.webp"),
+			("/files/image+one.jpeg", "image+one.jpeg"),
+		]
+		expected_content_types = {
+			".jpeg": "image/jpeg",
+			".png": "image/png",
+			".webp": "image/webp",
+		}
+		for encoded_path, filename in cases:
+			with self.subTest(path=encoded_path):
+				self.make_site_file(filename)
+				image_response = resolve_local_public_image(encoded_path)
+				self.assertEqual(image_response["filename"], os.path.basename(filename))
+				self.assertEqual(image_response["content"], PNG_BYTES)
+				self.assertEqual(
+					image_response["content_type"],
+					expected_content_types[os.path.splitext(filename)[1].lower()],
+				)
+
+	def test_resolve_public_pdf_image_target_decodes_actual_regression_filename(self):
+		self.make_site_file("IMG_3861 (1).jpeg")
+		with patch.object(property_instruction_module, "fetch_remote_public_image") as remote_fetch:
+			with patch.object(property_instruction_module.socket, "getaddrinfo", side_effect=AssertionError("dns should not run")):
+				image_response = resolve_public_pdf_image_target(
+					"http://development.localhost:8000/files/IMG_3861%20(1).jpeg"
+				)
+		self.assertEqual(image_response["filename"], "IMG_3861 (1).jpeg")
+		self.assertEqual(image_response["content_type"], "image/jpeg")
+		self.assertEqual(image_response["content"], PNG_BYTES)
+		remote_fetch.assert_not_called()
+
+	def test_resolve_public_pdf_image_target_treats_external_frappe_style_url_as_remote(self):
+		url = "https://estaex.co.uk/files/example%20image.jpeg"
+		with patch.object(property_instruction_module, "resolve_local_public_image", side_effect=AssertionError("local resolver should not run")):
+			with patch.object(property_instruction_module, "fetch_remote_public_image", return_value={"filename": "example image.jpeg", "content_type": "image/jpeg", "content": PNG_BYTES}) as remote_fetch:
+				image_response = resolve_public_pdf_image_target(url)
+		self.assertEqual(image_response["filename"], "example image.jpeg")
+		remote_fetch.assert_called_once_with(url)
+
+	def test_resolve_local_public_image_blocks_encoded_traversal(self):
+		for path in (
+			"/files/%2e%2e/private/files/secret.png",
+			"/files/%2E%2E%2Fsite_config.json",
+			"/files/subdir/%2e%2e/%2e%2e/secret.png",
+		):
+			with self.subTest(path=path):
+				with self.assertRaises(frappe.ValidationError):
+					resolve_local_public_image(path)
+
+	def test_resolve_public_pdf_image_target_missing_same_site_file_does_not_fetch_remote(self):
+		with patch.object(
+			property_instruction_module,
+			"fetch_remote_public_image",
+			side_effect=AssertionError("remote fetch should not be called"),
+		):
+			with patch.object(property_instruction_module.socket, "getaddrinfo", side_effect=AssertionError("dns should not run")):
+				with self.assertRaisesRegex(frappe.ValidationError, "Requested guest guide image was not found."):
+					resolve_public_pdf_image_target(
+						"http://development.localhost:8000/files/missing%20image.jpeg"
+					)
+
 	def test_validate_public_pdf_image_url_allows_registered_external_file_url(self):
 		url = "https://estaex.co.uk/files/test-guide-image.png"
 		self.make_external_file_record(url)
 		parsed = validate_public_pdf_image_url(url)
 		self.assertEqual(parsed.hostname, "estaex.co.uk")
+
+	def test_instruction_template_contains_image_unavailable_copy(self):
+		html = self.render_instruction(self.make_instruction())
+		self.assertIn('data-guide-progress-copy="image_unavailable"', html)
+		self.assertIn(">Image unavailable<", html)
+
+	def test_export_script_treats_map_qr_composites_as_expected_side_asymmetry(self):
+		source = self.get_export_script_source()
+		self.assertIn("var hasMapContent = !!(details && details.hasMapContent);", source)
+		self.assertIn("var hasQrContent = !!(details && details.hasQrContent);", source)
+		self.assertIn("if (hasMapContent || hasQrContent) {", source)
+		self.assertIn("Composite map/QR cards intentionally reserve asymmetric text/footer space", source)
+
+	def test_export_script_throws_when_adaptive_section_has_no_valid_row_plan(self):
+		source = self.get_export_script_source()
+		self.assertIn('adaptive-no-valid-row-plan:', source)
+		self.assertIn('adaptiveNoValidRowPlan', source)
+		self.assertIn('cardPlans.length && !planResult.rows.length', source)
 
 	def test_validate_public_pdf_image_url_allows_property_instruction_image_host(self):
 		self.make_instruction(
