@@ -130,6 +130,7 @@ class PropertyInstructionTestMixin:
 				"property": property_name,
 				"published": overrides.pop("published", 1),
 				"address": overrides.pop("address", "99A Burlington Road"),
+				"custom_map_embed_url": overrides.pop("custom_map_embed_url", None),
 				"google_maps_url": overrides.pop(
 					"google_maps_url",
 					"https://www.google.com/maps/place/99A+Burlington+Road",
@@ -373,6 +374,58 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 		doc = self.make_instruction(show_embedded_map=0)
 		self.assertIsNone(doc.get_map_embed_url())
 
+	def test_property_map_custom_embed_url_exists_in_schema(self):
+		schema = self.get_property_instruction_schema()
+		fields_by_name = {field["fieldname"]: field for field in schema["fields"]}
+		self.assertIn("custom_map_embed_url", fields_by_name)
+		self.assertEqual(fields_by_name["custom_map_embed_url"]["fieldtype"], "Small Text")
+		self.assertIn("Paste a Google Maps embed iframe or its src URL.", fields_by_name["custom_map_embed_url"]["description"])
+
+	def test_property_custom_embed_accepts_standard_iframe_and_stores_canonical_url(self):
+		doc = self.make_instruction(
+			custom_map_embed_url='<iframe src="https://www.google.com/maps/embed?pb=abc&amp;z=12" width="600" height="450"></iframe>'
+		)
+		self.assertEqual(doc.custom_map_embed_url, "https://www.google.com/maps/embed?pb=abc&z=12")
+		self.assertEqual(doc.get_map_embed_url(), "https://www.google.com/maps/embed?pb=abc&z=12")
+
+	def test_property_custom_embed_accepts_mymaps_url_and_derives_viewer_link(self):
+		doc = self.make_instruction(
+			custom_map_embed_url="https://www.google.com/maps/d/embed?mid=1A1kCH3-hgmeHlANOAt-XJAm3t2ptm1U&ehbc=2E312F",
+			google_maps_url=None,
+			map_search_query=None,
+			address=None,
+		)
+		context = doc.get_public_render_context()
+		self.assertEqual(
+			context.map_embed_url,
+			"https://www.google.com/maps/d/embed?mid=1A1kCH3-hgmeHlANOAt-XJAm3t2ptm1U&ehbc=2E312F",
+		)
+		self.assertEqual(
+			context.google_maps_url,
+			"https://www.google.com/maps/d/viewer?mid=1A1kCH3-hgmeHlANOAt-XJAm3t2ptm1U&ehbc=2E312F",
+		)
+		self.assertEqual(context.property_map.embed_kind, "google-my-maps")
+
+	def test_property_custom_embed_overrides_generated_embed(self):
+		doc = self.make_instruction(
+			custom_map_embed_url="https://www.google.com/maps/embed?pb=override",
+			map_search_query="99A Burlington Road",
+		)
+		self.assertEqual(doc.get_map_embed_url(), "https://www.google.com/maps/embed?pb=override")
+		self.assertEqual(doc.get_public_render_context().property_map.embed_url, "https://www.google.com/maps/embed?pb=override")
+
+	def test_property_custom_embed_rejects_invalid_inputs(self):
+		for invalid in (
+			"https://example.com/maps/embed?pb=abc",
+			"http://www.google.com/maps/embed?pb=abc",
+			"javascript:alert(1)",
+			'<iframe src="https://www.google.com/maps/embed?pb=one"></iframe><iframe src="https://www.google.com/maps/embed?pb=two"></iframe>',
+			'<iframe width="600"></iframe>',
+			"https://www.google.com.evil.example/maps/embed?pb=abc",
+		):
+			with self.assertRaises(frappe.ValidationError):
+				self.make_instruction(title=f"Invalid {uuid.uuid4().hex[:6]}", custom_map_embed_url=invalid)
+
 	def test_map_type_and_zoom_are_normalized(self):
 		doc = self.make_instruction(map_type="bad", map_zoom=88)
 		self.assertEqual(doc.map_type, "roadmap")
@@ -390,13 +443,17 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 	def test_map_block_option_and_embed_field_exist_in_schema(self):
 		schema = self.get_block_doctype_json()
 		block_type_field = next(field for field in schema["fields"] if field["fieldname"] == "block_type")
+		custom_embed_field = next(field for field in schema["fields"] if field["fieldname"] == "custom_map_embed_url")
 		embed_field = next(field for field in schema["fields"] if field["fieldname"] == "google_maps_embed_html")
 		self.assertIn("Map", block_type_field["options"].splitlines())
+		self.assertEqual(custom_embed_field["fieldtype"], "Small Text")
+		self.assertEqual(custom_embed_field["depends_on"], 'eval:doc.block_type')
+		self.assertEqual(custom_embed_field["mandatory_depends_on"], 'eval:doc.block_type == "Map"')
+		self.assertIn("Paste a Google Maps embed iframe or its src URL.", custom_embed_field["description"])
 		self.assertEqual(embed_field["fieldtype"], "Code")
 		self.assertEqual(embed_field["options"], "HTML")
-		self.assertEqual(embed_field["depends_on"], 'eval:doc.block_type')
-		self.assertEqual(embed_field["mandatory_depends_on"], 'eval:doc.block_type == "Map"')
-		self.assertIn("Required for Map blocks. Optional for Step/Text/Image/Warning/Link.", embed_field["description"])
+		self.assertEqual(embed_field["depends_on"], "eval:0")
+		self.assertEqual(embed_field["hidden"], 1)
 
 	def test_property_instruction_wifi_qr_fields_exist_in_schema(self):
 		schema = self.get_property_instruction_schema()
@@ -438,15 +495,20 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 					"section": "Finding the Property",
 					"block_type": "Map",
 					"title": "Front entrance map",
-					"google_maps_embed_html": embed_html,
+					"custom_map_embed_url": embed_html,
 				},
 			]
+		)
+		self.assertEqual(
+			doc.instruction_blocks[0].custom_map_embed_url,
+			"https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d2484.0!2d-0.249!3d51.399!2m3!1f0!2f0!3f0!3m2!1i1024!2i768",
 		)
 		grouped_sections = doc.get_grouped_blocks()
 		block = grouped_sections[0].blocks[0]
 		self.assertEqual(block.block_type, "Map")
 		self.assertEqual(block.map_embed_url, "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d2484.0!2d-0.249!3d51.399!2m3!1f0!2f0!3f0!3m2!1i1024!2i768")
 		self.assertNotIn("google_maps_embed_html", block)
+		self.assertNotIn("custom_map_embed_url", block)
 		html = self.render_instruction(doc)
 		self.assertIn('class="pi-instruction-map"', html)
 		self.assertIn('src="https://www.google.com/maps/embed?pb=', html)
@@ -461,7 +523,7 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 						"section": "Finding the Property",
 						"block_type": "Map",
 						"title": "Bad map",
-						"google_maps_embed_html": '<iframe src="https://example.com/maps/embed"></iframe>',
+						"custom_map_embed_url": '<iframe src="https://example.com/maps/embed"></iframe>',
 					},
 				]
 			)
@@ -472,7 +534,7 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 						"section": "Finding the Property",
 						"block_type": "Map",
 						"title": "Bad map",
-						"google_maps_embed_html": '<iframe srcdoc="<script>alert(1)</script>" src="https://www.google.com/maps/embed?pb=1"></iframe>',
+						"custom_map_embed_url": '<iframe srcdoc="<script>alert(1)</script>" src="https://www.google.com/maps/embed?pb=1"></iframe>',
 					},
 				]
 			)
@@ -483,10 +545,26 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 						"section": "Finding the Property",
 						"block_type": "Map",
 						"title": "Bad map",
-						"google_maps_embed_html": '<iframe src="javascript:alert(1)"></iframe>',
+						"custom_map_embed_url": '<iframe src="javascript:alert(1)"></iframe>',
 					},
 				]
 			)
+
+	def test_map_block_accepts_direct_mymaps_url(self):
+		doc = self.make_instruction(
+			instruction_blocks=[
+				{
+					"section": "Finding the Property",
+					"block_type": "Map",
+					"title": "Site map",
+					"custom_map_embed_url": "https://www.google.com/maps/d/embed?mid=mid123&ehbc=2E312F",
+				},
+			]
+		)
+		block = doc.get_grouped_blocks()[0].blocks[0]
+		self.assertEqual(block.map_embed_url, "https://www.google.com/maps/d/embed?mid=mid123&ehbc=2E312F")
+		self.assertEqual(block.map_embed_kind, "google-my-maps")
+		self.assertEqual(block.map_external_url, "https://www.google.com/maps/d/viewer?mid=mid123&ehbc=2E312F")
 
 	def test_map_block_coordinate_parsing_supports_embed_formats(self):
 		doc = self.make_instruction()
@@ -532,7 +610,7 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 					"section": "Finding the Property",
 					"block_type": "Map",
 					"title": "Arrival map",
-					"google_maps_embed_html": '<iframe src="https://www.google.com/maps?output=embed&q=99A+Burlington+Road"></iframe>',
+					"custom_map_embed_url": '<iframe src="https://www.google.com/maps?output=embed&q=99A+Burlington+Road"></iframe>',
 				},
 			]
 		)
@@ -550,7 +628,7 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 					"block_type": "Step",
 					"title": "Find the entrance",
 					"body": "<p>Use this map to find the side entrance.</p>",
-					"google_maps_embed_html": embed_html,
+					"custom_map_embed_url": embed_html,
 				},
 			]
 		)
@@ -573,7 +651,7 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 					"block_type": "Text",
 					"title": "Map details",
 					"body": "<p>Approach from the high street.</p>",
-					"google_maps_embed_html": embed_html,
+					"custom_map_embed_url": embed_html,
 				},
 			]
 		)
@@ -597,7 +675,7 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 					"section": "Parking",
 					"block_type": "Map",
 					"title": "Parking map",
-					"google_maps_embed_html": embed_html,
+					"custom_map_embed_url": embed_html,
 				},
 			]
 		)
@@ -636,10 +714,25 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 						"block_type": "Step",
 						"title": "Bad step map",
 						"body": "<p>Bad map.</p>",
-						"google_maps_embed_html": '<iframe src="https://example.com/maps/embed"></iframe>',
+						"custom_map_embed_url": '<iframe src="https://example.com/maps/embed"></iframe>',
 					},
 				]
 			)
+
+	def test_legacy_block_embed_field_is_canonicalized_to_custom_field(self):
+		doc = self.make_instruction(
+			instruction_blocks=[
+				{
+					"section": "Finding the Property",
+					"block_type": "Map",
+					"title": "Legacy map",
+					"google_maps_embed_html": '<iframe src="https://www.google.com/maps/embed?pb=legacy"></iframe>',
+				},
+			]
+		)
+		row = doc.instruction_blocks[0]
+		self.assertEqual(row.custom_map_embed_url, "https://www.google.com/maps/embed?pb=legacy")
+		self.assertEqual(row.google_maps_embed_html, "https://www.google.com/maps/embed?pb=legacy")
 
 	def test_google_translate_widget_disabled_by_default(self):
 		self.set_property_management_setting("enable_guest_guide_google_translate", 0)
