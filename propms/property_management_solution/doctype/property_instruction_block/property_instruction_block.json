@@ -16,6 +16,7 @@
   "caption",
   "link_url",
   "link_label",
+  "custom_map_embed_url",
   "google_maps_embed_html"
  ],
  "fields": [
@@ -79,11 +80,19 @@
   },
   {
    "depends_on": "eval:doc.block_type",
-   "description": "Paste the iframe HTML from Google Maps > Share > Embed a map. Required for Map blocks. Optional for Step/Text/Image/Warning/Link.",
+   "description": "Paste a Google Maps embed iframe or its src URL. Required for Map blocks. Optional for Step/Text/Image/Warning/Link.",
+   "fieldname": "custom_map_embed_url",
+   "fieldtype": "Small Text",
+   "label": "Google Maps Embed iframe or URL",
+   "mandatory_depends_on": "eval:doc.block_type == \"Map\""
+  },
+  {
+   "depends_on": "eval:0",
+   "description": "Legacy field retained for backward compatibility. New saves canonicalise embed input into Google Maps Embed iframe or URL.",
    "fieldname": "google_maps_embed_html",
    "fieldtype": "Code",
-   "label": "Google Maps Embed HTML",
-   "mandatory_depends_on": "eval:doc.block_type == \"Map\"",
+   "hidden": 1,
+   "label": "Google Maps Embed HTML (Legacy)",
    "options": "HTML"
   }
  ],

@@ -9,6 +9,7 @@ import os
 import re
 import socket
 from datetime import timedelta
+from html import unescape as html_unescape
 from html.parser import HTMLParser
 from ipaddress import ip_address
 from urllib.error import HTTPError
@@ -46,8 +47,12 @@ DEFAULT_MAP_ZOOM = 16
 MIN_MAP_ZOOM = 0
 MAX_MAP_ZOOM = 21
 GOOGLE_TRANSLATE_SCRIPT_BASE_URL = "https://translate.google.com/translate_a/element.js"
-TRUSTED_GOOGLE_MAP_HOSTS = {"www.google.com", "google.com", "maps.google.com"}
-TRUSTED_GOOGLE_MAP_EMBED_PATH_PREFIXES = ("/maps", "/maps/embed")
+TRUSTED_GOOGLE_MAP_HOSTS = {"www.google.com", "google.com"}
+TRUSTED_GOOGLE_MAP_EMBED_PATHS = {
+	"/maps",
+	"/maps/embed",
+	"/maps/d/embed",
+}
 TRUSTED_EXTERNAL_PDF_IMAGE_HOSTS = {"maps.googleapis.com", "tile.openstreetmap.org"}
 LANGUAGE_CODE_PATTERN = re.compile(r"^[a-z]{2,3}(?:-[a-z]{2,8})*$")
 PHONE_PATTERN = re.compile(r"(?:\+?\d[\d\s().-]{6,}\d)")
@@ -189,6 +194,19 @@ class PropertyInstruction(WebsiteGenerator):
 		for block in self.instruction_blocks or []:
 			if not block.sort_order:
 				block.sort_order = block.idx
+			embed_input = self.get_block_map_embed_input(block)
+			canonical_embed_url = (
+				self.normalize_google_maps_embed_input(embed_input)
+				if embed_input
+				else ""
+			)
+			block.set("custom_map_embed_url", canonical_embed_url)
+			if canonical_embed_url:
+				# Keep the legacy persisted field in canonical URL form until site migrations
+				# add the new column everywhere this code runs.
+				block.google_maps_embed_html = canonical_embed_url
+			elif (block.get("google_maps_embed_html") or "").strip():
+				block.google_maps_embed_html = ""
 
 	def validate_links(self):
 		if self.google_maps_url:
@@ -199,7 +217,7 @@ class PropertyInstruction(WebsiteGenerator):
 				self.validate_external_link(row.link_url, _("Instruction Block #{0} link").format(row.idx))
 			if row.block_type == "Link" and not row.link_url:
 				frappe.throw(_("Instruction Block #{0} is missing a link URL.").format(row.idx))
-			if (row.google_maps_embed_html or "").strip() or row.block_type == "Map":
+			if self.get_block_map_embed_input(row) or row.block_type == "Map":
 				self.validate_map_block(row)
 
 	def validate_external_link(self, url, label):
@@ -215,20 +233,25 @@ class PropertyInstruction(WebsiteGenerator):
 			frappe.throw(_("Google Maps URL must use a trusted Google Maps hostname."))
 
 	def validate_map_block(self, row):
-		embed_html = (row.google_maps_embed_html or "").strip()
-		if row.block_type == "Map" and not embed_html:
+		embed_input = self.get_block_map_embed_input(row)
+		if row.block_type == "Map" and not embed_input:
 			frappe.throw(
-				_("Instruction Block #{0} is missing Google Maps Embed HTML.").format(row.idx)
+				_("Instruction Block #{0} is missing a Google Maps embed iframe or URL.").format(row.idx)
 			)
-		if not embed_html:
+		if not embed_input:
 			return
 		try:
-			self.extract_google_maps_embed_url(embed_html)
+			canonical_embed_url = self.extract_google_maps_embed_url(embed_input)
+			row.set("custom_map_embed_url", canonical_embed_url)
+			if canonical_embed_url:
+				row.google_maps_embed_html = canonical_embed_url
+			elif (row.get("google_maps_embed_html") or "").strip():
+				row.google_maps_embed_html = ""
 		except frappe.ValidationError:
 			raise
 		except Exception as error:
 			frappe.throw(
-				_("Instruction Block #{0} has an invalid Google Maps embed: {1}").format(
+				_("Instruction Block #{0} has an invalid Google Maps embed iframe or URL: {1}").format(
 					row.idx,
 					frappe.safe_decode(str(error)),
 				)
@@ -286,6 +309,7 @@ class PropertyInstruction(WebsiteGenerator):
 			google_maps_url=property_map.external_url,
 			map_embed_url=property_map.embed_url,
 			map_embed_enabled=bool(property_map.embed_url),
+			custom_map_embed_url=property_map.custom_embed_url,
 			map_display_query=self.get_map_display_query(),
 			map_zoom=self.map_zoom,
 			map_type=self.map_type,
@@ -329,6 +353,7 @@ class PropertyInstruction(WebsiteGenerator):
 					step_counter += 1
 				block_row = row.as_dict()
 				block_row.pop("google_maps_embed_html", None)
+				block_row.pop("custom_map_embed_url", None)
 				block_map = self.get_block_map_data(row)
 				block_data = dict(block_row)
 				block_data.update(
@@ -342,6 +367,7 @@ class PropertyInstruction(WebsiteGenerator):
 					display_link_label=row.link_label or row.link_url,
 					image=self.get_public_pdf_image_src(row.image),
 					map_embed_url=block_map.embed_url,
+					map_embed_kind=block_map.embed_kind,
 					map_latitude=block_map.latitude,
 					map_longitude=block_map.longitude,
 					map_center_latitude=block_map.center_latitude,
@@ -382,7 +408,7 @@ class PropertyInstruction(WebsiteGenerator):
 		for row in sorted_rows:
 			if not row.get("name") or not self.block_has_content(row):
 				continue
-			if not (row.google_maps_embed_html or "").strip():
+			if not self.get_block_map_embed_input(row):
 				continue
 			block_map = self.get_block_map_data(row)
 			if not (block_map.embed_url or block_map.external_url):
@@ -391,6 +417,7 @@ class PropertyInstruction(WebsiteGenerator):
 				name=row.name,
 				title=row.title,
 				embed_url=block_map.embed_url,
+				embed_kind=block_map.embed_kind,
 				latitude=block_map.latitude,
 				longitude=block_map.longitude,
 				center_latitude=block_map.center_latitude,
@@ -407,6 +434,7 @@ class PropertyInstruction(WebsiteGenerator):
 
 	def normalize_map_fields(self):
 		self.show_embedded_map = cint(self.show_embedded_map or 0)
+		self.set("custom_map_embed_url", self.normalize_google_maps_embed_input(self.get("custom_map_embed_url")))
 		self.google_maps_place_id = (self.google_maps_place_id or "").strip()
 		self.map_search_query = (self.map_search_query or "").strip()
 		self.map_zoom = self.normalize_map_zoom(self.map_zoom)
@@ -439,11 +467,14 @@ class PropertyInstruction(WebsiteGenerator):
 		return (self.map_search_query or self.address or "").strip()
 
 	def get_property_map(self):
-		embed_url = self.get_map_embed_url()
+		custom_embed_url = self.get_custom_property_map_embed_url()
+		embed_url = custom_embed_url or self.get_generated_map_embed_url()
 		coordinates = self.get_map_coordinates()
 		return frappe._dict(
+			custom_embed_url=custom_embed_url,
 			embed_url=embed_url,
-			external_url=self.get_map_external_url(),
+			embed_kind=self.get_google_maps_embed_kind(embed_url),
+			external_url=self.get_map_external_url(embed_url),
 			static_image_url=self.get_static_map_image_url(),
 			latitude=coordinates.latitude if coordinates else None,
 			longitude=coordinates.longitude if coordinates else None,
@@ -451,12 +482,16 @@ class PropertyInstruction(WebsiteGenerator):
 			map_zoom=self.normalize_map_zoom(self.map_zoom),
 			parking_zoom=max(14, min(15, self.normalize_map_zoom(self.map_zoom))),
 			uses_api_key=bool(embed_url and "embed/v1/place" in embed_url),
+			is_custom_embed=bool(custom_embed_url),
 		)
 
 	def get_map_coordinates(self):
 		property_coordinates = self.get_property_coordinates()
 		if property_coordinates:
 			return property_coordinates
+		custom_embed_coordinates = self.parse_map_coordinates_from_url(self.get_custom_property_map_embed_url())
+		if custom_embed_coordinates:
+			return custom_embed_coordinates
 
 		return self.parse_map_coordinates_from_url(self.google_maps_url)
 
@@ -701,13 +736,17 @@ class PropertyInstruction(WebsiteGenerator):
 			if asset and not asset.startswith(GUEST_GUIDE_EXCLUDED_WEB_ASSET_PREFIXES)
 		]
 
-	def get_map_external_url(self):
+	def get_map_external_url(self, effective_embed_url=None):
 		if self.google_maps_url:
 			return self.google_maps_url
+		custom_embed_url = self.get_custom_property_map_embed_url()
+		derived_embed_view_url = self.derive_google_maps_view_url(custom_embed_url or effective_embed_url)
+		if derived_embed_view_url:
+			return derived_embed_view_url
 
 		query = (self.map_search_query or self.address or "").strip()
 		if not query:
-			return None
+			return effective_embed_url or self.get_map_embed_url() or None
 
 		params = {"api": 1, "query": query}
 		if self.google_maps_place_id:
@@ -715,6 +754,12 @@ class PropertyInstruction(WebsiteGenerator):
 		return f"https://www.google.com/maps/search/?{urlencode(params)}"
 
 	def get_map_embed_url(self):
+		return self.get_custom_property_map_embed_url() or self.get_generated_map_embed_url()
+
+	def get_custom_property_map_embed_url(self):
+		return self.normalize_google_maps_embed_input(self.get("custom_map_embed_url"))
+
+	def get_generated_map_embed_url(self):
 		if not cint(self.show_embedded_map):
 			return None
 
@@ -913,13 +958,28 @@ class PropertyInstruction(WebsiteGenerator):
 				row.image,
 				row.caption,
 				row.link_url,
-				row.google_maps_embed_html,
+				row.get("custom_map_embed_url"),
+				row.get("google_maps_embed_html"),
 			]
 		)
 
-	def extract_google_maps_embed_url(self, embed_html):
+	def normalize_google_maps_embed_input(self, value):
+		text = (value or "").strip()
+		if not text:
+			return ""
+		return self.extract_google_maps_embed_url(text)
+
+	def get_block_map_embed_input(self, row):
+		return (((row.get("custom_map_embed_url") or "").strip()) or ((row.get("google_maps_embed_html") or "").strip()))
+
+	def extract_google_maps_embed_url(self, embed_input):
+		text = html_unescape((embed_input or "").strip())
+		if not text:
+			return None
+		if "<" not in text and ">" not in text:
+			return self.validate_google_maps_embed_url(text)
 		parser = GoogleMapsEmbedParser()
-		parser.feed((embed_html or "").strip())
+		parser.feed(text)
 		parser.close()
 		if parser.invalid_reason:
 			frappe.throw(_("Google Maps embed is invalid: {0}").format(parser.invalid_reason))
@@ -928,7 +988,7 @@ class PropertyInstruction(WebsiteGenerator):
 		iframe_attrs = parser.iframe_attrs
 		if iframe_attrs.get("srcdoc"):
 			frappe.throw(_("Google Maps embed cannot use srcdoc."))
-		src = (iframe_attrs.get("src") or "").strip()
+		src = html_unescape((iframe_attrs.get("src") or "").strip())
 		if not src:
 			frappe.throw(_("Google Maps embed iframe is missing src."))
 		return self.validate_google_maps_embed_url(src)
@@ -943,18 +1003,53 @@ class PropertyInstruction(WebsiteGenerator):
 		hostname = (parsed.hostname or "").lower()
 		if hostname not in TRUSTED_GOOGLE_MAP_HOSTS:
 			frappe.throw(_("Google Maps embed URL must use a trusted Google Maps hostname."))
-		if not parsed.path.startswith(TRUSTED_GOOGLE_MAP_EMBED_PATH_PREFIXES):
+		if parsed.path not in TRUSTED_GOOGLE_MAP_EMBED_PATHS:
 			frappe.throw(_("Google Maps embed URL must use a supported Google Maps embed path."))
 		query_values = parse_qs(parsed.query or "", keep_blank_values=True)
-		is_embed_path = parsed.path.startswith("/maps/embed")
-		if not is_embed_path and not (query_values.get("output") == ["embed"] or "pb" in query_values):
+		is_standard_embed = parsed.path == "/maps/embed"
+		is_mymaps_embed = parsed.path == "/maps/d/embed"
+		if parsed.fragment:
+			parsed = parsed._replace(fragment="")
+		if is_standard_embed or is_mymaps_embed:
+			return parsed.geturl()
+		if not (query_values.get("output") == ["embed"] or "pb" in query_values):
 			frappe.throw(_("Google Maps embed URL must use a supported embed format."))
 		return parsed.geturl()
 
+	def get_google_maps_embed_kind(self, url):
+		parsed = urlparse((url or "").strip())
+		if not parsed.path:
+			return ""
+		if parsed.path == "/maps/d/embed":
+			return "google-my-maps"
+		if parsed.path in {"/maps", "/maps/embed"}:
+			return "google-maps"
+		return ""
+
+	def derive_google_maps_view_url(self, embed_url):
+		text = (embed_url or "").strip()
+		if not text:
+			return None
+		parsed = urlparse(text)
+		if (parsed.hostname or "").lower() not in TRUSTED_GOOGLE_MAP_HOSTS:
+			return None
+		if parsed.path == "/maps/d/embed":
+			query_values = parse_qs(parsed.query or "", keep_blank_values=True)
+			mid = (query_values.get("mid") or [None])[0]
+			if not mid:
+				return text
+			view_query = {"mid": mid}
+			if query_values.get("ehbc"):
+				view_query["ehbc"] = query_values["ehbc"][0]
+			return urlunparse((parsed.scheme, parsed.netloc, "/maps/d/viewer", "", urlencode(view_query), ""))
+		return text
+
 	def get_block_map_data(self, row):
-		if not (row.google_maps_embed_html or "").strip():
+		embed_input = self.get_block_map_embed_input(row)
+		if not embed_input:
 			return frappe._dict(
 				embed_url=None,
+				embed_kind="",
 				latitude=None,
 				longitude=None,
 				center_latitude=None,
@@ -966,7 +1061,7 @@ class PropertyInstruction(WebsiteGenerator):
 				external_url=None,
 				attribution="© OpenStreetMap contributors",
 			)
-		embed_url = self.extract_google_maps_embed_url(row.google_maps_embed_html)
+		embed_url = self.extract_google_maps_embed_url(embed_input)
 		marker_coordinates = self.parse_map_coordinates_from_url(embed_url)
 		center_coordinates = self.parse_map_center_coordinates_from_url(embed_url)
 		zoom = self.parse_map_zoom_from_url(embed_url, self.map_zoom)
@@ -979,10 +1074,13 @@ class PropertyInstruction(WebsiteGenerator):
 				"https://www.google.com/maps/search/?"
 				+ urlencode({"api": 1, "query": f"{preferred_latitude},{preferred_longitude}"})
 			)
+		if not external_url:
+			external_url = self.derive_google_maps_view_url(embed_url)
 		if not external_url and embed_url:
 			external_url = embed_url
 		return frappe._dict(
 			embed_url=embed_url,
+			embed_kind=self.get_google_maps_embed_kind(embed_url),
 			latitude=preferred_latitude,
 			longitude=preferred_longitude,
 			center_latitude=center_coordinates.latitude if center_coordinates else preferred_latitude,

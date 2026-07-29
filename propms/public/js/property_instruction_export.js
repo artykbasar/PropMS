@@ -2174,6 +2174,7 @@
     shell.setAttribute("translate", "no");
     shell.setAttribute("data-guide-block-map", "");
     shell.setAttribute("data-guide-block-map-embed-url", mapModel.embed_url || "");
+    shell.setAttribute("data-guide-block-map-kind", mapModel.embed_kind || "");
     shell.setAttribute("data-guide-block-map-latitude", mapModel.latitude != null ? String(mapModel.latitude) : "");
     shell.setAttribute("data-guide-block-map-longitude", mapModel.longitude != null ? String(mapModel.longitude) : "");
     shell.setAttribute("data-guide-block-map-center-latitude", mapModel.center_latitude != null ? String(mapModel.center_latitude) : "");
@@ -2190,7 +2191,7 @@
     iframe.src = mapModel.embed_url;
     iframe.loading = "lazy";
     iframe.allowFullscreen = true;
-    iframe.referrerPolicy = "no-referrer-when-downgrade";
+    iframe.referrerPolicy = "strict-origin-when-cross-origin";
     iframe.title = String(mapModel.title || "Map");
     iframe.setAttribute("translate", "no");
     shell.appendChild(iframe);
@@ -8733,6 +8734,7 @@
           imageSrc: imageNode ? String(imageNode.getAttribute("src") || "").trim() : "",
           imageAlt: imageNode ? String(imageNode.getAttribute("alt") || "").trim() : "",
           mapEmbedUrl: mapNode ? String(mapNode.getAttribute("data-guide-block-map-embed-url") || "").trim() : "",
+          mapEmbedKind: mapNode ? String(mapNode.getAttribute("data-guide-block-map-kind") || "").trim() : "",
           mapLatitude: parseNumericDataAttribute(mapNode, "data-guide-block-map-latitude"),
           mapLongitude: parseNumericDataAttribute(mapNode, "data-guide-block-map-longitude"),
           mapCenterLatitude: parseNumericDataAttribute(mapNode, "data-guide-block-map-center-latitude"),
@@ -8861,6 +8863,8 @@
       map: {
         title: getVisibleText(document.querySelector("[data-guide-map-title]")),
         imageSrc: mapCard ? String(mapCard.getAttribute("data-guide-map-image") || "").trim() : "",
+        embedUrl: mapCard ? String(mapCard.getAttribute("data-guide-map-embed-url") || "").trim() : "",
+        embedKind: mapCard ? String(mapCard.getAttribute("data-guide-map-kind") || "").trim() : "",
         linkHref: mapLinkHref,
         linkLabel: getVisibleText(mapLink),
         latitude: propertyLatitude,
@@ -10813,7 +10817,7 @@
       var sectionModel = preparedModel.sections[sectionIndex];
       for (var blockIndex = 0; blockIndex < sectionModel.blocks.length; blockIndex += 1) {
         var blockModel = sectionModel.blocks[blockIndex];
-        if (blockModel.type !== "Map") {
+        if (!blockModel.mapEmbedUrl && !Number.isFinite(blockModel.mapLatitude) && !Number.isFinite(blockModel.mapLongitude)) {
           continue;
         }
         if (Number.isFinite(blockModel.mapLatitude) && Number.isFinite(blockModel.mapLongitude)) {

@@ -5,6 +5,7 @@
 {% set screen_map_zoom = map_zoom or 16 %}
 {% set screen_map_embed_url = property_map.embed_url if property_map and property_map.embed_url else (map_embed_url if map_embed_url is defined and map_embed_url else (("https://www.google.com/maps?q=" ~ (screen_map_query | urlencode) ~ "&z=" ~ screen_map_zoom ~ "&output=embed" ~ ("&t=k" if map_type == "satellite" else "")) if show_embedded_map and screen_map_query else None)) %}
 {% set screen_map_external_url = property_map.external_url if property_map and property_map.external_url else (google_maps_url if google_maps_url is defined and google_maps_url else (("https://www.google.com/maps/search/?api=1&query=" ~ (screen_map_query | urlencode)) if screen_map_query else None)) %}
+{% set screen_map_embed_kind = property_map.embed_kind if property_map and property_map.embed_kind else "" %}
 
 {% block navbar %}{% endblock %}
 {% block footer %}{% endblock %}
@@ -1856,12 +1857,13 @@
     <img class="pi-image" src="{{ block.image }}" alt="{{ block.image_alt }}" data-guide-block-image>
     {% endif %}
 
-    {% if block_map and block_map.embed_url %}
+  {% if block_map and block_map.embed_url %}
     <div
       class="pi-instruction-map-shell notranslate"
       translate="no"
       data-guide-block-map
       data-guide-block-map-embed-url="{{ block_map.embed_url }}"
+      data-guide-block-map-kind="{{ block_map.embed_kind or '' }}"
       data-guide-block-map-latitude="{{ block_map.latitude if block_map.latitude is not none else '' }}"
       data-guide-block-map-longitude="{{ block_map.longitude if block_map.longitude is not none else '' }}"
       data-guide-block-map-center-latitude="{{ block_map.center_latitude if block_map.center_latitude is not none else '' }}"
@@ -1876,7 +1878,7 @@
         src="{{ block_map.embed_url }}"
         loading="lazy"
         allowfullscreen
-        referrerpolicy="no-referrer-when-downgrade"
+        referrerpolicy="strict-origin-when-cross-origin"
         title="{{ block.title or 'Map' }}"
         class="pi-instruction-map"
         translate="no"></iframe>
@@ -2105,6 +2107,8 @@
         aria-label="Property map"
         data-guide-map-card
         data-guide-map-image="{{ map_static_image_url or '' }}"
+        data-guide-map-embed-url="{{ screen_map_embed_url }}"
+        data-guide-map-kind="{{ screen_map_embed_kind }}"
         data-guide-map-latitude="{{ property_map.latitude if property_map and property_map.latitude is not none else '' }}"
         data-guide-map-longitude="{{ property_map.longitude if property_map and property_map.longitude is not none else '' }}"
         data-guide-map-zoom="{{ property_map.map_zoom if property_map and property_map.map_zoom is not none else (map_zoom or 16) }}"

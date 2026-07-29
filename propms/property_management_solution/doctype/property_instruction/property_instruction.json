@@ -16,6 +16,7 @@
   "section_basic_details",
   "address",
   "cover_image",
+  "custom_map_embed_url",
   "google_maps_url",
   "show_embedded_map",
   "google_maps_place_id",
@@ -94,6 +95,12 @@
    "fieldname": "cover_image",
    "fieldtype": "Attach Image",
    "label": "Cover Image"
+  },
+  {
+   "description": "Paste a Google Maps embed iframe or its src URL. When provided, this overrides the generated Property Location embed on the webpage.",
+   "fieldname": "custom_map_embed_url",
+   "fieldtype": "Small Text",
+   "label": "Google Maps Embed iframe or URL"
   },
   {
    "fieldname": "google_maps_url",
