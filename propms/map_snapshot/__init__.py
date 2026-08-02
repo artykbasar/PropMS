@@ -6,12 +6,12 @@ __all__ = [
 	"CAPTURE_DEVICE_SCALE_FACTOR",
 	"CAPTURE_IMPLEMENTATION_VERSION",
 	"CAPTURE_TEMPLATE_VERSION",
-	"CAPTURE_TOKEN_COOKIE_NAME",
 	"CAPTURE_VIEWPORT_HEIGHT_CSS_PX",
 	"CAPTURE_VIEWPORT_WIDTH_CSS_PX",
 	"CAPTURE_VISIBLE_HEIGHT_CSS_PX",
 	"CAPTURE_VISIBLE_WIDTH_CSS_PX",
 	"CaptureMapReference",
+	"MAX_CAPTURE_DOCUMENT_BYTES",
 	"MapSnapshotManifestEntry",
 	"MY_MAPS_HEADER_CROP_PX",
 	"MY_MAPS_PRESENTATION_VERSION",
@@ -43,12 +43,12 @@ _LAZY_ATTRS = {
 	"CAPTURE_DEVICE_SCALE_FACTOR": "presentation",
 	"CAPTURE_IMPLEMENTATION_VERSION": "presentation",
 	"CAPTURE_TEMPLATE_VERSION": "presentation",
-	"CAPTURE_TOKEN_COOKIE_NAME": "security",
 	"CAPTURE_VIEWPORT_HEIGHT_CSS_PX": "presentation",
 	"CAPTURE_VIEWPORT_WIDTH_CSS_PX": "presentation",
 	"CAPTURE_VISIBLE_HEIGHT_CSS_PX": "presentation",
 	"CAPTURE_VISIBLE_WIDTH_CSS_PX": "presentation",
 	"CaptureMapReference": "resolver",
+	"MAX_CAPTURE_DOCUMENT_BYTES": "capture",
 	"MapSnapshotManifestEntry": "manifest",
 	"MY_MAPS_HEADER_CROP_PX": "presentation",
 	"MY_MAPS_PRESENTATION_VERSION": "presentation",
@@ -87,7 +87,7 @@ def __getattr__(name):
 
 
 if TYPE_CHECKING:
-	from .capture import MapCaptureResult, capture_map_png
+	from .capture import MAX_CAPTURE_DOCUMENT_BYTES, MapCaptureResult, capture_map_png
 	from .jobs import capture_property_instruction_maps, queue_snapshot_generation
 	from .manifest import (
 		SNAPSHOT_STATUS_FAILED,
@@ -120,4 +120,3 @@ if TYPE_CHECKING:
 		normalize_map_kind,
 	)
 	from .resolver import CaptureMapReference, ResolvedMap, resolve_capture_map
-	from .security import CAPTURE_TOKEN_COOKIE_NAME

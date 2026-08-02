@@ -1,14 +1,16 @@
 from __future__ import annotations
 
 import base64
+import html
 import io
 import math
 import os
+import re
 import shlex
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from urllib.parse import urljoin, urlparse
+from urllib.parse import urlparse
 
 from PIL import Image, ImageChops, ImageStat
 
@@ -35,26 +37,25 @@ from .lifecycle import (
 from .presentation import (
 	CAPTURE_CLIP_SCALE,
 	CAPTURE_DEVICE_SCALE_FACTOR,
+	CAPTURE_IMPLEMENTATION_VERSION,
 	CAPTURE_VIEWPORT_HEIGHT_CSS_PX,
 	CAPTURE_VIEWPORT_WIDTH_CSS_PX,
 	CAPTURE_VISIBLE_HEIGHT_CSS_PX,
 	CAPTURE_VISIBLE_WIDTH_CSS_PX,
-	get_map_presentation,
+	get_map_presentation_context,
 )
-from .resolver import CaptureMapReference, resolve_capture_map
-from .security import (
-	CAPTURE_TOKEN_COOKIE_NAME,
-	CAPTURE_TOKEN_COOKIE_PATH,
-	build_capture_claim,
-)
+from .resolver import CaptureMapReference, ResolvedMap, resolve_capture_map
 
-
-CAPTURE_ROUTE_PATH = "/internal_map_capture"
 CAPTURE_SELECTOR = "#map-capture"
 INITIAL_SETTLE_SECONDS = 8.0
 STABILITY_INTERVAL_SECONDS = 1.5
 MAX_STABILITY_SECONDS = 20.0
 STABILITY_DIFF_THRESHOLD = 3.0
+# The rendered wrapper is intentionally tiny: one iframe plus fixed presentation CSS.
+# A conservative cap blocks unexpected document growth before Chromium launches.
+MAX_CAPTURE_DOCUMENT_BYTES = 16384
+DATA_URL_REPLACEMENT = "<redacted-data-url>"
+URL_REPLACEMENT = "<redacted-url>"
 
 
 @dataclass(frozen=True)
@@ -77,6 +78,82 @@ def _timed_send(socket, method, params=None, session_id=None, timeout=20):
 	inner = future.result()
 	socket.wait_for_event(inner, timeout)
 	return socket._destructure_response(inner.result())
+
+
+def _sanitize_trace_url(url: str | None) -> dict[str, str]:
+	parsed = urlparse((url or "").strip())
+	if parsed.scheme == "data":
+		return {"scheme": "data", "host": "", "path": ""}
+	return {
+		"scheme": parsed.scheme or "",
+		"host": parsed.hostname or "",
+		"path": parsed.path or "",
+	}
+
+
+def _sanitize_sensitive_text(value: str | None) -> str:
+	text = str(value or "")
+	if not text:
+		return ""
+	text = re.sub(r"data:text/html[^)\]>\s'\"\\]+", DATA_URL_REPLACEMENT, text, flags=re.IGNORECASE)
+	text = re.sub(r"https?://[^\s'\"<>]+", URL_REPLACEMENT, text, flags=re.IGNORECASE)
+	return text
+
+
+def sanitize_capture_exception_message(exception: Exception) -> str:
+	return _sanitize_sensitive_text(str(exception))
+
+
+def _start_network_trace(page: Page, enabled: bool, max_events: int = 200) -> list[dict[str, object]]:
+	trace: list[dict[str, object]] = []
+	if not enabled:
+		return trace
+
+	def _append(event_type: str, response):
+		if len(trace) >= max_events:
+			return
+		params = response.get("params") or {}
+		request = params.get("request") or {}
+		headers = request.get("headers") or {}
+		trace.append(
+			{
+				"event": event_type,
+				"frameId": params.get("frameId"),
+				"resourceType": params.get("type") or params.get("resourceType") or "",
+				"url": _sanitize_trace_url(request.get("url") or params.get("documentURL") or ""),
+				"has_cookie_header": bool(headers.get("Cookie")),
+				"has_frappe_site_header": "X-Frappe-Site-Name" in headers,
+				"status": (params.get("response") or {}).get("status"),
+			}
+		)
+
+	def _on_request(future, response):
+		_append("request", response)
+
+	def _on_response(future, response):
+		_append("response", response)
+
+	def _on_extra_info(future, response):
+		if len(trace) >= max_events:
+			return
+		params = response.get("params") or {}
+		headers = params.get("headers") or {}
+		trace.append(
+			{
+				"event": "request-extra-info",
+				"frameId": params.get("frameId"),
+				"resourceType": "",
+				"url": {"scheme": "", "host": "", "path": ""},
+				"has_cookie_header": bool(headers.get("Cookie")),
+				"has_frappe_site_header": "X-Frappe-Site-Name" in headers,
+				"status": None,
+			}
+		)
+
+	page.session.start_listener("Network.requestWillBeSent", _on_request, page.session_id)
+	page.session.start_listener("Network.responseReceived", _on_response, page.session_id)
+	page.session.start_listener("Network.requestWillBeSentExtraInfo", _on_extra_info, page.session_id)
+	return trace
 
 
 def _eval_value(page: Page, expression: str):
@@ -127,6 +204,94 @@ def _layout_metrics(page: Page):
 	if error:
 		raise RuntimeError(error)
 	return result
+
+
+def render_capture_document_html(resolved: ResolvedMap) -> str:
+	presentation = get_map_presentation_context(resolved.map_kind)
+	title = html.escape(resolved.title or "Map capture", quote=True)
+	embed_url = html.escape(resolved.embed_url, quote=True)
+	map_key = html.escape(resolved.map_key, quote=True)
+	map_kind = html.escape(presentation["map_kind"], quote=True)
+	map_kind_class = html.escape(presentation["map_kind_class"], quote=True)
+	map_source_hash = html.escape(resolved.source_hash, quote=True)
+	row_name_attr = ""
+	if resolved.row_name:
+		row_name_attr = f' data-map-row-name="{html.escape(resolved.row_name, quote=True)}"'
+
+	return f"""<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="robots" content="noindex, nofollow, noarchive">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    html,
+    body {{
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: #fff;
+    }}
+
+    body {{
+      font-family: sans-serif;
+    }}
+
+    #map-capture {{
+      width: {presentation["capture_visible_width_css_px"]}px;
+      height: {presentation["capture_visible_height_css_px"]}px;
+      overflow: hidden;
+      background: #fff;
+    }}
+
+    #map-capture iframe {{
+      display: block;
+      width: 100%;
+      height: 100%;
+      border: 0;
+    }}
+
+    #map-capture.custom-map-frame--google-my-maps {{
+      position: relative;
+      overflow: hidden;
+    }}
+
+    #map-capture.custom-map-frame--google-my-maps iframe {{
+      height: calc(100% + var(--pi-my-maps-header-crop));
+      transform: translateY(calc(-1 * var(--pi-my-maps-header-crop)));
+      transform-origin: top center;
+    }}
+  </style>
+</head>
+<body
+  style="--pi-my-maps-header-crop: {presentation["my_maps_header_crop_px"]}px;"
+  data-my-maps-presentation-version="{presentation["my_maps_presentation_version"]}"
+  data-capture-implementation-version="{presentation["capture_implementation_version"]}"
+  data-capture-template-version="{presentation["capture_template_version"]}"
+  data-capture-map-kind="{map_kind}"
+  data-capture-map-source-hash="{map_source_hash}">
+  <div
+    id="map-capture"
+    class="custom-map-frame custom-map-frame--{map_kind_class}"
+    data-map-capture-key="{map_key}"{row_name_attr}>
+    <iframe
+      src="{embed_url}"
+      title="{title}"
+      loading="eager"
+      allowfullscreen
+      referrerpolicy="strict-origin-when-cross-origin"></iframe>
+  </div>
+</body>
+</html>
+"""
+
+
+def build_capture_document_data_url(html_document: str) -> str:
+	document_bytes = html_document.encode("utf-8")
+	if len(document_bytes) > MAX_CAPTURE_DOCUMENT_BYTES:
+		raise frappe.ValidationError(_("Map capture document exceeded the maximum safe size."))
+	return "data:text/html;charset=utf-8;base64," + base64.b64encode(document_bytes).decode("ascii")
 
 
 def _corrected_clip(geometry: dict[str, float], layout: dict[str, object]) -> dict[str, float]:
@@ -245,82 +410,6 @@ def _resolve_real_chromium_executable(configured_path: str) -> str:
 	return candidate
 
 
-def get_internal_capture_base_url() -> str:
-	value = (frappe.conf.get("propms_map_capture_internal_base_url") or "").strip()
-	if not value:
-		raise frappe.ValidationError(_("Site config must define propms_map_capture_internal_base_url."))
-	parsed = urlparse(value)
-	if parsed.scheme not in {"http", "https"}:
-		raise frappe.ValidationError(_("Internal capture base URL must use http or https."))
-	if parsed.username or parsed.password:
-		raise frappe.ValidationError(_("Internal capture base URL cannot include credentials."))
-	if not parsed.hostname:
-		raise frappe.ValidationError(_("Internal capture base URL must include a hostname."))
-	if parsed.fragment:
-		raise frappe.ValidationError(_("Internal capture base URL cannot include a fragment."))
-	if (parsed.path or "").rstrip("/") not in {"", "/"}:
-		raise frappe.ValidationError(_("Internal capture base URL cannot include a path."))
-	allowed_hosts = {
-		"127.0.0.1",
-		"localhost",
-		"development.localhost",
-		(getattr(frappe.local, "site", "") or "").strip().lower(),
-	}
-	extra_hosts = str(frappe.conf.get("propms_map_capture_internal_allowed_hosts") or "")
-	for configured_host in extra_hosts.replace("\n", ",").split(","):
-		host = (configured_host or "").strip().lower()
-		if host:
-			allowed_hosts.add(host)
-	if parsed.hostname.lower() not in {host for host in allowed_hosts if host}:
-		raise frappe.ValidationError(_("Internal capture base URL must use an internal allowed hostname."))
-	return value.rstrip("/")
-
-
-def build_internal_capture_route_url(base_url: str, site_name: str) -> str:
-	parsed = urlparse(base_url)
-	target_site = (site_name or "").strip()
-	if not target_site:
-		raise frappe.ValidationError(_("Internal capture route requires a target site name."))
-	netloc = target_site
-	if parsed.port:
-		netloc = f"{netloc}:{parsed.port}"
-	return parsed._replace(netloc=netloc, path=CAPTURE_ROUTE_PATH, params="", query="", fragment="").geturl()
-
-
-def build_internal_capture_host_resolver_rule(base_url: str, site_name: str) -> str | None:
-	parsed = urlparse(base_url)
-	target_site = (site_name or "").strip().lower()
-	if not target_site or not parsed.hostname:
-		return None
-	internal_host = parsed.hostname.strip().lower()
-	if target_site == internal_host:
-		return None
-	return f"MAP {target_site} {internal_host}"
-
-
-def _set_capture_cookie(page: Page, route_url: str, token: str):
-	parsed = urlparse(route_url)
-	secure = parsed.scheme == "https"
-	expires = int(time.time()) + 300
-	result, error = _timed_send(
-		page.session,
-		"Network.setCookie",
-		{
-			"name": CAPTURE_TOKEN_COOKIE_NAME,
-			"value": token,
-			"url": route_url,
-			"path": CAPTURE_TOKEN_COOKIE_PATH,
-			"httpOnly": True,
-			"sameSite": "Strict",
-			"secure": secure,
-			"expires": expires,
-		},
-		session_id=page.session_id,
-	)
-	if error or not result.get("success", False):
-		raise RuntimeError("Failed to set capture cookie.")
-
-
 def _ensure_google_child_frame(page: Page):
 	result, error = _timed_send(page.session, "Page.getFrameTree", session_id=page.session_id)
 	if error:
@@ -350,11 +439,30 @@ def _wait_for_stable_capture(page: Page, selector: str) -> tuple[bytes, float]:
 	raise RuntimeError(f"Map capture did not stabilise within {MAX_STABILITY_SECONDS} seconds (last diff {last_diff}).")
 
 
-def _navigate_capture_page(session: CDPSocketClient, page: Page, route_url: str):
-	waiter = page.wait_for_load(["load", "DOMContentLoaded"], timeout=60)
-	_timed_send(session, "Page.navigate", {"url": route_url}, session_id=page.session_id)
+def _set_capture_document(page: Page, html_document: str):
+	data_url = build_capture_document_data_url(html_document)
+	waiter = page.wait_for_load(["DOMContentLoaded"], timeout=60)
+	_timed_send(page.session, "Page.navigate", {"url": data_url}, session_id=page.session_id)
 	waiter()
-	_timed_send(session, "Page.bringToFront", session_id=page.session_id)
+	_timed_send(page.session, "Page.bringToFront", session_id=page.session_id)
+
+
+def _document_identity(page: Page) -> dict[str, object]:
+	value = _eval_value(
+		page,
+		"""(() => ({
+  href: window.location.href,
+  origin: window.origin,
+  frameCount: window.frames.length,
+  iframeSrc: (document.querySelector('#map-capture iframe') || {}).src || '',
+}))()""",
+	)
+	return {
+		"href": _sanitize_trace_url(value.get("href") or ""),
+		"origin": value.get("origin") or "",
+		"frameCount": value.get("frameCount") or 0,
+		"iframeSrc": _sanitize_trace_url(value.get("iframeSrc") or ""),
+	}
 
 
 def capture_map_png(
@@ -362,20 +470,14 @@ def capture_map_png(
 	map_key: str,
 	row_name: str | None = None,
 	expected_source_hash: str | None = None,
+	collect_network_trace: bool = False,
 ) -> MapCaptureResult:
 	started_at = time.monotonic()
 	resolved = resolve_capture_map(CaptureMapReference(property_instruction=property_instruction, map_key=map_key, row_name=row_name))
 	if expected_source_hash and expected_source_hash != resolved.source_hash:
 		raise frappe.ValidationError(_("Map capture source hash changed before capture."))
-	base_url = get_internal_capture_base_url()
-	route_url = build_internal_capture_route_url(base_url, frappe.local.site)
-	host_resolver_rule = build_internal_capture_host_resolver_rule(base_url, frappe.local.site)
-	token = build_capture_claim(
-		property_instruction=resolved.property_instruction,
-		map_key=resolved.map_key,
-		row_name=resolved.row_name,
-		expected_source_hash=resolved.source_hash,
-	)
+	document_html = render_capture_document_html(resolved)
+	build_capture_document_data_url(document_html)
 
 	lifecycle_state = BrowserLifecycleState()
 	lifecycle_state.diagnostics["child_subreaper_enabled"] = enable_child_subreaper()
@@ -383,7 +485,6 @@ def capture_map_png(
 	stability_score = 0.0
 	chromium_version = ""
 	original_chromium_finder = chromium_process_module.find_or_download_chromium_executable
-	original_start_chromium_process = ChromePDFGenerator._start_chromium_process
 	try:
 		had_instance = ChromePDFGenerator._instance is not None
 		had_process = bool(
@@ -402,20 +503,14 @@ def capture_map_png(
 		chromium_process_module.find_or_download_chromium_executable = (
 			_patched_find_or_download_chromium_executable
 		)
-		def _patched_start_chromium_process(self, command_args):
-			augmented_args = list(command_args)
-			if host_resolver_rule:
-				augmented_args.append(f"--host-resolver-rules={host_resolver_rule}")
-			return original_start_chromium_process(self, augmented_args)
-
-		ChromePDFGenerator._start_chromium_process = _patched_start_chromium_process
 		generator = ChromePDFGenerator()
 		lifecycle_state.generator = generator
 		lifecycle_state.owned_generator = not had_process
 		lifecycle_state.owned_process = generator._chromium_process
-		lifecycle_state.diagnostics["capture_route_url"] = route_url
 		lifecycle_state.diagnostics["capture_target_site"] = frappe.local.site
-		lifecycle_state.diagnostics["capture_host_resolver_rule"] = host_resolver_rule
+		lifecycle_state.diagnostics["capture_document_bytes"] = len(document_html.encode("utf-8"))
+		lifecycle_state.diagnostics["capture_document_limit"] = MAX_CAPTURE_DOCUMENT_BYTES
+		lifecycle_state.diagnostics["capture_implementation_version"] = CAPTURE_IMPLEMENTATION_VERSION
 		isolate_owned_process_group(lifecycle_state)
 		if not generator._devtools_url:
 			generator._set_devtools_url()
@@ -461,8 +556,9 @@ def capture_map_png(
 		_timed_send(session, "Network.enable", session_id=page.session_id)
 		_timed_send(session, "Runtime.enable", session_id=page.session_id)
 		_timed_send(session, "Page.enable", session_id=page.session_id)
-		_set_capture_cookie(page, route_url, token)
-		_navigate_capture_page(session, page, route_url)
+		network_trace = _start_network_trace(page, collect_network_trace)
+		_set_capture_document(page, document_html)
+		lifecycle_state.diagnostics["document_identity"] = _document_identity(page)
 		viewport = _viewport(page)
 		if viewport["innerWidth"] != CAPTURE_VIEWPORT_WIDTH_CSS_PX or viewport["innerHeight"] != CAPTURE_VIEWPORT_HEIGHT_CSS_PX:
 			raise RuntimeError("Unexpected capture viewport dimensions.")
@@ -477,6 +573,8 @@ def capture_map_png(
 		png_bytes, stability_score = _wait_for_stable_capture(page, CAPTURE_SELECTOR)
 		metrics = _validate_png_bytes(png_bytes, resolved.map_kind)
 		cleanup_diagnostics = cleanup_browser_lifecycle(lifecycle_state)
+		if collect_network_trace:
+			cleanup_diagnostics["network_trace"] = network_trace
 		cleanup_diagnostics.update(lifecycle_state.diagnostics)
 		lifecycle_state.page = None
 		lifecycle_state.session = None
@@ -496,6 +594,5 @@ def capture_map_png(
 		)
 	finally:
 		chromium_process_module.find_or_download_chromium_executable = original_chromium_finder
-		ChromePDFGenerator._start_chromium_process = original_start_chromium_process
 		if lifecycle_state.page or lifecycle_state.session or lifecycle_state.browser_context_id or lifecycle_state.generator:
 			lifecycle_state.diagnostics = cleanup_browser_lifecycle(lifecycle_state)
