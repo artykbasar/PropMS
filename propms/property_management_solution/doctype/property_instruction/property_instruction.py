@@ -3,17 +3,14 @@
 from __future__ import annotations
 
 import json
-import base64
 import mimetypes
 import os
 import re
 import socket
 from datetime import timedelta
-from html import unescape as html_unescape
-from html.parser import HTMLParser
 from ipaddress import ip_address
 from urllib.error import HTTPError
-from urllib.parse import parse_qs, quote, unquote, urlencode, urljoin, urlparse, urlunparse
+from urllib.parse import quote, unquote, urlencode, urljoin, urlparse, urlunparse
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 import frappe
@@ -23,6 +20,33 @@ from frappe.utils import cint, formatdate, get_bench_path, get_build_version, sa
 from frappe.website.website_generator import WebsiteGenerator
 from markupsafe import Markup
 from werkzeug.datastructures import Headers
+
+from propms.map_snapshot.presentation import (
+	build_map_source_hash,
+	get_map_kind_class,
+	get_map_presentation_context,
+)
+from propms.map_snapshot.pdf_assets import (
+	build_pdf_map_representation,
+)
+from propms.map_snapshot.jobs import queue_document_snapshot_job, queue_snapshot_generation
+from propms.map_snapshot.manifest import (
+	SNAPSHOT_STATUS_FAILED,
+	SNAPSHOT_STATUS_NOT_REQUIRED,
+	SNAPSHOT_STATUS_PENDING,
+	SNAPSHOT_STATUS_PROCESSING,
+	SNAPSHOT_STATUS_READY,
+	is_snapshot_current,
+)
+from propms.map_snapshot.storage import schedule_delete_generated_snapshot_file
+from propms.map_snapshot.validation import (
+	TRUSTED_GOOGLE_MAP_HOSTS,
+	derive_google_maps_view_url as derive_google_maps_view_url_value,
+	extract_google_maps_embed_url as extract_google_maps_embed_url_value,
+	get_google_maps_embed_kind as get_google_maps_embed_kind_value,
+	normalize_google_maps_embed_input as normalize_google_maps_embed_input_value,
+	validate_google_maps_embed_url as validate_google_maps_embed_url_value,
+)
 
 
 SECTION_OPTIONS = [
@@ -47,26 +71,12 @@ DEFAULT_MAP_ZOOM = 16
 MIN_MAP_ZOOM = 0
 MAX_MAP_ZOOM = 21
 GOOGLE_TRANSLATE_SCRIPT_BASE_URL = "https://translate.google.com/translate_a/element.js"
-TRUSTED_GOOGLE_MAP_HOSTS = {"www.google.com", "google.com"}
-TRUSTED_GOOGLE_MAP_EMBED_PATHS = {
-	"/maps",
-	"/maps/embed",
-	"/maps/d/embed",
-}
-TRUSTED_EXTERNAL_PDF_IMAGE_HOSTS = {"maps.googleapis.com", "tile.openstreetmap.org"}
+TRUSTED_EXTERNAL_PDF_IMAGE_HOSTS = set()
 LANGUAGE_CODE_PATTERN = re.compile(r"^[a-z]{2,3}(?:-[a-z]{2,8})*$")
 PHONE_PATTERN = re.compile(r"(?:\+?\d[\d\s().-]{6,}\d)")
 EMAIL_PATTERN = re.compile(r"\b[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}\b")
 ROAD_NAME_PATTERN = re.compile(
 	r"\b(?:Road|Street|Lane|Avenue|Close|Drive|Way|Court|Crescent|Place|Gardens|Terrace|Park|Square)\b",
-	re.IGNORECASE,
-)
-GOOGLE_MAP_AT_PATTERN = re.compile(r"@(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)")
-GOOGLE_MAP_3D4D_PATTERN = re.compile(r"!3d(-?\d+(?:\.\d+)?)!4d(-?\d+(?:\.\d+)?)")
-GOOGLE_MAP_2D3D_PATTERN = re.compile(r"!2d(-?\d+(?:\.\d+)?)!3d(-?\d+(?:\.\d+)?)")
-COORDINATE_TEXT_PATTERN = re.compile(r"(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)")
-DMS_COORDINATE_COMPONENT_PATTERN = re.compile(
-	r"(\d{1,3})\s*[°º]\s*(\d{1,2})\s*['’′]\s*(\d{1,2}(?:\.\d+)?)\s*(?:[\"”″]|''|”)?\s*([NSEW])",
 	re.IGNORECASE,
 )
 NOINDEX_ROBOTS_CONTENT = "noindex, nofollow, noarchive, nosnippet, noimageindex"
@@ -85,42 +95,6 @@ PUBLIC_PDF_IMAGE_ALLOWED_CONTENT_TYPES = {
 	"image/gif",
 	"image/avif",
 }
-
-
-class GoogleMapsEmbedParser(HTMLParser):
-	def __init__(self):
-		super().__init__()
-		self.iframe_attrs = None
-		self.iframe_count = 0
-		self.invalid_reason = ""
-
-	def handle_starttag(self, tag, attrs):
-		tag_name = (tag or "").lower()
-		if tag_name != "iframe":
-			self.invalid_reason = "only-iframe-embed-allowed"
-			return
-		self.iframe_count += 1
-		if self.iframe_count > 1:
-			self.invalid_reason = "multiple-iframes-not-allowed"
-			return
-		normalized_attrs = {}
-		for key, value in attrs:
-			attribute_name = (key or "").strip().lower()
-			if not attribute_name:
-				continue
-			if attribute_name.startswith("on"):
-				self.invalid_reason = "event-handler-attributes-not-allowed"
-				return
-			normalized_attrs[attribute_name] = value or ""
-		self.iframe_attrs = normalized_attrs
-
-	def handle_startendtag(self, tag, attrs):
-		self.handle_starttag(tag, attrs)
-
-	def handle_data(self, data):
-		if data and data.strip():
-			self.invalid_reason = "embed-html-must-contain-only-an-iframe"
-
 
 class PropertyInstruction(WebsiteGenerator):
 	website = frappe._dict(
@@ -142,7 +116,12 @@ class PropertyInstruction(WebsiteGenerator):
 		self.normalize_wifi_qr_fields()
 		self.normalize_blocks()
 		self.validate_links()
+		self.prepare_map_snapshot_lifecycle()
 		super().validate()
+
+	def on_update(self):
+		self.schedule_removed_map_snapshot_cleanup()
+		self.enqueue_pending_map_snapshot_jobs()
 
 	def make_route(self):
 		return f"instructions/{self.slug}"
@@ -194,19 +173,13 @@ class PropertyInstruction(WebsiteGenerator):
 		for block in self.instruction_blocks or []:
 			if not block.sort_order:
 				block.sort_order = block.idx
-			embed_input = self.get_block_map_embed_input(block)
+			embed_input = self.get_block_map_canonical_embed_input(block)
 			canonical_embed_url = (
 				self.normalize_google_maps_embed_input(embed_input)
 				if embed_input
 				else ""
 			)
 			block.set("custom_map_embed_url", canonical_embed_url)
-			if canonical_embed_url:
-				# Keep the legacy persisted field in canonical URL form until site migrations
-				# add the new column everywhere this code runs.
-				block.google_maps_embed_html = canonical_embed_url
-			elif (block.get("google_maps_embed_html") or "").strip():
-				block.google_maps_embed_html = ""
 
 	def validate_links(self):
 		if self.google_maps_url:
@@ -233,20 +206,17 @@ class PropertyInstruction(WebsiteGenerator):
 			frappe.throw(_("Google Maps URL must use a trusted Google Maps hostname."))
 
 	def validate_map_block(self, row):
-		embed_input = self.get_block_map_embed_input(row)
-		if row.block_type == "Map" and not embed_input:
+		canonical_input = self.get_block_map_canonical_embed_input(row)
+		legacy_input = self.get_block_map_legacy_embed_input(row)
+		if row.block_type == "Map" and not (canonical_input or legacy_input):
 			frappe.throw(
 				_("Instruction Block #{0} is missing a Google Maps embed iframe or URL.").format(row.idx)
 			)
-		if not embed_input:
+		if not canonical_input:
 			return
 		try:
-			canonical_embed_url = self.extract_google_maps_embed_url(embed_input)
+			canonical_embed_url = self.extract_google_maps_embed_url(canonical_input)
 			row.set("custom_map_embed_url", canonical_embed_url)
-			if canonical_embed_url:
-				row.google_maps_embed_html = canonical_embed_url
-			elif (row.get("google_maps_embed_html") or "").strip():
-				row.google_maps_embed_html = ""
 		except frappe.ValidationError:
 			raise
 		except Exception as error:
@@ -256,6 +226,193 @@ class PropertyInstruction(WebsiteGenerator):
 					frappe.safe_decode(str(error)),
 				)
 			)
+
+	def _set_snapshot_fields(
+		self,
+		target,
+		*,
+		snapshot=None,
+		status=None,
+		source_hash=None,
+		generated_at=None,
+		error_log=None,
+	):
+		if snapshot is not None:
+			target.set("custom_map_snapshot", snapshot)
+		if status is not None:
+			target.set("custom_map_snapshot_status", status)
+		if source_hash is not None:
+			target.set("custom_map_snapshot_source_hash", source_hash)
+		if generated_at is not None:
+			target.set("custom_map_snapshot_generated_at", generated_at)
+		if error_log is not None:
+			target.set("custom_map_snapshot_error_log", error_log)
+
+	def _clear_snapshot_fields(self, target, *, status=SNAPSHOT_STATUS_NOT_REQUIRED):
+		target.set("custom_map_snapshot", "")
+		target.set("custom_map_snapshot_status", status)
+		target.set("custom_map_snapshot_source_hash", "")
+		target.set("custom_map_snapshot_generated_at", None)
+		target.set("custom_map_snapshot_error_log", "")
+
+	def _get_snapshot_field_values(self, target):
+		return frappe._dict(
+			snapshot=(target.get("custom_map_snapshot") or "").strip(),
+			status=(target.get("custom_map_snapshot_status") or "").strip(),
+			source_hash=(target.get("custom_map_snapshot_source_hash") or "").strip(),
+			error_log=(target.get("custom_map_snapshot_error_log") or "").strip(),
+		)
+
+	def _compute_previous_main_snapshot_hash(self, previous_doc):
+		if not previous_doc:
+			return ""
+		embed_url = (previous_doc.get_custom_property_map_embed_url() or "").strip()
+		if not embed_url:
+			return ""
+		map_kind = (previous_doc.get_property_map().embed_kind or "").strip()
+		if not map_kind:
+			return ""
+		return build_map_source_hash(embed_url, map_kind)
+
+	def _compute_previous_block_snapshot_hash(self, previous_doc, previous_row):
+		if not previous_doc or not previous_row:
+			return ""
+		embed_input = (previous_doc.get_block_map_embed_input(previous_row) or "").strip()
+		if not embed_input:
+			return ""
+		block_map = previous_doc.get_block_map_data(previous_row)
+		if not ((block_map.embed_url or "").strip() and (block_map.embed_kind or "").strip()):
+			return ""
+		return build_map_source_hash(block_map.embed_url, block_map.embed_kind)
+
+	def _restore_server_owned_snapshot_state(self, target, db_target, desired_hash):
+		if not db_target or not desired_hash:
+			return False
+
+		db_fields = self._get_snapshot_field_values(db_target)
+		db_status = db_fields.status
+		if (
+			db_status == SNAPSHOT_STATUS_READY
+			and db_fields.source_hash == desired_hash
+			and not is_snapshot_current(
+				db_fields.snapshot,
+				db_fields.status,
+				db_fields.source_hash,
+				desired_hash,
+				self.name,
+			)
+		):
+			return False
+
+		if db_fields.source_hash == desired_hash and db_status in {
+			SNAPSHOT_STATUS_READY,
+			SNAPSHOT_STATUS_PROCESSING,
+			SNAPSHOT_STATUS_FAILED,
+		}:
+			self._set_snapshot_fields(
+				target,
+				snapshot=db_fields.snapshot,
+				status=db_fields.status,
+				source_hash=db_fields.source_hash,
+				generated_at=db_target.get("custom_map_snapshot_generated_at"),
+				error_log=db_fields.error_log,
+			)
+			return True
+
+		return False
+
+	def _prepare_target_snapshot_state(self, *, target, db_target, has_map, desired_hash, previous_hash, removed_files):
+		fields = self._get_snapshot_field_values(target)
+		if not has_map:
+			if fields.snapshot:
+				removed_files.append(fields.snapshot)
+			self._clear_snapshot_fields(target, status=SNAPSHOT_STATUS_NOT_REQUIRED)
+			return
+
+		if is_snapshot_current(fields.snapshot, fields.status, fields.source_hash, desired_hash, self.name):
+			return
+
+		source_changed = previous_hash != desired_hash
+		if not source_changed and self._restore_server_owned_snapshot_state(target, db_target, desired_hash):
+			return
+
+		ready_but_missing_file = (
+			fields.status == SNAPSHOT_STATUS_READY
+			and fields.source_hash == desired_hash
+			and fields.snapshot
+			and not is_snapshot_current(fields.snapshot, fields.status, fields.source_hash, desired_hash, self.name)
+		)
+
+		if fields.status == SNAPSHOT_STATUS_FAILED and not source_changed:
+			return
+		if fields.status in {SNAPSHOT_STATUS_PENDING, SNAPSHOT_STATUS_PROCESSING} and not source_changed:
+			return
+		if ready_but_missing_file or source_changed or fields.status in {"", SNAPSHOT_STATUS_NOT_REQUIRED, SNAPSHOT_STATUS_READY}:
+			self._set_snapshot_fields(
+				target,
+				status=SNAPSHOT_STATUS_PENDING,
+				error_log="",
+			)
+
+	def prepare_map_snapshot_lifecycle(self):
+		previous_doc = None if self.is_new() else self.get_doc_before_save()
+		removed_files = []
+		previous_rows = {
+			row.name: row
+			for row in ((previous_doc.instruction_blocks or []) if previous_doc else [])
+			if row.name
+		}
+		current_row_names = {row.name for row in (self.instruction_blocks or []) if row.name}
+
+		main_embed_url = (self.get_custom_property_map_embed_url() or "").strip()
+		main_map = self.get_property_map()
+		main_map_kind = (main_map.embed_kind or "").strip()
+		main_hash = build_map_source_hash(main_embed_url, main_map_kind) if (main_embed_url and main_map_kind) else ""
+		self._prepare_target_snapshot_state(
+			target=self,
+			db_target=previous_doc,
+			has_map=bool(main_hash),
+			desired_hash=main_hash,
+			previous_hash=self._compute_previous_main_snapshot_hash(previous_doc),
+			removed_files=removed_files,
+		)
+
+		for row in self.instruction_blocks or []:
+			block_embed_input = (self.get_block_map_embed_input(row) or "").strip()
+			block_map = self.get_block_map_data(row) if block_embed_input else frappe._dict(embed_url="", embed_kind="")
+			block_hash = (
+				build_map_source_hash(block_map.embed_url, block_map.embed_kind)
+				if ((block_map.embed_url or "").strip() and (block_map.embed_kind or "").strip())
+				else ""
+			)
+			self._prepare_target_snapshot_state(
+				target=row,
+				db_target=previous_rows.get(row.name),
+				has_map=bool(block_hash),
+				desired_hash=block_hash,
+				previous_hash=self._compute_previous_block_snapshot_hash(previous_doc, previous_rows.get(row.name)),
+				removed_files=removed_files,
+			)
+
+		for row_name, previous_row in previous_rows.items():
+			if row_name in current_row_names:
+				continue
+			previous_snapshot = (previous_row.get("custom_map_snapshot") or "").strip()
+			if previous_snapshot:
+				removed_files.append(previous_snapshot)
+
+		self.flags.map_snapshot_removed_files = [
+			value for value in removed_files if value
+		]
+
+	def schedule_removed_map_snapshot_cleanup(self):
+		for snapshot_url in self.flags.get("map_snapshot_removed_files") or []:
+			schedule_delete_generated_snapshot_file(snapshot_url, self.name)
+
+	def enqueue_pending_map_snapshot_jobs(self):
+		if frappe.flags.in_test and not getattr(self.flags, "allow_map_snapshot_enqueue_in_test", False):
+			return None
+		return queue_document_snapshot_job(self)
 
 	def get_page_info(self):
 		page_info = super().get_page_info()
@@ -291,13 +448,20 @@ class PropertyInstruction(WebsiteGenerator):
 
 	def get_public_render_context(self):
 		property_map = self.get_property_map()
+		property_map_pdf = self.get_pdf_map_representation("property-location")
+		property_map.pdf_representation = property_map_pdf.representation
+		property_map.pdf_snapshot_image_url = property_map_pdf.snapshot_image_url
+		property_map.pdf_open_url = property_map_pdf.open_url
+		property_map.pdf_desired_source_hash = property_map_pdf.desired_source_hash
+		property_map.pdf_reason_code = property_map_pdf.reason_code
+		property_map.is_custom_google_map = property_map_pdf.custom_map
 		sections = self.get_grouped_blocks()
 		instruction_block_maps = self.get_instruction_block_maps(sections)
-		map_static_image_url = self.get_public_pdf_image_src(property_map.static_image_url)
 		google_translate = self.get_google_translate_settings()
 		wifi_password_public = self.get_public_wifi_password()
 		wifi_security_type = self.get_normalized_wifi_security_type()
 		show_wifi_qr_in_pdf = bool(cint(self.show_wifi_qr_in_pdf or 0))
+		my_maps_presentation = get_map_presentation_context("google-my-maps")
 		return frappe._dict(
 			title=self.title,
 			page_title=self.title,
@@ -318,7 +482,8 @@ class PropertyInstruction(WebsiteGenerator):
 			google_maps_place_id=self.google_maps_place_id,
 			map_search_query=self.map_search_query,
 			property_map=property_map,
-			map_static_image_url=map_static_image_url,
+			my_maps_header_crop_px=my_maps_presentation["my_maps_header_crop_px"],
+			my_maps_presentation_version=my_maps_presentation["my_maps_presentation_version"],
 			check_in_time=self.format_display_time(self.check_in_time),
 			check_out_time=self.format_display_time(self.check_out_time),
 			wifi_name=self.wifi_name,
@@ -355,6 +520,7 @@ class PropertyInstruction(WebsiteGenerator):
 				block_row.pop("google_maps_embed_html", None)
 				block_row.pop("custom_map_embed_url", None)
 				block_map = self.get_block_map_data(row)
+				block_pdf = self.get_pdf_map_representation("block", row.name)
 				block_data = dict(block_row)
 				block_data.update(
 					title_translation_protected=self.should_protect_identifier_value(row.title),
@@ -368,16 +534,14 @@ class PropertyInstruction(WebsiteGenerator):
 					image=self.get_public_pdf_image_src(row.image),
 					map_embed_url=block_map.embed_url,
 					map_embed_kind=block_map.embed_kind,
-					map_latitude=block_map.latitude,
-					map_longitude=block_map.longitude,
-					map_center_latitude=block_map.center_latitude,
-					map_center_longitude=block_map.center_longitude,
-					map_marker_latitude=block_map.marker_latitude,
-					map_marker_longitude=block_map.marker_longitude,
-					map_coordinate_source=block_map.coordinate_source,
-					map_zoom=block_map.zoom,
+					map_embed_kind_class=block_map.embed_kind_class,
 					map_external_url=block_map.external_url,
-					map_attribution=block_map.attribution,
+					map_pdf_representation=block_pdf.representation,
+					map_pdf_snapshot_image_url=block_pdf.snapshot_image_url,
+					map_pdf_open_url=block_pdf.open_url,
+					map_pdf_desired_source_hash=block_pdf.desired_source_hash,
+					map_pdf_reason_code=block_pdf.reason_code,
+					map_is_custom_google_map=block_pdf.custom_map,
 					display_link_label_translation_protected=self.should_protect_identifier_value(
 						row.link_label or row.link_url
 					),
@@ -411,6 +575,7 @@ class PropertyInstruction(WebsiteGenerator):
 			if not self.get_block_map_embed_input(row):
 				continue
 			block_map = self.get_block_map_data(row)
+			block_pdf = self.get_pdf_map_representation("block", row.name)
 			if not (block_map.embed_url or block_map.external_url):
 				continue
 			block_maps[row.name] = frappe._dict(
@@ -418,17 +583,15 @@ class PropertyInstruction(WebsiteGenerator):
 				title=row.title,
 				embed_url=block_map.embed_url,
 				embed_kind=block_map.embed_kind,
-				latitude=block_map.latitude,
-				longitude=block_map.longitude,
-				center_latitude=block_map.center_latitude,
-				center_longitude=block_map.center_longitude,
-				marker_latitude=block_map.marker_latitude,
-				marker_longitude=block_map.marker_longitude,
-				coordinate_source=block_map.coordinate_source,
-				zoom=block_map.zoom,
+				embed_kind_class=block_map.embed_kind_class,
 				external_url=block_map.external_url,
-				attribution=block_map.attribution,
 				link_label=row.link_label or row.link_url,
+				pdf_representation=block_pdf.representation,
+				pdf_snapshot_image_url=block_pdf.snapshot_image_url,
+				pdf_open_url=block_pdf.open_url,
+				pdf_desired_source_hash=block_pdf.desired_source_hash,
+				pdf_reason_code=block_pdf.reason_code,
+				is_custom_google_map=block_pdf.custom_map,
 			)
 		return block_maps
 
@@ -469,264 +632,19 @@ class PropertyInstruction(WebsiteGenerator):
 	def get_property_map(self):
 		custom_embed_url = self.get_custom_property_map_embed_url()
 		embed_url = custom_embed_url or self.get_generated_map_embed_url()
-		coordinates = self.get_map_coordinates()
 		return frappe._dict(
 			custom_embed_url=custom_embed_url,
 			embed_url=embed_url,
 			embed_kind=self.get_google_maps_embed_kind(embed_url),
+			embed_kind_class=get_map_kind_class(self.get_google_maps_embed_kind(embed_url)),
 			external_url=self.get_map_external_url(embed_url),
-			static_image_url=self.get_static_map_image_url(),
-			latitude=coordinates.latitude if coordinates else None,
-			longitude=coordinates.longitude if coordinates else None,
-			coordinate_source=coordinates.source if coordinates else None,
 			map_zoom=self.normalize_map_zoom(self.map_zoom),
-			parking_zoom=max(14, min(15, self.normalize_map_zoom(self.map_zoom))),
 			uses_api_key=bool(embed_url and "embed/v1/place" in embed_url),
 			is_custom_embed=bool(custom_embed_url),
 		)
 
-	def get_map_coordinates(self):
-		property_coordinates = self.get_property_coordinates()
-		if property_coordinates:
-			return property_coordinates
-		custom_embed_coordinates = self.parse_map_coordinates_from_url(self.get_custom_property_map_embed_url())
-		if custom_embed_coordinates:
-			return custom_embed_coordinates
-
-		return self.parse_map_coordinates_from_url(self.google_maps_url)
-
-	def get_property_coordinates(self):
-		if not self.property:
-			return None
-
-		try:
-			property_doc = frappe.get_cached_doc("Property", self.property)
-		except Exception:
-			return None
-
-		for latitude_field, longitude_field in (
-			("latitude", "longitude"),
-			("lat", "lng"),
-			("location_latitude", "location_longitude"),
-			("property_latitude", "property_longitude"),
-		):
-			latitude = self.parse_coordinate_value(property_doc.get(latitude_field))
-			longitude = self.parse_coordinate_value(property_doc.get(longitude_field))
-			if latitude is not None and longitude is not None:
-				return frappe._dict(latitude=latitude, longitude=longitude, source=f"property.{latitude_field}/{longitude_field}")
-
-		location_value = property_doc.get("location")
-		parsed_location = self.parse_map_coordinates_from_text(location_value)
-		if parsed_location:
-			parsed_location.source = "property.location"
-			return parsed_location
-
-		return None
-
-	def parse_coordinate_value(self, value):
-		if value in (None, ""):
-			return None
-		try:
-			return float(str(value).strip())
-		except (TypeError, ValueError):
-			return None
-
-	def parse_map_coordinates_from_text(self, value):
-		text = (value or "").strip()
-		if not text:
-			return None
-		match = COORDINATE_TEXT_PATTERN.search(text)
-		if not match:
-			return None
-		latitude = self.parse_coordinate_value(match.group(1))
-		longitude = self.parse_coordinate_value(match.group(2))
-		if latitude is None or longitude is None:
-			return None
-		return frappe._dict(latitude=latitude, longitude=longitude, source="text")
-
-	def parse_map_coordinates_from_url(self, url):
-		text = (url or "").strip()
-		if not text:
-			return None
-
-		marker_coordinates = self.parse_google_embed_marker_coordinates(text)
-		if marker_coordinates:
-			return marker_coordinates
-
-		parsed = urlparse(text)
-		query_params = parse_qs(parsed.query or "", keep_blank_values=False)
-		for key in ("q", "query"):
-			query_values = query_params.get(key) or []
-			for query_value in query_values:
-				query_coordinates = self.parse_map_coordinates_from_text(query_value)
-				if query_coordinates:
-					query_coordinates.source = f"google_query_coordinate_{key}"
-					return query_coordinates
-
-		match = GOOGLE_MAP_AT_PATTERN.search(text)
-		if match:
-			latitude = self.parse_coordinate_value(match.group(1))
-			longitude = self.parse_coordinate_value(match.group(2))
-			if latitude is not None and longitude is not None:
-				return frappe._dict(latitude=latitude, longitude=longitude, source="google_at_coordinate")
-
-		center_coordinates = self.parse_map_center_coordinates_from_url(text)
-		if center_coordinates:
-			return frappe._dict(
-				latitude=center_coordinates.latitude,
-				longitude=center_coordinates.longitude,
-				source="fallback_center_as_marker",
-			)
-
-		query_coordinates = self.parse_map_coordinates_from_text(parsed.query or "")
-		if query_coordinates:
-			query_coordinates.source = "google_maps_url_query"
-			return query_coordinates
-
-		return None
-
-	def parse_map_center_coordinates_from_url(self, url):
-		text = (url or "").strip()
-		if not text:
-			return None
-
-		match = GOOGLE_MAP_2D3D_PATTERN.search(text)
-		if match:
-			longitude = self.parse_coordinate_value(match.group(1))
-			latitude = self.parse_coordinate_value(match.group(2))
-			if latitude is not None and longitude is not None:
-				return frappe._dict(
-					latitude=latitude,
-					longitude=longitude,
-					source="google_embed_viewport_center",
-				)
-
-		match = GOOGLE_MAP_AT_PATTERN.search(text)
-		if match:
-			latitude = self.parse_coordinate_value(match.group(1))
-			longitude = self.parse_coordinate_value(match.group(2))
-			if latitude is not None and longitude is not None:
-				return frappe._dict(
-					latitude=latitude,
-					longitude=longitude,
-					source="google_at_coordinate",
-				)
-
-		marker_coordinates = self.parse_google_embed_marker_coordinates(text)
-		if marker_coordinates:
-			return frappe._dict(
-				latitude=marker_coordinates.latitude,
-				longitude=marker_coordinates.longitude,
-				source=marker_coordinates.source,
-			)
-
-		return None
-
-	def parse_google_embed_marker_coordinates(self, url):
-		text = (url or "").strip()
-		if not text:
-			return None
-
-		match = re.search(r"!2z([^!&?#]+)", text)
-		if match:
-			encoded_marker = match.group(1).strip()
-			try:
-				marker_text = self.decode_google_embed_marker_token(encoded_marker)
-			except Exception:
-				marker_text = None
-			if marker_text:
-				marker_coordinates = self.parse_map_coordinates_from_dms_text(marker_text)
-				if marker_coordinates:
-					marker_coordinates.source = "google_embed_dms_marker"
-					return marker_coordinates
-
-		parsed = urlparse(text)
-		query_params = parse_qs(parsed.query or "", keep_blank_values=False)
-		for key in ("q", "query"):
-			query_values = query_params.get(key) or []
-			for query_value in query_values:
-				query_coordinates = self.parse_map_coordinates_from_text(query_value)
-				if query_coordinates:
-					query_coordinates.source = f"google_query_coordinate_{key}"
-					return query_coordinates
-
-		match = GOOGLE_MAP_AT_PATTERN.search(text)
-		if match:
-			latitude = self.parse_coordinate_value(match.group(1))
-			longitude = self.parse_coordinate_value(match.group(2))
-			if latitude is not None and longitude is not None:
-				return frappe._dict(latitude=latitude, longitude=longitude, source="google_at_coordinate")
-
-		match = GOOGLE_MAP_2D3D_PATTERN.search(text)
-		if match:
-			longitude = self.parse_coordinate_value(match.group(1))
-			latitude = self.parse_coordinate_value(match.group(2))
-			if latitude is not None and longitude is not None:
-				return frappe._dict(latitude=latitude, longitude=longitude, source="google_embed_viewport_center")
-
-		return None
-
-	def decode_google_embed_marker_token(self, token):
-		value = (token or "").strip()
-		if not value:
-			return None
-		decoded = urlparse(f"https://example.com/?q={value}").query[2:]
-		normalized = decoded.replace("-", "+").replace("_", "/")
-		padding = len(normalized) % 4
-		if padding:
-			normalized += "=" * (4 - padding)
-		try:
-			return base64.b64decode(normalized).decode("utf-8")
-		except Exception:
-			return None
-
-	def parse_map_coordinates_from_dms_text(self, value):
-		text = (value or "").strip()
-		if not text:
-			return None
-		matches = DMS_COORDINATE_COMPONENT_PATTERN.findall(text.replace("″", "\"").replace("′", "'"))
-		if len(matches) < 2:
-			return None
-		latitude = None
-		longitude = None
-		for degrees, minutes, seconds, hemisphere in matches:
-			decimal = self.convert_dms_to_decimal(degrees, minutes, seconds, hemisphere)
-			if decimal is None:
-				return None
-			hemisphere = hemisphere.upper()
-			if hemisphere in {"N", "S"} and latitude is None:
-				latitude = decimal
-			elif hemisphere in {"E", "W"} and longitude is None:
-				longitude = decimal
-		if latitude is None or longitude is None:
-			return None
-		if not (-90 <= latitude <= 90 and -180 <= longitude <= 180):
-			return None
-		return frappe._dict(latitude=latitude, longitude=longitude, source="google_embed_dms_marker")
-
-	def convert_dms_to_decimal(self, degrees, minutes, seconds, hemisphere):
-		try:
-			degrees_value = float(degrees)
-			minutes_value = float(minutes)
-			seconds_value = float(seconds)
-		except (TypeError, ValueError):
-			return None
-		decimal = degrees_value + (minutes_value / 60.0) + (seconds_value / 3600.0)
-		if hemisphere.upper() in {"S", "W"}:
-			decimal *= -1
-		return decimal
-
-	def parse_map_zoom_from_url(self, url, default_zoom=None):
-		parsed = urlparse((url or "").strip())
-		query_values = parse_qs(parsed.query or "", keep_blank_values=False)
-		for key in ("z", "zoom"):
-			values = query_values.get(key) or []
-			if values:
-				return self.normalize_map_zoom(values[0])
-		match = re.search(r"@-?\d+(?:\.\d+)?,-?\d+(?:\.\d+)?,(\d+)(?:z|m)", url or "")
-		if match:
-			return self.normalize_map_zoom(match.group(1))
-		return self.normalize_map_zoom(default_zoom or self.map_zoom)
+	def get_pdf_map_representation(self, map_key, row_name=None):
+		return build_pdf_map_representation(self, map_key, row_name)
 
 	def get_guest_guide_web_assets(self, existing_assets=None, asset_type="css"):
 		assets = list(existing_assets or frappe.get_hooks(f"web_include_{asset_type}") or [])
@@ -785,24 +703,6 @@ class PropertyInstruction(WebsiteGenerator):
 		if self.map_type == "satellite":
 			params["t"] = "k"
 		return urlunparse(("https", "www.google.com", "/maps", "", urlencode(params), ""))
-
-	def get_static_map_image_url(self):
-		query = self.get_map_display_query()
-		if not query:
-			return None
-		api_key = self.get_map_embed_api_key()
-		if not api_key:
-			return None
-		params = {
-			"center": query,
-			"zoom": self.normalize_map_zoom(self.map_zoom),
-			"size": "1200x720",
-			"scale": 2,
-			"maptype": self.map_type if self.map_type in MAP_TYPES else "roadmap",
-			"markers": query,
-			"key": api_key,
-		}
-		return f"https://maps.googleapis.com/maps/api/staticmap?{urlencode(params)}"
 
 	def get_google_translate_settings(self):
 		enabled = cint(self.get_property_management_setting("enable_guest_guide_google_translate") or 0)
@@ -964,133 +864,58 @@ class PropertyInstruction(WebsiteGenerator):
 		)
 
 	def normalize_google_maps_embed_input(self, value):
-		text = (value or "").strip()
-		if not text:
-			return ""
-		return self.extract_google_maps_embed_url(text)
+		return normalize_google_maps_embed_input_value(value)
+
+	def get_block_map_canonical_embed_input(self, row):
+		return (row.get("custom_map_embed_url") or "").strip()
+
+	def get_block_map_legacy_embed_input(self, row):
+		return (row.get("google_maps_embed_html") or "").strip()
 
 	def get_block_map_embed_input(self, row):
-		return (((row.get("custom_map_embed_url") or "").strip()) or ((row.get("google_maps_embed_html") or "").strip()))
+		return self.get_block_map_canonical_embed_input(row) or self.get_block_map_legacy_embed_input(row)
 
 	def extract_google_maps_embed_url(self, embed_input):
-		text = html_unescape((embed_input or "").strip())
-		if not text:
-			return None
-		if "<" not in text and ">" not in text:
-			return self.validate_google_maps_embed_url(text)
-		parser = GoogleMapsEmbedParser()
-		parser.feed(text)
-		parser.close()
-		if parser.invalid_reason:
-			frappe.throw(_("Google Maps embed is invalid: {0}").format(parser.invalid_reason))
-		if parser.iframe_count != 1 or not parser.iframe_attrs:
-			frappe.throw(_("Google Maps embed must contain exactly one iframe."))
-		iframe_attrs = parser.iframe_attrs
-		if iframe_attrs.get("srcdoc"):
-			frappe.throw(_("Google Maps embed cannot use srcdoc."))
-		src = html_unescape((iframe_attrs.get("src") or "").strip())
-		if not src:
-			frappe.throw(_("Google Maps embed iframe is missing src."))
-		return self.validate_google_maps_embed_url(src)
+		return extract_google_maps_embed_url_value(embed_input)
 
 	def validate_google_maps_embed_url(self, url):
-		self.validate_external_link(url, _("Google Maps embed URL"))
-		parsed = urlparse((url or "").strip())
-		if parsed.scheme.lower() != "https":
-			frappe.throw(_("Google Maps embed URL must use HTTPS."))
-		if parsed.username or parsed.password:
-			frappe.throw(_("Google Maps embed URL cannot include credentials."))
-		hostname = (parsed.hostname or "").lower()
-		if hostname not in TRUSTED_GOOGLE_MAP_HOSTS:
-			frappe.throw(_("Google Maps embed URL must use a trusted Google Maps hostname."))
-		if parsed.path not in TRUSTED_GOOGLE_MAP_EMBED_PATHS:
-			frappe.throw(_("Google Maps embed URL must use a supported Google Maps embed path."))
-		query_values = parse_qs(parsed.query or "", keep_blank_values=True)
-		is_standard_embed = parsed.path == "/maps/embed"
-		is_mymaps_embed = parsed.path == "/maps/d/embed"
-		if parsed.fragment:
-			parsed = parsed._replace(fragment="")
-		if is_standard_embed or is_mymaps_embed:
-			return parsed.geturl()
-		if not (query_values.get("output") == ["embed"] or "pb" in query_values):
-			frappe.throw(_("Google Maps embed URL must use a supported embed format."))
-		return parsed.geturl()
+		return validate_google_maps_embed_url_value(url)
 
 	def get_google_maps_embed_kind(self, url):
-		parsed = urlparse((url or "").strip())
-		if not parsed.path:
-			return ""
-		if parsed.path == "/maps/d/embed":
-			return "google-my-maps"
-		if parsed.path in {"/maps", "/maps/embed"}:
-			return "google-maps"
-		return ""
+		return get_google_maps_embed_kind_value(url)
 
 	def derive_google_maps_view_url(self, embed_url):
-		text = (embed_url or "").strip()
-		if not text:
-			return None
-		parsed = urlparse(text)
-		if (parsed.hostname or "").lower() not in TRUSTED_GOOGLE_MAP_HOSTS:
-			return None
-		if parsed.path == "/maps/d/embed":
-			query_values = parse_qs(parsed.query or "", keep_blank_values=True)
-			mid = (query_values.get("mid") or [None])[0]
-			if not mid:
-				return text
-			view_query = {"mid": mid}
-			if query_values.get("ehbc"):
-				view_query["ehbc"] = query_values["ehbc"][0]
-			return urlunparse((parsed.scheme, parsed.netloc, "/maps/d/viewer", "", urlencode(view_query), ""))
-		return text
+		return derive_google_maps_view_url_value(embed_url)
 
-	def get_block_map_data(self, row):
+	def resolve_block_map_embed_url(self, row, *, raise_invalid=False):
 		embed_input = self.get_block_map_embed_input(row)
 		if not embed_input:
+			return ""
+		try:
+			return self.extract_google_maps_embed_url(embed_input) or ""
+		except frappe.ValidationError:
+			if raise_invalid:
+				raise
+			return ""
+
+	def get_block_map_data(self, row):
+		embed_url = self.resolve_block_map_embed_url(row, raise_invalid=False)
+		if not embed_url:
 			return frappe._dict(
 				embed_url=None,
 				embed_kind="",
-				latitude=None,
-				longitude=None,
-				center_latitude=None,
-				center_longitude=None,
-				marker_latitude=None,
-				marker_longitude=None,
-				coordinate_source=None,
-				zoom=None,
 				external_url=None,
-				attribution="© OpenStreetMap contributors",
 			)
-		embed_url = self.extract_google_maps_embed_url(embed_input)
-		marker_coordinates = self.parse_map_coordinates_from_url(embed_url)
-		center_coordinates = self.parse_map_center_coordinates_from_url(embed_url)
-		zoom = self.parse_map_zoom_from_url(embed_url, self.map_zoom)
 		external_url = (row.link_url or "").strip()
-		preferred_latitude = marker_coordinates.latitude if marker_coordinates else (center_coordinates.latitude if center_coordinates else None)
-		preferred_longitude = marker_coordinates.longitude if marker_coordinates else (center_coordinates.longitude if center_coordinates else None)
-		coordinate_source = marker_coordinates.source if marker_coordinates else (center_coordinates.source if center_coordinates else None)
-		if not external_url and preferred_latitude is not None and preferred_longitude is not None:
-			external_url = (
-				"https://www.google.com/maps/search/?"
-				+ urlencode({"api": 1, "query": f"{preferred_latitude},{preferred_longitude}"})
-			)
-		if not external_url:
+		if not external_url and embed_url:
 			external_url = self.derive_google_maps_view_url(embed_url)
 		if not external_url and embed_url:
 			external_url = embed_url
 		return frappe._dict(
 			embed_url=embed_url,
 			embed_kind=self.get_google_maps_embed_kind(embed_url),
-			latitude=preferred_latitude,
-			longitude=preferred_longitude,
-			center_latitude=center_coordinates.latitude if center_coordinates else preferred_latitude,
-			center_longitude=center_coordinates.longitude if center_coordinates else preferred_longitude,
-			marker_latitude=marker_coordinates.latitude if marker_coordinates else preferred_latitude,
-			marker_longitude=marker_coordinates.longitude if marker_coordinates else preferred_longitude,
-			coordinate_source=coordinate_source,
-			zoom=zoom,
+			embed_kind_class=get_map_kind_class(self.get_google_maps_embed_kind(embed_url)),
 			external_url=external_url,
-			attribution="© OpenStreetMap contributors",
 		)
 
 	def set_noindex_response_header(self):
@@ -1107,6 +932,32 @@ def apply_guest_guide_noindex_headers(response=None, request=None):
 	path = (getattr(request, "path", "") or "").strip()
 	if path.startswith("/instructions/"):
 		response.headers["X-Robots-Tag"] = NOINDEX_ROBOTS_CONTENT
+
+
+def _require_map_snapshot_admin_access(name):
+	doc = frappe.get_doc("Property Instruction", name)
+	if not doc.has_permission("write"):
+		raise frappe.PermissionError
+	frappe.only_for("System Manager")
+	return doc
+
+
+@frappe.whitelist()
+def generate_property_instruction_map_snapshots(name):
+	_require_map_snapshot_admin_access(name)
+	return queue_snapshot_generation(name)
+
+
+@frappe.whitelist()
+def regenerate_property_instruction_map_snapshots(name):
+	_require_map_snapshot_admin_access(name)
+	return queue_snapshot_generation(name, force=True)
+
+
+@frappe.whitelist()
+def retry_failed_property_instruction_map_snapshots(name):
+	_require_map_snapshot_admin_access(name)
+	return queue_snapshot_generation(name, retry_failed_only=True)
 
 
 def get_allowed_guest_image_hosts():
@@ -1254,9 +1105,6 @@ def validate_public_pdf_image_url(url):
 		frappe.throw(_("Image host is not allowed."))
 	if hostname not in TRUSTED_EXTERNAL_PDF_IMAGE_HOSTS and not is_site_file_path:
 		frappe.throw(_("Only Frappe file paths are allowed for site-hosted images."))
-	if hostname in TRUSTED_EXTERNAL_PDF_IMAGE_HOSTS and hostname == "maps.googleapis.com":
-		if not path.startswith("/maps/api/staticmap"):
-			frappe.throw(_("Map image path is not allowed."))
 
 	return parsed
 

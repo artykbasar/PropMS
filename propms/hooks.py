@@ -59,6 +59,7 @@ doctype_js = {
     "Journal Entry Account": "property_management_solution/journal_entry_account.js",
     "Issue": "property_management_solution/issue.js",
     "Company": "property_management_solution/company.js",
+    "Property Instruction": "property_management_solution/doctype/property_instruction/property_instruction.js",
 }
 # doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
@@ -318,6 +319,7 @@ scheduler_events = {
 # -------
 
 # before_tests = "propms.install.before_tests"
+
 
 # Overriding Whitelisted Methods
 # ------------------------------

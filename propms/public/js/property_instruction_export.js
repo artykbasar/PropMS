@@ -62,7 +62,7 @@
     }
   ];
   var PUBLIC_PDF_IMAGE_ENDPOINT = "/api/method/propms.property_management_solution.doctype.property_instruction.property_instruction.public_pdf_image";
-  var OPEN_STREET_MAP_TILE_TEMPLATE = "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
+  var PUBLIC_MAP_SNAPSHOT_IMAGE_ENDPOINT = "/api/method/propms.map_snapshot.pdf_assets.public_map_snapshot_image";
   var PDF_LAYOUT_VERSION = "2026-07-25-contents-qr-v1";
   var PDF_ADAPTIVE_LAYOUT_VERSION = "2026-07-27-adaptive-a4-v1";
   var PDF_DEFAULT_LAYOUT = "adaptive";
@@ -212,9 +212,7 @@
     artifactCache: {},
     warmupPromise: null,
     imageDataCache: new Map(),
-    mapImageCache: new Map(),
-    qrImageCache: new Map(),
-    decodedTileImageCache: new Map()
+    qrImageCache: new Map()
   };
   var pdfExportController = {
     activePromise: null,
@@ -1537,6 +1535,32 @@
     };
   }
 
+  function applyCustomGoogleMapQrFallback(mediaDescriptor, reason) {
+    if (!mediaDescriptor || !mediaDescriptor.target) {
+      return false;
+    }
+    if (mediaDescriptor.mediaRole === "property-map") {
+      mediaDescriptor.target.imageSrc = "";
+      mediaDescriptor.target.mapAssetKind = "qr";
+      mediaDescriptor.target.finalPdfRepresentation = "qr";
+      mediaDescriptor.target.pdfFinalCode = "snapshot-load-failed-qr-used";
+      mediaDescriptor.target.imageLoadCode = reason && reason.code ? reason.code : "load-failed";
+      mediaDescriptor.target.attribution = "";
+      mediaDescriptor.target.qrEntries = buildMainCustomMapQrEntries({ map: mediaDescriptor.target });
+      return true;
+    }
+    if (mediaDescriptor.mediaRole === "block-map") {
+      mediaDescriptor.target.mapImageSrc = "";
+      mediaDescriptor.target.mapAssetKind = "qr";
+      mediaDescriptor.target.finalPdfRepresentation = "qr";
+      mediaDescriptor.target.pdfFinalCode = "snapshot-load-failed-qr-used";
+      mediaDescriptor.target.imageLoadCode = reason && reason.code ? reason.code : "load-failed";
+      mediaDescriptor.target.qrEntries = buildBlockCustomMapQrEntries(mediaDescriptor.target);
+      return true;
+    }
+    return false;
+  }
+
   function initializePdfInteractionDiagnostics() {
     window.__propertyInstructionPdfInteractionDiagnostics = {
       events: []
@@ -2170,21 +2194,22 @@
       return null;
     }
     var shell = document.createElement("div");
+    var embedKindClass = String(mapModel.embed_kind_class || mapModel.embed_kind || "").trim();
     shell.className = "pi-instruction-map-shell notranslate";
+    if (embedKindClass) {
+      shell.classList.add("pi-instruction-map-shell--" + embedKindClass);
+    }
     shell.setAttribute("translate", "no");
     shell.setAttribute("data-guide-block-map", "");
     shell.setAttribute("data-guide-block-map-embed-url", mapModel.embed_url || "");
     shell.setAttribute("data-guide-block-map-kind", mapModel.embed_kind || "");
-    shell.setAttribute("data-guide-block-map-latitude", mapModel.latitude != null ? String(mapModel.latitude) : "");
-    shell.setAttribute("data-guide-block-map-longitude", mapModel.longitude != null ? String(mapModel.longitude) : "");
-    shell.setAttribute("data-guide-block-map-center-latitude", mapModel.center_latitude != null ? String(mapModel.center_latitude) : "");
-    shell.setAttribute("data-guide-block-map-center-longitude", mapModel.center_longitude != null ? String(mapModel.center_longitude) : "");
-    shell.setAttribute("data-guide-block-map-marker-latitude", mapModel.marker_latitude != null ? String(mapModel.marker_latitude) : "");
-    shell.setAttribute("data-guide-block-map-marker-longitude", mapModel.marker_longitude != null ? String(mapModel.marker_longitude) : "");
-    shell.setAttribute("data-guide-block-map-coordinate-source", mapModel.coordinate_source || "");
-    shell.setAttribute("data-guide-block-map-zoom", mapModel.zoom != null ? String(mapModel.zoom) : "");
     shell.setAttribute("data-guide-block-map-external-url", mapModel.external_url || "");
-    shell.setAttribute("data-guide-block-map-attribution", mapModel.attribution || "© OpenStreetMap contributors");
+    shell.setAttribute("data-guide-block-map-pdf-representation", mapModel.pdf_representation || "none");
+    shell.setAttribute("data-guide-block-map-snapshot-image", mapModel.pdf_snapshot_image_url || "");
+    shell.setAttribute("data-guide-block-map-open-url", mapModel.pdf_open_url || "");
+    shell.setAttribute("data-guide-block-map-source-hash", mapModel.pdf_desired_source_hash || "");
+    shell.setAttribute("data-guide-block-map-reason", mapModel.pdf_reason_code || "");
+    shell.setAttribute("data-guide-block-map-custom-google", mapModel.is_custom_google_map ? "1" : "0");
 
     var iframe = document.createElement("iframe");
     iframe.className = "pi-instruction-map";
@@ -2565,7 +2590,10 @@
     var absoluteUrl = new URL(rawUrl, window.location.origin);
     if (
       absoluteUrl.origin === window.location.origin &&
-      absoluteUrl.pathname === PUBLIC_PDF_IMAGE_ENDPOINT
+      (
+        absoluteUrl.pathname === PUBLIC_PDF_IMAGE_ENDPOINT ||
+        absoluteUrl.pathname === PUBLIC_MAP_SNAPSHOT_IMAGE_ENDPOINT
+      )
     ) {
       return absoluteUrl.toString();
     }
@@ -2573,6 +2601,18 @@
     var proxyUrl = new URL(PUBLIC_PDF_IMAGE_ENDPOINT, window.location.origin);
     proxyUrl.searchParams.set("url", absoluteUrl.toString());
     return proxyUrl.toString();
+  }
+
+  function normalizePdfMapRepresentation(value) {
+    var normalized = String(value || "").trim().toLowerCase();
+    if (normalized === "snapshot" || normalized === "qr" || normalized === "none") {
+      return normalized;
+    }
+    return "none";
+  }
+
+  function shouldUseQrForCustomMap(representation, isCustomGoogleMap) {
+    return !!isCustomGoogleMap && normalizePdfMapRepresentation(representation) !== "snapshot";
   }
 
   function getSemanticNodeId(element) {
@@ -8671,21 +8711,6 @@
     return Number.isFinite(parsedValue) ? parsedValue : null;
   }
 
-  function parseGoogleMapCoordinatesFromUrl(rawUrl) {
-    var text = String(rawUrl || "").trim();
-    if (!text) {
-      return null;
-    }
-    var atMatch = text.match(/@(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/);
-    if (atMatch) {
-      return {
-        latitude: Number(atMatch[1]),
-        longitude: Number(atMatch[2])
-      };
-    }
-    return null;
-  }
-
   function getSectionGoogleMapsLink(sectionModel) {
     var blocks = (sectionModel && sectionModel.blocks) || [];
     for (var index = 0; index < blocks.length; index += 1) {
@@ -8735,16 +8760,13 @@
           imageAlt: imageNode ? String(imageNode.getAttribute("alt") || "").trim() : "",
           mapEmbedUrl: mapNode ? String(mapNode.getAttribute("data-guide-block-map-embed-url") || "").trim() : "",
           mapEmbedKind: mapNode ? String(mapNode.getAttribute("data-guide-block-map-kind") || "").trim() : "",
-          mapLatitude: parseNumericDataAttribute(mapNode, "data-guide-block-map-latitude"),
-          mapLongitude: parseNumericDataAttribute(mapNode, "data-guide-block-map-longitude"),
-          mapCenterLatitude: parseNumericDataAttribute(mapNode, "data-guide-block-map-center-latitude"),
-          mapCenterLongitude: parseNumericDataAttribute(mapNode, "data-guide-block-map-center-longitude"),
-          mapMarkerLatitude: parseNumericDataAttribute(mapNode, "data-guide-block-map-marker-latitude"),
-          mapMarkerLongitude: parseNumericDataAttribute(mapNode, "data-guide-block-map-marker-longitude"),
-          mapCoordinateSource: mapNode ? String(mapNode.getAttribute("data-guide-block-map-coordinate-source") || "").trim() : "",
-          mapZoom: parseNumericDataAttribute(mapNode, "data-guide-block-map-zoom") || 16,
           mapExternalUrl: normalizeHref(mapNode && mapNode.getAttribute("data-guide-block-map-external-url")),
-          mapAttribution: mapNode ? String(mapNode.getAttribute("data-guide-block-map-attribution") || "").trim() : ""
+          mapPdfRepresentation: normalizePdfMapRepresentation(mapNode && mapNode.getAttribute("data-guide-block-map-pdf-representation")),
+          mapSnapshotImageSrc: mapNode ? String(mapNode.getAttribute("data-guide-block-map-snapshot-image") || "").trim() : "",
+          mapSnapshotSourceHash: mapNode ? String(mapNode.getAttribute("data-guide-block-map-source-hash") || "").trim() : "",
+          mapOpenUrl: normalizeHref(mapNode && mapNode.getAttribute("data-guide-block-map-open-url")),
+          mapPdfReasonCode: mapNode ? String(mapNode.getAttribute("data-guide-block-map-reason") || "").trim() : "",
+          mapIsCustomGoogleMap: mapNode ? String(mapNode.getAttribute("data-guide-block-map-custom-google") || "") === "1" : false
         };
       }).filter(function (block) {
         return block.title || block.body || block.caption || block.linkLabel || block.imageSrc || block.mapEmbedUrl;
@@ -8781,25 +8803,8 @@
     });
     var parkingLink = getSectionGoogleMapsLink(parkingSection);
     var mapLinkHref = normalizeHref(mapLink && mapLink.getAttribute("href"));
-    var fallbackCoordinates = parseGoogleMapCoordinatesFromUrl(mapLinkHref);
-    var propertyLatitude = parseNumericDataAttribute(mapCard, "data-guide-map-latitude");
-    var propertyLongitude = parseNumericDataAttribute(mapCard, "data-guide-map-longitude");
-    if (!Number.isFinite(propertyLatitude) && fallbackCoordinates) {
-      propertyLatitude = fallbackCoordinates.latitude;
-    }
-    if (!Number.isFinite(propertyLongitude) && fallbackCoordinates) {
-      propertyLongitude = fallbackCoordinates.longitude;
-    }
 
     var guideLinks = [];
-    if (mapLinkHref) {
-      guideLinks.push({
-        href: mapLinkHref,
-        label: getVisibleText(mapLink),
-        sourceNodeId: "map:link_label",
-        kind: "property-map"
-      });
-    }
     if (parkingLink && parkingLink.href) {
       guideLinks.push({
         href: parkingLink.href,
@@ -8811,22 +8816,18 @@
     }
     sections.forEach(function (sectionModel) {
       (sectionModel.blocks || []).forEach(function (blockModel) {
-        if (blockModel.linkHref) {
+        var blockMapLinkIsPrimary = !!(
+          blockModel.mapOpenUrl &&
+          blockModel.linkHref &&
+          normalizeHref(blockModel.mapOpenUrl) === normalizeHref(blockModel.linkHref)
+        );
+        if (blockModel.linkHref && !blockMapLinkIsPrimary) {
           guideLinks.push({
             href: blockModel.linkHref,
             label: blockModel.linkLabel || blockModel.linkHref,
             sourceNodeId: blockModel.id ? ("block:" + blockModel.id + ":link_label") : "",
             blockId: blockModel.id || "",
             kind: "block-link"
-          });
-        }
-        if (blockModel.mapExternalUrl) {
-          guideLinks.push({
-            href: blockModel.mapExternalUrl,
-            label: blockModel.linkLabel || blockModel.mapExternalUrl,
-            sourceNodeId: blockModel.id ? ("block:" + blockModel.id + ":link_label") : "",
-            blockId: blockModel.id || "",
-            kind: "block-map"
           });
         }
         collectStructuredContentLinks(
@@ -8862,24 +8863,17 @@
       lastReviewed: getFieldWithLabel("last_reviewed"),
       map: {
         title: getVisibleText(document.querySelector("[data-guide-map-title]")),
-        imageSrc: mapCard ? String(mapCard.getAttribute("data-guide-map-image") || "").trim() : "",
+        imageSrc: "",
         embedUrl: mapCard ? String(mapCard.getAttribute("data-guide-map-embed-url") || "").trim() : "",
         embedKind: mapCard ? String(mapCard.getAttribute("data-guide-map-kind") || "").trim() : "",
         linkHref: mapLinkHref,
         linkLabel: getVisibleText(mapLink),
-        latitude: propertyLatitude,
-        longitude: propertyLongitude,
-        zoom: parseNumericDataAttribute(mapCard, "data-guide-map-zoom") || 16,
-        attribution: mapCard ? String(mapCard.getAttribute("data-guide-map-attribution") || "").trim() : ""
-      },
-      parkingMap: {
-        linkHref: parkingLink ? parkingLink.href : "",
-        linkLabel: parkingLink ? parkingLink.label : "",
-        linkSourceNodeId: parkingLink ? parkingLink.sourceNodeId : "",
-        latitude: propertyLatitude,
-        longitude: propertyLongitude,
-        zoom: parseNumericDataAttribute(mapCard, "data-guide-map-parking-zoom") || 15,
-        attribution: mapCard ? String(mapCard.getAttribute("data-guide-map-attribution") || "").trim() : ""
+        pdfRepresentation: normalizePdfMapRepresentation(mapCard && mapCard.getAttribute("data-guide-map-pdf-representation")),
+        snapshotImageSrc: mapCard ? String(mapCard.getAttribute("data-guide-map-snapshot-image") || "").trim() : "",
+        snapshotSourceHash: mapCard ? String(mapCard.getAttribute("data-guide-map-source-hash") || "").trim() : "",
+        openUrl: normalizeHref(mapCard && mapCard.getAttribute("data-guide-map-open-url")),
+        pdfReasonCode: mapCard ? String(mapCard.getAttribute("data-guide-map-reason") || "").trim() : "",
+        isCustomGoogleMap: mapCard ? String(mapCard.getAttribute("data-guide-map-custom-google") || "") === "1" : false
       },
       contentsEntries: sections.map(function (sectionModel) {
         return {
@@ -9259,9 +9253,10 @@
     header.appendChild(heroTop);
     exportDocument.appendChild(header);
 
-    if (model.map.linkHref || model.map.imageSrc) {
+    if (model.map.linkHref || model.map.imageSrc || (model.map.qrEntries && model.map.qrEntries.length)) {
       var mapSection = document.createElement("section");
-      mapSection.className = "pi-export-map";
+      mapSection.className = "pi-export-map pi-export-map--" + String(model.map.mapAssetKind || "none").replace(/[^a-z0-9-]+/gi, "-");
+      mapSection.setAttribute("data-pdf-map-representation", String(model.map.mapAssetKind || "none"));
       setPdfSemantic(mapSection, "rect", "overview-map-panel");
       if (model.map.title) {
         var mapTitle = document.createElement("h2");
@@ -9289,10 +9284,26 @@
         mapSection.appendChild(overviewMapImage);
       }
 
+      if (model.map.qrEntries && model.map.qrEntries.length) {
+        var mapQrPanel = createPdfQrPanel(
+          document,
+          "",
+          model.map.qrEntries,
+          "pi-export-map-qr-panel"
+        );
+        if (mapQrPanel) {
+          var qrTitle = mapQrPanel.querySelector(".pi-export-panel-title");
+          if (qrTitle && qrTitle.parentNode) {
+            qrTitle.parentNode.removeChild(qrTitle);
+          }
+          mapSection.appendChild(mapQrPanel);
+        }
+      }
+
       var mapMeta = document.createElement("div");
       mapMeta.className = "pi-export-map-meta";
 
-      if (model.map.linkHref) {
+      if (model.map.linkHref && !(model.map.qrEntries && model.map.qrEntries.length)) {
         var mapLink = document.createElement("a");
         mapLink.href = model.map.linkHref;
         mapLink.target = "_blank";
@@ -9301,15 +9312,6 @@
         mapLink.setAttribute("data-export-source-id", "map:link_label");
         setPdfSemantic(mapLink, "text", "map-link", { linkHref: model.map.linkHref, fontWeight: 600 });
         mapMeta.appendChild(mapLink);
-      }
-
-      if (model.map.attribution && !model.map.imageSrc) {
-        var mapAttribution = document.createElement("span");
-        mapAttribution.className = "pi-export-map-attribution notranslate";
-        mapAttribution.textContent = model.map.attribution;
-        mapAttribution.setAttribute("translate", "no");
-        setPdfSemantic(mapAttribution, "text", "map-attribution", { fontWeight: 400 });
-        mapMeta.appendChild(mapAttribution);
       }
 
       if (mapMeta.childNodes.length) {
@@ -9350,48 +9352,6 @@
       sectionTitle.setAttribute("data-export-source-id", "section:" + sectionModel.anchor + ":title");
       setPdfSemantic(sectionTitle, "text", "section-title", { fontWeight: 700 });
       section.appendChild(sectionTitle);
-
-      if (
-        sectionModel.anchor === "parking" &&
-        model.parkingMap &&
-        model.parkingMap.imageSrc
-      ) {
-        var parkingMap = document.createElement("div");
-        parkingMap.className = "pi-export-parking-map";
-        parkingMap.setAttribute("data-pdf-section-item", "1");
-        setPdfSemantic(parkingMap, "rect", "parking-map-panel");
-
-        if (model.parkingMap.imageSrc) {
-          var parkingMapImage = createManagedImage(document, {
-              src: model.parkingMap.imageSrc,
-              alt: "",
-              className: "pi-export-map-image pi-export-map-image--parking",
-              frameClassName: "pi-export-image-frame pi-export-map-image-frame pi-export-map-image-frame--parking",
-              imageRole: "map",
-              placeholderClass: "pi-export-map-placeholder",
-              placeholderOnly: !!(model.parkingMap && model.parkingMap.mediaUnavailable),
-              placeholderText: model.parkingMap && model.parkingMap.mediaUnavailable
-                ? String((model.parkingMap.mediaUnavailable || {}).placeholderText || getGuideImageUnavailableText())
-                : ""
-            }, pendingImages);
-          setPdfSemantic(parkingMapImage, "image", "parking-map", { imageKind: "map" });
-          parkingMap.appendChild(parkingMapImage);
-        }
-
-        if (model.parkingMap.attribution && !model.parkingMap.imageSrc) {
-          var parkingMapMeta = document.createElement("div");
-          parkingMapMeta.className = "pi-export-map-meta";
-          var parkingAttribution = document.createElement("span");
-          parkingAttribution.className = "pi-export-map-attribution notranslate";
-          parkingAttribution.textContent = model.parkingMap.attribution;
-          parkingAttribution.setAttribute("translate", "no");
-          setPdfSemantic(parkingAttribution, "text", "map-attribution", { fontWeight: 400 });
-          parkingMapMeta.appendChild(parkingAttribution);
-          parkingMap.appendChild(parkingMapMeta);
-        }
-
-        section.appendChild(parkingMap);
-      }
 
       sectionModel.blocks.forEach(function (blockModel) {
         var card = document.createElement("article");
@@ -9512,7 +9472,14 @@
           footerRegion.appendChild(caption);
         }
 
-        if (blockModel.linkHref) {
+        var linkBelongsToQrMap = !!(
+          blockModel.mapAssetKind === "qr" &&
+          blockModel.mapOpenUrl &&
+          blockModel.linkHref &&
+          normalizeHref(blockModel.mapOpenUrl) === normalizeHref(blockModel.linkHref)
+        );
+
+        if (blockModel.linkHref && !linkBelongsToQrMap) {
           var linkWrap = document.createElement("p");
           linkWrap.className = "pi-export-card-link";
           var link = document.createElement("a");
@@ -9544,15 +9511,6 @@
             }
             footerRegion.appendChild(blockQrPanel);
           }
-        }
-
-        if (blockModel.mapAttribution && !blockModel.mapImageSrc) {
-          var blockMapAttribution = document.createElement("p");
-          blockMapAttribution.className = "pi-export-map-attribution notranslate";
-          blockMapAttribution.textContent = blockModel.mapAttribution;
-          blockMapAttribution.setAttribute("translate", "no");
-          setPdfSemantic(blockMapAttribution, "text", "map-attribution", { fontWeight: 400 });
-          footerRegion.appendChild(blockMapAttribution);
         }
 
         textColumn.appendChild(bodyRegion);
@@ -10246,17 +10204,9 @@
         required: true,
         sourceUrl: model.map.imageSrc,
         target: model.map,
-        targetKey: "propertyMap"
-      });
-    }
-
-    if (model.parkingMap && model.parkingMap.imageSrc) {
-      pushDescriptor({
-        mediaRole: "parking-map",
-        required: true,
-        sourceUrl: model.parkingMap.imageSrc,
-        target: model.parkingMap,
-        targetKey: "parkingMap"
+        targetKey: "imageSrc",
+        customGoogleMap: !!model.map.isCustomGoogleMap,
+        requestedRepresentation: model.map.pdfRepresentation || "none"
       });
     }
 
@@ -10283,6 +10233,8 @@
             sourceUrl: blockModel.mapImageSrc,
             target: blockModel,
             targetKey: "mapImageSrc",
+            customGoogleMap: !!blockModel.mapIsCustomGoogleMap,
+            requestedRepresentation: blockModel.mapPdfRepresentation || "none",
             sectionAnchor: sectionModel.anchor || "",
             sectionTitle: sectionModel.title || "",
             blockId: blockModel.id || "",
@@ -10337,6 +10289,13 @@
         required: descriptor.required,
         sourceType: descriptor.sourceType
       });
+      if (
+        descriptor.customGoogleMap &&
+        descriptor.requestedRepresentation === "snapshot" &&
+        applyCustomGoogleMapQrFallback(descriptor, reason)
+      ) {
+        return;
+      }
       if (policy.placeholderAllowed) {
         var warning = buildOptionalMediaWarning(descriptor, reason, policy);
         applyOptionalMediaFallback(descriptor, policy, warning);
@@ -10350,102 +10309,6 @@
       uniqueImageCount: uniqueEntries.length,
       optionalMediaWarnings: trimWarningCollection(optionalMediaWarnings, 20)
     };
-  }
-
-  function getMapSnapshotCacheKey(mapConfig) {
-    return [
-      Number(mapConfig.centerLongitude != null ? mapConfig.centerLongitude : mapConfig.longitude).toFixed(6),
-      Number(mapConfig.centerLatitude != null ? mapConfig.centerLatitude : mapConfig.latitude).toFixed(6),
-      Number(mapConfig.markerLongitude != null ? mapConfig.markerLongitude : mapConfig.longitude).toFixed(6),
-      Number(mapConfig.markerLatitude != null ? mapConfig.markerLatitude : mapConfig.latitude).toFixed(6),
-      String(mapConfig.zoom || 16),
-      String(mapConfig.width || 760),
-      String(mapConfig.height || 300),
-      OPEN_STREET_MAP_TILE_TEMPLATE,
-      getCurrentPdfLayoutVersion()
-    ].join("::");
-  }
-
-  function getMapDiagnosticsStore() {
-    window.__propertyInstructionLastMapDiagnostics = window.__propertyInstructionLastMapDiagnostics || {
-      maps: []
-    };
-    return window.__propertyInstructionLastMapDiagnostics;
-  }
-
-  function pushMapDiagnostic(diagnostic) {
-    var diagnosticsStore = getMapDiagnosticsStore();
-    diagnosticsStore.maps.push(diagnostic);
-    diagnosticsStore.maps = diagnosticsStore.maps.slice(-20);
-  }
-
-  function createMapMarkerCanvas() {
-    var markerCanvas = document.createElement("canvas");
-    markerCanvas.width = 34;
-    markerCanvas.height = 46;
-    var ctx = markerCanvas.getContext("2d");
-    ctx.fillStyle = "#115e59";
-    ctx.beginPath();
-    ctx.arc(17, 14, 11, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.beginPath();
-    ctx.moveTo(17, 42);
-    ctx.lineTo(8, 20);
-    ctx.lineTo(26, 20);
-    ctx.closePath();
-    ctx.fill();
-    ctx.fillStyle = "#ffffff";
-    ctx.beginPath();
-    ctx.arc(17, 14, 4.5, 0, Math.PI * 2);
-    ctx.fill();
-    return markerCanvas;
-  }
-
-  function drawMapAttribution(targetContext, width, mapHeight, attribution) {
-    targetContext.fillStyle = "#ffffff";
-    targetContext.fillRect(0, mapHeight, width, 28);
-    targetContext.fillStyle = "#475569";
-    targetContext.font = "12px Inter, Arial, sans-serif";
-    targetContext.textBaseline = "middle";
-    targetContext.fillText(attribution, 12, mapHeight + 14);
-  }
-
-  function buildMapSnapshotDataUri(mapCanvas, mapConfig) {
-    var exportCanvas = document.createElement("canvas");
-    exportCanvas.width = mapConfig.width;
-    exportCanvas.height = mapConfig.height + 28;
-    var ctx = exportCanvas.getContext("2d");
-    ctx.fillStyle = "#ffffff";
-    ctx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
-    ctx.drawImage(mapCanvas, 0, 0, mapConfig.width, mapConfig.height);
-
-    var markerCanvas = createMapMarkerCanvas();
-    var markerX = Math.round(Number(mapConfig.projectedMarkerX || 0) - (markerCanvas.width / 2));
-    var markerY = Math.round(Number(mapConfig.projectedMarkerY || 0) - (markerCanvas.height - 4));
-    ctx.drawImage(markerCanvas, markerX, markerY);
-    drawMapAttribution(ctx, exportCanvas.width, mapConfig.height, mapConfig.attribution);
-
-    return exportCanvas.toDataURL("image/png");
-  }
-
-  function projectLongitudeToWorldX(longitude, zoomLevel) {
-    var scale = 256 * Math.pow(2, zoomLevel);
-    return ((longitude + 180) / 360) * scale;
-  }
-
-  function projectLatitudeToWorldY(latitude, zoomLevel) {
-    var sinLatitude = Math.sin((latitude * Math.PI) / 180);
-    var scale = 256 * Math.pow(2, zoomLevel);
-    return (
-      (0.5 - (Math.log((1 + sinLatitude) / (1 - sinLatitude)) / (4 * Math.PI))) * scale
-    );
-  }
-
-  function buildOpenStreetMapTileUrl(zoomLevel, tileX, tileY) {
-    return OPEN_STREET_MAP_TILE_TEMPLATE
-      .replace("{z}", String(zoomLevel))
-      .replace("{x}", String(tileX))
-      .replace("{y}", String(tileY));
   }
 
   function loadImageFromDataUri(dataUri) {
@@ -10470,213 +10333,38 @@
     });
   }
 
-  async function getOrCreateDecodedTileImage(tileUrl, exportImageDataCache, decodedTileImageCache) {
-    if (!decodedTileImageCache.has(tileUrl)) {
-      decodedTileImageCache.set(tileUrl, (async function () {
-        var tileDataUri = await getExportImageDataUri(tileUrl, exportImageDataCache);
-        return loadImageFromDataUri(tileDataUri);
-      })());
+  function buildMainCustomMapQrEntries(model) {
+    var mapModel = model && model.map ? model.map : null;
+    if (!mapModel || !shouldUseQrForCustomMap(mapModel.finalPdfRepresentation || mapModel.pdfRepresentation, mapModel.isCustomGoogleMap)) {
+      return [];
     }
-    return decodedTileImageCache.get(tileUrl);
+    if (!mapModel.openUrl) {
+      return [];
+    }
+    return [{
+      kind: "property-map",
+      label: mapModel.linkLabel || "Open in Google Maps",
+      linkHref: mapModel.openUrl,
+      sourceNodeId: "map:link_label",
+      payload: mapModel.openUrl
+    }];
   }
 
-  function sampleCanvasPaintStats(sourceCanvas) {
-    if (!sourceCanvas || !sourceCanvas.width || !sourceCanvas.height) {
-      return {
-        width: 0,
-        height: 0,
-        variance: 0,
-        nonWhiteRatio: 0,
-        painted: false
-      };
+  function buildBlockCustomMapQrEntries(blockModel) {
+    if (!blockModel || !shouldUseQrForCustomMap(blockModel.finalPdfRepresentation || blockModel.mapPdfRepresentation, blockModel.mapIsCustomGoogleMap)) {
+      return [];
     }
-
-    var sampleWidth = Math.max(1, Math.min(sourceCanvas.width, 160));
-    var sampleHeight = Math.max(1, Math.min(sourceCanvas.height, 120));
-    var analysisCanvas = document.createElement("canvas");
-    analysisCanvas.width = sampleWidth;
-    analysisCanvas.height = sampleHeight;
-    var analysisContext = analysisCanvas.getContext("2d", { willReadFrequently: true });
-    if (!analysisContext) {
-      return {
-        width: sourceCanvas.width,
-        height: sourceCanvas.height,
-        variance: 0,
-        nonWhiteRatio: 0,
-        painted: false
-      };
+    if (!blockModel.mapOpenUrl) {
+      return [];
     }
-
-    analysisContext.drawImage(sourceCanvas, 0, 0, sampleWidth, sampleHeight);
-    var imageData = analysisContext.getImageData(0, 0, sampleWidth, sampleHeight).data;
-    var pixelCount = imageData.length / 4;
-    var sum = 0;
-    var sumSquares = 0;
-    var nonWhiteCount = 0;
-    for (var index = 0; index < imageData.length; index += 4) {
-      var red = imageData[index];
-      var green = imageData[index + 1];
-      var blue = imageData[index + 2];
-      var luminance = (0.2126 * red) + (0.7152 * green) + (0.0722 * blue);
-      sum += luminance;
-      sumSquares += luminance * luminance;
-      if (red < 250 || green < 250 || blue < 250) {
-        nonWhiteCount += 1;
-      }
-    }
-
-    var mean = pixelCount ? (sum / pixelCount) : 0;
-    var variance = pixelCount ? Math.max(0, (sumSquares / pixelCount) - (mean * mean)) : 0;
-    var nonWhiteRatio = pixelCount ? (nonWhiteCount / pixelCount) : 0;
-
-    return {
-      width: sourceCanvas.width,
-      height: sourceCanvas.height,
-      variance: Number(variance.toFixed(3)),
-      nonWhiteRatio: Number(nonWhiteRatio.toFixed(4)),
-      painted: variance > 8 || (nonWhiteRatio > 0.05 && nonWhiteRatio < 0.98)
-    };
-  }
-
-  async function renderStaticMapSnapshot(mapConfig, exportImageDataCache) {
-    if (!mapConfig || !Number.isFinite(mapConfig.latitude) || !Number.isFinite(mapConfig.longitude)) {
-      throw new Error("map-coordinates-missing");
-    }
-    var centerLatitude = Number.isFinite(mapConfig.centerLatitude) ? mapConfig.centerLatitude : mapConfig.latitude;
-    var centerLongitude = Number.isFinite(mapConfig.centerLongitude) ? mapConfig.centerLongitude : mapConfig.longitude;
-    var markerLatitude = Number.isFinite(mapConfig.markerLatitude) ? mapConfig.markerLatitude : centerLatitude;
-    var markerLongitude = Number.isFinite(mapConfig.markerLongitude) ? mapConfig.markerLongitude : centerLongitude;
-    var diagnostic = {
-      kind: mapConfig.kind,
-      centerLatitude: Number(centerLatitude.toFixed(6)),
-      centerLongitude: Number(centerLongitude.toFixed(6)),
-      markerLatitude: Number(markerLatitude.toFixed(6)),
-      markerLongitude: Number(markerLongitude.toFixed(6)),
-      markerCoordinateSource: mapConfig.markerCoordinateSource || "",
-      zoom: mapConfig.zoom,
-      style: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
-      width: mapConfig.width,
-      height: mapConfig.height,
-      startedAt: Date.now(),
-      events: [],
-      code: ""
-    };
-
-    try {
-      var tileCanvas = document.createElement("canvas");
-      tileCanvas.width = mapConfig.width;
-      tileCanvas.height = mapConfig.height;
-      var tileContext = tileCanvas.getContext("2d");
-      if (!tileContext) {
-        throw new Error("map-canvas-export-failed");
-      }
-      tileContext.fillStyle = "#eef2f4";
-      tileContext.fillRect(0, 0, mapConfig.width, mapConfig.height);
-
-      var zoomLevel = Math.max(0, Math.min(19, Math.round(mapConfig.zoom || 16)));
-      var worldX = projectLongitudeToWorldX(centerLongitude, zoomLevel);
-      var worldY = projectLatitudeToWorldY(centerLatitude, zoomLevel);
-      var leftWorldX = worldX - (mapConfig.width / 2);
-      var topWorldY = worldY - (mapConfig.height / 2);
-      var startTileX = Math.floor(leftWorldX / 256);
-      var endTileX = Math.floor((leftWorldX + mapConfig.width - 1) / 256);
-      var startTileY = Math.floor(topWorldY / 256);
-      var endTileY = Math.floor((topWorldY + mapConfig.height - 1) / 256);
-      var maxTileIndex = Math.pow(2, zoomLevel);
-      var tileRequests = [];
-
-      for (var tileY = startTileY; tileY <= endTileY; tileY += 1) {
-        if (tileY < 0 || tileY >= maxTileIndex) {
-          continue;
-        }
-        for (var tileX = startTileX; tileX <= endTileX; tileX += 1) {
-          var wrappedTileX = ((tileX % maxTileIndex) + maxTileIndex) % maxTileIndex;
-          tileRequests.push({
-            tileX: tileX,
-            tileY: tileY,
-            wrappedTileX: wrappedTileX,
-            url: buildOpenStreetMapTileUrl(zoomLevel, wrappedTileX, tileY)
-          });
-        }
-      }
-
-      diagnostic.events.push({
-        type: "tile-grid",
-        timestamp: Date.now(),
-        tileCount: tileRequests.length,
-        zoom: zoomLevel
-      });
-
-      await Promise.all(tileRequests.map(async function (tileRequest) {
-        var resolvedTileUrl = resolveExportImageUrl(tileRequest.url);
-        if (!resolvedTileUrl) {
-          throw new Error("map-tile-load-failed");
-        }
-        var tileImage = await getOrCreateDecodedTileImage(
-          resolvedTileUrl,
-          exportImageDataCache,
-          pdfPreparationState.decodedTileImageCache
-        );
-        var drawX = Math.round((tileRequest.tileX * 256) - leftWorldX);
-        var drawY = Math.round((tileRequest.tileY * 256) - topWorldY);
-        tileContext.drawImage(tileImage, drawX, drawY, 256, 256);
-      }));
-
-      var renderedMap = {
-        canvas: tileCanvas,
-        paintStats: sampleCanvasPaintStats(tileCanvas)
-      };
-      if (!renderedMap.paintStats.painted) {
-        throw new Error("map-render-timeout");
-      }
-
-      var markerWorldX = projectLongitudeToWorldX(markerLongitude, zoomLevel);
-      var markerWorldY = projectLatitudeToWorldY(markerLatitude, zoomLevel);
-      var projectedMarkerX = markerWorldX - leftWorldX;
-      var projectedMarkerY = markerWorldY - topWorldY;
-      diagnostic.projectedMarkerX = Number(projectedMarkerX.toFixed(2));
-      diagnostic.projectedMarkerY = Number(projectedMarkerY.toFixed(2));
-      diagnostic.markerInsideCanvas = projectedMarkerX >= 0
-        && projectedMarkerX <= mapConfig.width
-        && projectedMarkerY >= 0
-        && projectedMarkerY <= mapConfig.height;
-      if (!diagnostic.markerInsideCanvas) {
-        throw new Error("map-marker-outside-canvas");
-      }
-
-      var dataUri = buildMapSnapshotDataUri(tileCanvas, Object.assign({}, mapConfig, {
-        projectedMarkerX: projectedMarkerX,
-        projectedMarkerY: projectedMarkerY,
-        attribution: mapConfig.attribution || "© OpenStreetMap contributors"
-      }));
-      diagnostic.finishedAt = Date.now();
-      diagnostic.durationMs = diagnostic.finishedAt - diagnostic.startedAt;
-      diagnostic.code = "ok";
-      diagnostic.paintStats = renderedMap.paintStats;
-      pushMapDiagnostic(diagnostic);
-      return {
-        dataUri: dataUri,
-        attribution: mapConfig.attribution || "© OpenStreetMap contributors",
-        durationMs: diagnostic.durationMs
-      };
-    } catch (error) {
-      diagnostic.finishedAt = Date.now();
-      diagnostic.durationMs = diagnostic.finishedAt - diagnostic.startedAt;
-      diagnostic.code = error && error.message ? error.message : "map-render-failed";
-      if (error && error.lastPaintStats) {
-        diagnostic.paintStats = error.lastPaintStats;
-      }
-      pushMapDiagnostic(diagnostic);
-      throw error;
-    }
-  }
-
-  async function getOrCreateMapSnapshot(mapConfig, mapImageCache, exportImageDataCache) {
-    var cacheKey = getMapSnapshotCacheKey(mapConfig);
-    if (!mapImageCache.has(cacheKey)) {
-      mapImageCache.set(cacheKey, renderStaticMapSnapshot(mapConfig, exportImageDataCache));
-    }
-    return mapImageCache.get(cacheKey);
+    return [{
+      kind: "block-map",
+      label: blockModel.linkLabel || "Open in Google Maps",
+      linkHref: blockModel.mapOpenUrl,
+      sourceNodeId: blockModel.id ? ("block:" + blockModel.id + ":link_label") : "",
+      blockId: blockModel.id || "",
+      payload: blockModel.mapOpenUrl
+    }];
   }
 
   function buildQuickAccessEntries(model) {
@@ -10690,21 +10378,6 @@
         linkHref: "",
         sourceNodeId: (model.wifiName && model.wifiName.valueNodeId) || "",
         payload: wifiPayload
-      });
-    }
-
-    var propertyMapIndex = remainingLinks.findIndex(function (entry) {
-      return entry.kind === "property-map";
-    });
-    if (propertyMapIndex !== -1) {
-      var propertyMapEntry = remainingLinks.splice(propertyMapIndex, 1)[0];
-      quickEntries.push({
-        kind: propertyMapEntry.kind,
-        label: propertyMapEntry.label,
-        linkHref: propertyMapEntry.href,
-        sourceNodeId: propertyMapEntry.sourceNodeId || "",
-        blockId: propertyMapEntry.blockId || "",
-        payload: propertyMapEntry.href
       });
     }
 
@@ -10749,66 +10422,78 @@
 
     (model.sections || []).forEach(function (sectionModel) {
       (sectionModel.blocks || []).forEach(function (blockModel) {
-        blockModel.qrEntries = (blockEntryMap[blockModel.id] || []).slice();
+        var mapEntries = buildBlockCustomMapQrEntries(blockModel).map(function (entry) {
+          return Object.assign({}, entry, {
+            qrImageSrc: getOrCreateQrImageDataUri(entry.payload, qrImageCache)
+          });
+        });
+        blockModel.qrEntries = mapEntries.concat((blockEntryMap[blockModel.id] || []).slice());
       });
     });
   }
 
-  async function prepareGuideModelAssets(model, exportImageDataCache, mapImageCache) {
+  function deriveMapPdfFinalCode(target) {
+    if (!target) {
+      return "";
+    }
+    if (target.mapAssetKind === "snapshot") {
+      return "snapshot-ready";
+    }
+    if (target.mapAssetKind === "qr" && target.pdfFinalCode) {
+      return target.pdfFinalCode;
+    }
+    if (target.isCustomGoogleMap || target.mapIsCustomGoogleMap) {
+      if (target.pdfReasonCode === "stale-hash") {
+        return "snapshot-stale-qr-used";
+      }
+      if (target.pdfReasonCode === "missing-file" || target.pdfReasonCode === "wrong-owner") {
+        return "snapshot-missing-qr-used";
+      }
+      return "qr-requested";
+    }
+    return "not-custom";
+  }
+
+  async function prepareGuideModelAssets(model, exportImageDataCache) {
     var preparedModel = deepCloneModel(model);
-    var imageDiagnostics = await prewarmImageDataCacheForModel(preparedModel, exportImageDataCache);
-    var optionalMediaWarnings = Array.isArray(imageDiagnostics && imageDiagnostics.optionalMediaWarnings)
-      ? imageDiagnostics.optionalMediaWarnings.slice()
-      : [];
+    var imageDiagnostics = null;
+    var optionalMediaWarnings = [];
     var mapStartedAt = Date.now();
     var mapRenderPlan = {
-      propertyMap: !!(preparedModel.map && Number.isFinite(preparedModel.map.latitude) && Number.isFinite(preparedModel.map.longitude)),
-      parkingMap: false,
+      propertyMap: false,
       blockMapIds: []
     };
     var mapDiagnostics = {
       plan: mapRenderPlan,
       propertyMap: null,
-      parkingMap: null,
       blockMaps: []
     };
 
+    preparedModel.map.qrEntries = buildMainCustomMapQrEntries(preparedModel);
+    preparedModel.map.finalPdfRepresentation = preparedModel.map.pdfRepresentation || "none";
+
     try {
-      if (Number.isFinite(preparedModel.map.latitude) && Number.isFinite(preparedModel.map.longitude)) {
-        var propertyMapSnapshot = await getOrCreateMapSnapshot({
-          kind: "property",
-          latitude: preparedModel.map.latitude,
-          longitude: preparedModel.map.longitude,
-          centerLatitude: preparedModel.map.latitude,
-          centerLongitude: preparedModel.map.longitude,
-          markerLatitude: preparedModel.map.latitude,
-          markerLongitude: preparedModel.map.longitude,
-          markerCoordinateSource: preparedModel.map.coordinateSource || "property_center",
-          zoom: preparedModel.map.zoom || 16,
-          width: 760,
-          height: 220,
-          attribution: "© OpenStreetMap contributors"
-        }, mapImageCache, exportImageDataCache);
-        preparedModel.map.imageSrc = propertyMapSnapshot.dataUri;
-        preparedModel.map.attribution = propertyMapSnapshot.attribution || preparedModel.map.attribution;
-        mapDiagnostics.propertyMap = {
-          code: "ok",
-          durationMs: propertyMapSnapshot.durationMs || 0,
-          image: summarizeDiagnosticImageSource(propertyMapSnapshot.dataUri, "map")
-        };
+      if (preparedModel.map.isCustomGoogleMap) {
+        if (
+          preparedModel.map.pdfRepresentation === "snapshot" &&
+          preparedModel.map.snapshotImageSrc
+        ) {
+          preparedModel.map.imageSrc = preparedModel.map.snapshotImageSrc;
+          preparedModel.map.mapAssetKind = "snapshot";
+          preparedModel.map.finalPdfRepresentation = "snapshot";
+        } else {
+          preparedModel.map.imageSrc = "";
+          preparedModel.map.mapAssetKind = "qr";
+          preparedModel.map.finalPdfRepresentation = "qr";
+          preparedModel.map.qrEntries = buildMainCustomMapQrEntries(preparedModel);
+        }
+      } else {
+        preparedModel.map.imageSrc = "";
+        preparedModel.map.mapAssetKind = "none";
+        preparedModel.map.finalPdfRepresentation = "none";
       }
     } catch (error) {
       mapDiagnostics.propertyMap = {
-        code: error && error.message ? error.message : "map-render-failed"
-      };
-    }
-
-    try {
-      mapDiagnostics.parkingMap = {
-        code: "omitted-by-render-plan"
-      };
-    } catch (error) {
-      mapDiagnostics.parkingMap = {
         code: error && error.message ? error.message : "map-render-failed"
       };
     }
@@ -10817,56 +10502,110 @@
       var sectionModel = preparedModel.sections[sectionIndex];
       for (var blockIndex = 0; blockIndex < sectionModel.blocks.length; blockIndex += 1) {
         var blockModel = sectionModel.blocks[blockIndex];
-        if (!blockModel.mapEmbedUrl && !Number.isFinite(blockModel.mapLatitude) && !Number.isFinite(blockModel.mapLongitude)) {
+        if (!blockModel.mapEmbedUrl && !blockModel.mapOpenUrl) {
           continue;
         }
-        if (Number.isFinite(blockModel.mapLatitude) && Number.isFinite(blockModel.mapLongitude)) {
-          mapRenderPlan.blockMapIds.push(blockModel.id);
-          try {
-            var blockMapSnapshot = await getOrCreateMapSnapshot({
-              kind: "block-" + (blockModel.id || "map"),
-              latitude: blockModel.mapLatitude,
-              longitude: blockModel.mapLongitude,
-              centerLatitude: Number.isFinite(blockModel.mapCenterLatitude) ? blockModel.mapCenterLatitude : blockModel.mapLatitude,
-              centerLongitude: Number.isFinite(blockModel.mapCenterLongitude) ? blockModel.mapCenterLongitude : blockModel.mapLongitude,
-              markerLatitude: Number.isFinite(blockModel.mapMarkerLatitude) ? blockModel.mapMarkerLatitude : blockModel.mapLatitude,
-              markerLongitude: Number.isFinite(blockModel.mapMarkerLongitude) ? blockModel.mapMarkerLongitude : blockModel.mapLongitude,
-              markerCoordinateSource: blockModel.mapCoordinateSource || "fallback_center_as_marker",
-              zoom: blockModel.mapZoom || 16,
-              width: 760,
-              height: 280,
-              attribution: blockModel.mapAttribution || "© OpenStreetMap contributors"
-            }, mapImageCache, exportImageDataCache);
-            blockModel.mapImageSrc = blockMapSnapshot.dataUri;
-            blockModel.mapAttribution = blockMapSnapshot.attribution || blockModel.mapAttribution;
-            mapDiagnostics.blockMaps.push({
-              blockId: blockModel.id,
-              code: "ok",
-              durationMs: blockMapSnapshot.durationMs || 0,
-              image: summarizeDiagnosticImageSource(blockMapSnapshot.dataUri, "map")
-            });
-          } catch (error) {
-            mapDiagnostics.blockMaps.push({
-              blockId: blockModel.id,
-              code: error && error.message ? error.message : "block-map-render-failed"
-            });
+        blockModel.qrEntries = buildBlockCustomMapQrEntries(blockModel);
+        blockModel.finalPdfRepresentation = blockModel.mapPdfRepresentation || "none";
+        if (blockModel.mapIsCustomGoogleMap) {
+          if (
+            blockModel.mapPdfRepresentation === "snapshot" &&
+            blockModel.mapSnapshotImageSrc
+          ) {
+            blockModel.mapImageSrc = blockModel.mapSnapshotImageSrc;
+            blockModel.mapAssetKind = "snapshot";
+            blockModel.finalPdfRepresentation = "snapshot";
+          } else {
+            blockModel.mapImageSrc = "";
+            blockModel.mapAssetKind = "qr";
+            blockModel.finalPdfRepresentation = "qr";
+            blockModel.qrEntries = buildBlockCustomMapQrEntries(blockModel);
           }
+          mapDiagnostics.blockMaps.push({
+            blockId: blockModel.id,
+            requestedRepresentation: blockModel.mapPdfRepresentation || "none",
+            finalRepresentation: blockModel.finalPdfRepresentation || "none",
+            mapKind: blockModel.mapEmbedKind || "",
+            sourceHash: blockModel.mapSnapshotSourceHash || "",
+            code: deriveMapPdfFinalCode(blockModel)
+          });
           continue;
         }
+        blockModel.mapImageSrc = "";
+        blockModel.mapAssetKind = "none";
+        blockModel.finalPdfRepresentation = "none";
         mapDiagnostics.blockMaps.push({
           blockId: blockModel.id,
-          code: "block-map-coordinates-missing"
+          requestedRepresentation: blockModel.mapPdfRepresentation || "none",
+          finalRepresentation: "none",
+          mapKind: blockModel.mapEmbedKind || "",
+          sourceHash: blockModel.mapSnapshotSourceHash || "",
+          code: deriveMapPdfFinalCode(blockModel)
         });
       }
     }
 
+    if (!mapDiagnostics.propertyMap) {
+      mapDiagnostics.propertyMap = {
+        requestedRepresentation: preparedModel.map.pdfRepresentation || "none",
+        finalRepresentation: preparedModel.map.finalPdfRepresentation || preparedModel.map.pdfRepresentation || "none",
+        mapKind: preparedModel.map.embedKind || "",
+        sourceHash: preparedModel.map.snapshotSourceHash || "",
+        code: deriveMapPdfFinalCode(preparedModel.map)
+      };
+    }
+
+    imageDiagnostics = await prewarmImageDataCacheForModel(preparedModel, exportImageDataCache);
+    optionalMediaWarnings = Array.isArray(imageDiagnostics && imageDiagnostics.optionalMediaWarnings)
+      ? imageDiagnostics.optionalMediaWarnings.slice()
+      : [];
+    mapDiagnostics.propertyMap = Object.assign({}, mapDiagnostics.propertyMap || {}, {
+      requestedRepresentation: preparedModel.map.pdfRepresentation || "none",
+      finalRepresentation: preparedModel.map.finalPdfRepresentation || preparedModel.map.pdfRepresentation || "none",
+      mapKind: preparedModel.map.embedKind || "",
+      sourceHash: preparedModel.map.snapshotSourceHash || "",
+      imageLoadCode: preparedModel.map.imageLoadCode || "ok",
+      code: deriveMapPdfFinalCode(preparedModel.map)
+    });
+    mapDiagnostics.blockMaps = (preparedModel.sections || []).reduce(function (entries, sectionModel) {
+      (sectionModel.blocks || []).forEach(function (blockModel) {
+        if (!blockModel.mapEmbedUrl && !blockModel.mapImageSrc && !blockModel.mapOpenUrl) {
+          return;
+        }
+        entries.push({
+          blockId: blockModel.id,
+          requestedRepresentation: blockModel.mapPdfRepresentation || "none",
+          finalRepresentation: blockModel.finalPdfRepresentation || blockModel.mapPdfRepresentation || "none",
+          mapKind: blockModel.mapEmbedKind || "",
+          sourceHash: blockModel.mapSnapshotSourceHash || "",
+          imageLoadCode: blockModel.imageLoadCode || "ok",
+          code: deriveMapPdfFinalCode(blockModel)
+        });
+      });
+      return entries;
+    }, []);
+
     var qrStartedAt = Date.now();
     var qrEntries = buildQuickAccessEntries(preparedModel);
+    var needsQrLibrary =
+      !!qrEntries.quickAccessEntries.length ||
+      !!qrEntries.remainingLinkEntries.length ||
+      !!((preparedModel.map.qrEntries || []).length) ||
+      (preparedModel.sections || []).some(function (sectionModel) {
+        return (sectionModel.blocks || []).some(function (blockModel) {
+          return !!((blockModel.qrEntries || []).length);
+        });
+      });
+    if (needsQrLibrary) {
+      await ensureQrCodeLibrary();
+    }
     preparedModel.quickAccessEntries = assignQrImagesToEntries(qrEntries.quickAccessEntries, pdfPreparationState.qrImageCache);
+    preparedModel.map.qrEntries = assignQrImagesToEntries(preparedModel.map.qrEntries || [], pdfPreparationState.qrImageCache);
     attachBlockQrEntries(preparedModel, qrEntries.remainingLinkEntries, pdfPreparationState.qrImageCache);
     var qrDiagnostics = {
       quickAccessCount: preparedModel.quickAccessEntries.length,
-      blockQrCount: qrEntries.remainingLinkEntries.length
+      blockQrCount: qrEntries.remainingLinkEntries.length,
+      propertyMapQrCount: (preparedModel.map.qrEntries || []).length
     };
 
     return {
@@ -10911,13 +10650,18 @@
       }
 
       var model = extractGuideModel();
-      if (buildWifiQrPayload(model) || (model.guideLinks || []).length) {
+      var needsCustomMapQr = shouldUseQrForCustomMap(model.map && model.map.pdfRepresentation, model.map && model.map.isCustomGoogleMap)
+        || (model.sections || []).some(function (sectionModel) {
+          return (sectionModel.blocks || []).some(function (blockModel) {
+            return shouldUseQrForCustomMap(blockModel.mapPdfRepresentation, blockModel.mapIsCustomGoogleMap);
+          });
+        });
+      if (buildWifiQrPayload(model) || (model.guideLinks || []).length || needsCustomMapQr) {
         await ensureQrCodeLibrary();
       }
       var preparedAssets = await prepareGuideModelAssets(
         model,
-        pdfPreparationState.imageDataCache,
-        pdfPreparationState.mapImageCache
+        pdfPreparationState.imageDataCache
       );
 
       var preparedState = {

@@ -3,11 +3,13 @@
 # For license information, please see license.txt
 
 from __future__ import unicode_literals
-from frappe.utils.nestedset import NestedSet
-from frappe.website.page_renderers.document_page import DocumentPage
+
 import frappe
 import re
 from urllib.parse import unquote
+
+from frappe.utils.nestedset import NestedSet
+from frappe.website.page_renderers.document_page import DocumentPage
 from frappe.utils.caching import redis_cache
 from frappe.website.path_resolver import evaluate_dynamic_routes
 from frappe.website.path_resolver import resolve_path as original_resolve_path
@@ -394,7 +396,6 @@ def get_web_pages_with_dynamic_routes() -> dict[str, str]:
 
 
 def resolve_path(path):
-    print(path)
     try:
         if find_page_with_path(path):
             return path

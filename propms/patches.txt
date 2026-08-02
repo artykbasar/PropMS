@@ -1,1 +1,5 @@
+[pre_model_sync]
 propms.patches.v1_0.remove_property_instruction_translation_doctypes
+
+[post_model_sync]
+propms.patches.v1_0.migrate_google_maps_embed_html_to_custom_map_embed_url
