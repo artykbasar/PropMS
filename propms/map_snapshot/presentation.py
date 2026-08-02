@@ -5,8 +5,9 @@ import json
 from dataclasses import asdict, dataclass
 
 
-MY_MAPS_HEADER_CROP_PX = 60
-MY_MAPS_PRESENTATION_VERSION = 1
+MY_MAPS_HEADER_CROP_PX = 68
+MY_MAPS_BOTTOM_OVERSCAN_PX = 2
+MY_MAPS_PRESENTATION_VERSION = 2
 
 CAPTURE_VISIBLE_WIDTH_CSS_PX = 1047
 CAPTURE_VISIBLE_HEIGHT_CSS_PX = 590
@@ -25,6 +26,7 @@ CAPTURE_TEMPLATE_VERSION = 1
 class MapPresentation:
 	map_kind: str
 	crop_px: int
+	bottom_overscan_px: int
 	presentation_version: int
 	visible_width_css_px: int
 	visible_height_css_px: int
@@ -40,6 +42,7 @@ class MapPresentation:
 			"embed_url": (embed_url or "").strip(),
 			"map_kind": self.map_kind,
 			"crop_px": self.crop_px,
+			"bottom_overscan_px": self.bottom_overscan_px,
 			"presentation_version": self.presentation_version,
 			"visible_width_css_px": self.visible_width_css_px,
 			"visible_height_css_px": self.visible_height_css_px,
@@ -55,6 +58,7 @@ class MapPresentation:
 STANDARD_MAP_PRESENTATION = MapPresentation(
 	map_kind="google-maps",
 	crop_px=0,
+	bottom_overscan_px=0,
 	presentation_version=0,
 	visible_width_css_px=CAPTURE_VISIBLE_WIDTH_CSS_PX,
 	visible_height_css_px=CAPTURE_VISIBLE_HEIGHT_CSS_PX,
@@ -68,6 +72,7 @@ STANDARD_MAP_PRESENTATION = MapPresentation(
 MY_MAPS_PRESENTATION = MapPresentation(
 	map_kind="google-my-maps",
 	crop_px=MY_MAPS_HEADER_CROP_PX,
+	bottom_overscan_px=MY_MAPS_BOTTOM_OVERSCAN_PX,
 	presentation_version=MY_MAPS_PRESENTATION_VERSION,
 	visible_width_css_px=CAPTURE_VISIBLE_WIDTH_CSS_PX,
 	visible_height_css_px=CAPTURE_VISIBLE_HEIGHT_CSS_PX,
@@ -120,6 +125,7 @@ def get_map_presentation_context(map_kind: str | None) -> dict[str, object]:
 		"map_kind": presentation.map_kind,
 		"map_kind_class": get_map_kind_class(presentation.map_kind),
 		"my_maps_header_crop_px": presentation.crop_px,
+		"my_maps_bottom_overscan_px": presentation.bottom_overscan_px,
 		"my_maps_presentation_version": presentation.presentation_version,
 		"capture_visible_width_css_px": presentation.visible_width_css_px,
 		"capture_visible_height_css_px": presentation.visible_height_css_px,

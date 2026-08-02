@@ -50,6 +50,18 @@ class TestMapSnapshotCapture(PropertyInstructionTestMixin, FrappeTestCase):
 		self.assertIn('id="map-capture"', html)
 		self.assertNotIn('title="Direct  "quoted"', html)
 
+	def test_capture_wrapper_uses_absolute_geometry_without_transform(self):
+		doc = self.make_instruction(
+			title="Geometry wrapper",
+			custom_map_embed_url=self.MY_MAPS_EMBED_URL,
+		)
+		resolved = resolve_capture_map(CaptureMapReference(property_instruction=doc.name, map_key="property-location"))
+		html = render_capture_document_html(resolved)
+		self.assertIn("position: absolute;", html)
+		self.assertIn("--pi-my-maps-bottom-overscan: 2px;", html)
+		self.assertIn("var(--pi-my-maps-bottom-overscan)", html)
+		self.assertNotIn("transform: translateY", html)
+
 	def test_document_wrapper_supports_unicode_and_large_safe_titles(self):
 		doc = self.make_instruction(
 			title="Привет 地図 " + ("A" * 96),
@@ -155,3 +167,13 @@ class TestMapSnapshotCapture(PropertyInstructionTestMixin, FrappeTestCase):
 		self.assertEqual(result.map_kind, "google-my-maps")
 		hosts = {entry["url"]["host"] for entry in result.cleanup_diagnostics.get("network_trace", []) if entry["url"]["host"]}
 		self.assertNotIn("development.localhost", hosts)
+
+	def test_standard_capture_wrapper_has_no_my_maps_crop_class(self):
+		doc = self.make_instruction(
+			title="Standard geometry wrapper",
+			custom_map_embed_url=self.STANDARD_EMBED_URL,
+		)
+		resolved = resolve_capture_map(CaptureMapReference(property_instruction=doc.name, map_key="property-location"))
+		html = render_capture_document_html(resolved)
+		self.assertIn('class="custom-map-frame custom-map-frame--google-maps"', html)
+		self.assertIn("--pi-my-maps-bottom-overscan: 0px;", html)

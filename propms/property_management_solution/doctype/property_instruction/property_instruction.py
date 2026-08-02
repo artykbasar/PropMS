@@ -483,6 +483,7 @@ class PropertyInstruction(WebsiteGenerator):
 			map_search_query=self.map_search_query,
 			property_map=property_map,
 			my_maps_header_crop_px=my_maps_presentation["my_maps_header_crop_px"],
+			my_maps_bottom_overscan_px=my_maps_presentation["my_maps_bottom_overscan_px"],
 			my_maps_presentation_version=my_maps_presentation["my_maps_presentation_version"],
 			check_in_time=self.format_display_time(self.check_in_time),
 			check_out_time=self.format_display_time(self.check_out_time),

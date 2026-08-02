@@ -235,6 +235,7 @@ def render_capture_document_html(resolved: ResolvedMap) -> str:
     }}
 
     #map-capture {{
+      position: relative;
       width: {presentation["capture_visible_width_css_px"]}px;
       height: {presentation["capture_visible_height_css_px"]}px;
       overflow: hidden;
@@ -242,6 +243,9 @@ def render_capture_document_html(resolved: ResolvedMap) -> str:
     }}
 
     #map-capture iframe {{
+      position: absolute;
+      top: 0;
+      left: 0;
       display: block;
       width: 100%;
       height: 100%;
@@ -254,14 +258,17 @@ def render_capture_document_html(resolved: ResolvedMap) -> str:
     }}
 
     #map-capture.custom-map-frame--google-my-maps iframe {{
-      height: calc(100% + var(--pi-my-maps-header-crop));
-      transform: translateY(calc(-1 * var(--pi-my-maps-header-crop)));
-      transform-origin: top center;
+      top: calc(-1 * var(--pi-my-maps-header-crop));
+      height: calc(
+        100% +
+        var(--pi-my-maps-header-crop) +
+        var(--pi-my-maps-bottom-overscan)
+      );
     }}
   </style>
 </head>
 <body
-  style="--pi-my-maps-header-crop: {presentation["my_maps_header_crop_px"]}px;"
+  style="--pi-my-maps-header-crop: {presentation["my_maps_header_crop_px"]}px; --pi-my-maps-bottom-overscan: {presentation["my_maps_bottom_overscan_px"]}px;"
   data-my-maps-presentation-version="{presentation["my_maps_presentation_version"]}"
   data-capture-implementation-version="{presentation["capture_implementation_version"]}"
   data-capture-template-version="{presentation["capture_template_version"]}"

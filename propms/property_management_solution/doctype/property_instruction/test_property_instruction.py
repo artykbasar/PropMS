@@ -843,6 +843,11 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 		self.assertNotIn("data-guide-block-map-center-latitude=", html)
 		self.assertNotIn("data-guide-block-map-coordinate-source=", html)
 
+	def test_export_script_creates_block_shell_with_embed_kind_class(self):
+		source = self.get_export_script_source()
+		self.assertIn('shell.className = "pi-instruction-map-shell notranslate";', source)
+		self.assertIn('shell.classList.add("pi-instruction-map-shell--" + embedKindClass);', source)
+
 	def test_public_render_context_exposes_safe_pdf_snapshot_fields(self):
 		doc = self.make_instruction(custom_map_embed_url="https://www.google.com/maps/embed?pb=context-snapshot")
 		source_hash = build_map_source_hash(doc.custom_map_embed_url, doc.get_property_map().embed_kind)
