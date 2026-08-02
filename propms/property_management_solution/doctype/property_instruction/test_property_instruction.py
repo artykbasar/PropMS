@@ -176,11 +176,6 @@ class PropertyInstructionTestMixin:
 					"google_maps_url",
 					"https://www.google.com/maps/place/99A+Burlington+Road",
 				),
-				"show_embedded_map": overrides.pop("show_embedded_map", 1),
-				"google_maps_place_id": overrides.pop("google_maps_place_id", None),
-				"map_search_query": overrides.pop("map_search_query", None),
-				"map_zoom": overrides.pop("map_zoom", 16),
-				"map_type": overrides.pop("map_type", "roadmap"),
 				"wifi_name": overrides.pop("wifi_name", "Estaex Guest WiFi"),
 				"wifi_password": overrides.pop("wifi_password", "guest-wifi-only"),
 				"check_in_time": overrides.pop("check_in_time", "15:00:00"),
@@ -235,6 +230,31 @@ class PropertyInstructionTestMixin:
 		self.to_delete.append(("Property Instruction", doc.name))
 		self.clear_route_cache()
 		return doc
+
+	def set_legacy_main_map_columns(self, doc, **values):
+		allowed_fields = {
+			"google_maps_place_id",
+			"map_search_query",
+			"map_zoom",
+			"map_type",
+			"show_embedded_map",
+		}
+		assignments = []
+		params = []
+		for fieldname, value in values.items():
+			if fieldname not in allowed_fields:
+				raise AssertionError(f"Unsupported legacy field: {fieldname}")
+			assignments.append(f"`{fieldname}` = %s")
+			params.append(value)
+		if not assignments:
+			return
+		params.append(doc.name)
+		frappe.db.sql(
+			f"update `tabProperty Instruction` set {', '.join(assignments)} where name = %s",
+			tuple(params),
+		)
+		frappe.db.commit()
+		doc.reload()
 
 	def get_context(self, doc):
 		doc.reload()
@@ -385,7 +405,6 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 		doc = self.make_instruction(
 			address=None,
 			google_maps_url=None,
-			show_embedded_map=0,
 			wifi_name=None,
 			wifi_password=None,
 			emergency_contact=None,
@@ -408,28 +427,49 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 		doc = self.make_instruction(published=0)
 		self.assertIsNone(_find_matching_document_webview(doc.route))
 
-	def test_map_embed_url_uses_place_id_first(self):
-		self.set_conf("google_maps_embed_api_key", "test-key")
+	def test_main_property_map_requires_explicit_embed(self):
 		doc = self.make_instruction(
-			google_maps_place_id="ChIJ123",
-			map_search_query="Other Query",
+			custom_map_embed_url="",
+			google_maps_url="",
 			address="99A Burlington Road",
 		)
-		embed_url = doc.get_map_embed_url()
-		self.assertIn("embed/v1/place", embed_url)
-		self.assertIn("place_id%3AChIJ123", embed_url)
-		self.assertIn("key=test-key", embed_url)
-
-	def test_map_embed_url_encodes_address_query_without_api_key(self):
-		doc = self.make_instruction(google_maps_place_id=None, map_search_query=None, address="99A Burlington Road")
-		embed_url = doc.get_map_embed_url()
-		self.assertIn("https://www.google.com/maps", embed_url)
-		self.assertIn("99A+Burlington+Road", embed_url)
-		self.assertIn("output=embed", embed_url)
-
-	def test_map_embed_url_not_rendered_when_disabled(self):
-		doc = self.make_instruction(show_embedded_map=0)
 		self.assertIsNone(doc.get_map_embed_url())
+		property_map = doc.get_property_map()
+		self.assertFalse(property_map.embed_url)
+		self.assertFalse(property_map.external_url)
+
+	def test_main_property_map_ignores_legacy_columns_without_explicit_embed(self):
+		doc = self.make_instruction(
+			custom_map_embed_url="",
+			google_maps_url="",
+			address="99A Burlington Road",
+		)
+		self.set_legacy_main_map_columns(
+			doc,
+			show_embedded_map=1,
+			google_maps_place_id="ChIJ123",
+			map_search_query="Legacy Query",
+			map_zoom=19,
+			map_type="satellite",
+		)
+		self.assertIsNone(doc.get_map_embed_url())
+		context = doc.get_public_render_context()
+		self.assertFalse(context.map_embed_enabled)
+		self.assertFalse(context.property_map.embed_url)
+		self.assertFalse(context.google_maps_url)
+
+	def test_property_map_requires_embed_even_when_google_maps_url_is_present(self):
+		doc = self.make_instruction(
+			custom_map_embed_url="",
+			google_maps_url="https://www.google.com/maps/place/99A+Burlington+Road",
+		)
+		property_map = doc.get_property_map()
+		self.assertFalse(property_map.embed_url)
+		self.assertFalse(property_map.external_url)
+		html = self.render_instruction(doc)
+		self.assertNotIn('data-guide-map-card', html)
+		self.assertNotIn('data-guide-map-link', html)
+		self.assertNotIn("Open in Google Maps", html)
 
 	def test_property_map_custom_embed_url_exists_in_schema(self):
 		schema = self.get_property_instruction_schema()
@@ -449,7 +489,6 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 		doc = self.make_instruction(
 			custom_map_embed_url="https://www.google.com/maps/d/embed?mid=1A1kCH3-hgmeHlANOAt-XJAm3t2ptm1U&ehbc=2E312F",
 			google_maps_url=None,
-			map_search_query=None,
 			address=None,
 		)
 		context = doc.get_public_render_context()
@@ -463,10 +502,9 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 		)
 		self.assertEqual(context.property_map.embed_kind, "google-my-maps")
 
-	def test_property_custom_embed_overrides_generated_embed(self):
+	def test_property_custom_embed_is_the_only_main_embed_source(self):
 		doc = self.make_instruction(
 			custom_map_embed_url="https://www.google.com/maps/embed?pb=override",
-			map_search_query="99A Burlington Road",
 		)
 		self.assertEqual(doc.get_map_embed_url(), "https://www.google.com/maps/embed?pb=override")
 		self.assertEqual(doc.get_public_render_context().property_map.embed_url, "https://www.google.com/maps/embed?pb=override")
@@ -483,19 +521,19 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 			with self.assertRaises(frappe.ValidationError):
 				self.make_instruction(title=f"Invalid {uuid.uuid4().hex[:6]}", custom_map_embed_url=invalid)
 
-	def test_map_type_and_zoom_are_normalized(self):
-		doc = self.make_instruction(map_type="bad", map_zoom=88)
-		self.assertEqual(doc.map_type, "roadmap")
-		self.assertEqual(doc.map_zoom, 16)
-
 	def test_google_maps_url_rejects_untrusted_host(self):
 		with self.assertRaises(frappe.ValidationError):
 			self.make_instruction(google_maps_url="https://example.com/maps")
 
-	def test_map_external_url_is_generated_from_address(self):
-		doc = self.make_instruction(google_maps_url=None, google_maps_place_id=None, map_search_query=None)
-		self.assertIn("https://www.google.com/maps/search/", doc.get_map_external_url())
-		self.assertIn("99A+Burlington+Road", doc.get_map_external_url())
+	def test_map_external_url_is_derived_from_explicit_embed(self):
+		doc = self.make_instruction(
+			custom_map_embed_url="https://www.google.com/maps/d/embed?mid=derive-main&ehbc=2E312F",
+			google_maps_url=None,
+		)
+		self.assertEqual(
+			doc.get_map_external_url(),
+			"https://www.google.com/maps/d/viewer?mid=derive-main&ehbc=2E312F",
+		)
 
 	def test_map_block_option_and_embed_field_exist_in_schema(self):
 		schema = self.get_block_doctype_json()
@@ -515,6 +553,14 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 	def test_snapshot_fields_exist_in_parent_schema(self):
 		schema = self.get_property_instruction_schema()
 		fields_by_name = {field["fieldname"]: field for field in schema["fields"]}
+		for removed_field in (
+			"google_maps_place_id",
+			"map_search_query",
+			"map_zoom",
+			"map_type",
+			"show_embedded_map",
+		):
+			self.assertNotIn(removed_field, fields_by_name)
 		self.assertEqual(fields_by_name["custom_map_snapshot"]["fieldtype"], "Attach Image")
 		self.assertEqual(fields_by_name["custom_map_snapshot_status"]["options"], "Not Required\nPending\nProcessing\nReady\nFailed")
 		self.assertEqual(fields_by_name["custom_map_snapshot_source_hash"]["hidden"], 1)
@@ -687,13 +733,63 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 
 	def test_removed_custom_map_becomes_not_required(self):
 		doc = self.make_instruction(custom_map_embed_url="https://www.google.com/maps/embed?pb=remove-main")
-		doc.custom_map_snapshot = "/private/files/old-map.png"
+		file_doc = save_snapshot_png(
+			property_instruction=doc.name,
+			map_key="property-location",
+			row_name=None,
+			source_hash=build_map_source_hash(doc.custom_map_embed_url, doc.get_property_map().embed_kind),
+			png_bytes=PNG_BYTES,
+		)
+		doc.custom_map_snapshot = file_doc.file_url
 		doc.custom_map_snapshot_status = "Ready"
-		doc.custom_map_snapshot_source_hash = "old-hash"
+		doc.custom_map_snapshot_source_hash = build_map_source_hash(
+			doc.custom_map_embed_url, doc.get_property_map().embed_kind
+		)
 		doc.custom_map_embed_url = ""
 		doc.save(ignore_permissions=True)
+		frappe.db.commit()
 		self.assertEqual(doc.custom_map_snapshot_status, "Not Required")
 		self.assertFalse(doc.custom_map_snapshot)
+		self.assertFalse(frappe.db.exists("File", file_doc.name))
+
+	def test_clearing_main_embed_preserves_snapshot_file_still_used_by_block(self):
+		doc = self.make_instruction(
+			custom_map_embed_url="https://www.google.com/maps/embed?pb=shared-main",
+			instruction_blocks=[
+				{
+					"section": "Finding the Property",
+					"block_type": "Map",
+					"title": "Shared block map",
+					"custom_map_embed_url": "https://www.google.com/maps/embed?pb=shared-main",
+				}
+			],
+		)
+		source_hash = build_map_source_hash(doc.custom_map_embed_url, doc.get_property_map().embed_kind)
+		file_doc = save_snapshot_png(
+			property_instruction=doc.name,
+			map_key="property-location",
+			row_name=None,
+			source_hash=source_hash,
+			png_bytes=PNG_BYTES,
+		)
+		doc.custom_map_snapshot = file_doc.file_url
+		doc.custom_map_snapshot_status = "Ready"
+		doc.custom_map_snapshot_source_hash = source_hash
+		block_row = doc.instruction_blocks[0]
+		block_row.custom_map_snapshot = file_doc.file_url
+		block_row.custom_map_snapshot_status = "Ready"
+		block_row.custom_map_snapshot_source_hash = source_hash
+		doc.save(ignore_permissions=True)
+		doc.custom_map_embed_url = ""
+		doc.save(ignore_permissions=True)
+		frappe.db.commit()
+		doc.reload()
+		block_row = doc.instruction_blocks[0]
+		self.assertEqual(doc.custom_map_snapshot_status, "Not Required")
+		self.assertFalse(doc.custom_map_snapshot)
+		self.assertEqual(block_row.custom_map_snapshot, file_doc.file_url)
+		self.assertEqual(block_row.custom_map_snapshot_status, "Ready")
+		self.assertTrue(frappe.db.exists("File", file_doc.name))
 
 	def test_property_instruction_wifi_qr_fields_exist_in_schema(self):
 		schema = self.get_property_instruction_schema()
@@ -867,27 +963,41 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 		self.assertNotIn("/private/files/", context.property_map.pdf_snapshot_image_url)
 		self.assertEqual(context.property_map.pdf_desired_source_hash, source_hash)
 
-	def test_generated_live_google_map_retains_live_iframe_and_has_no_pdf_representation(self):
+	def test_empty_main_embed_renders_no_property_location_section(self):
 		doc = self.make_instruction(
 			custom_map_embed_url="",
 			google_maps_url="",
-			show_embedded_map=1,
 			address="10 Downing Street",
+		)
+		self.set_legacy_main_map_columns(
+			doc,
+			show_embedded_map=1,
 			map_search_query="10 Downing Street London",
+			map_zoom=17,
+			map_type="satellite",
 		)
 		context = doc.get_public_render_context()
-		self.assertTrue(context.property_map.embed_url)
-		self.assertFalse(context.property_map.is_custom_embed)
+		self.assertFalse(context.property_map.embed_url)
+		self.assertFalse(context.property_map.external_url)
 		self.assertEqual(context.property_map.pdf_representation, "none")
 		self.assertEqual(context.property_map.pdf_snapshot_image_url, "")
 		html = self.render_instruction(doc)
-		self.assertIn('data-guide-map-pdf-representation="none"', html)
-		self.assertIn('data-guide-map-custom-google="0"', html)
-		self.assertIn('data-guide-map-embed-url="https://www.google.com/maps?', html)
-		self.assertIn('class="pi-map"', html)
-		self.assertIn("Open in Google Maps", html)
-		self.assertNotIn("data-guide-map-latitude=", html)
-		self.assertNotIn("data-guide-map-image=", html)
+		self.assertNotIn('data-guide-map-card', html)
+		self.assertNotIn('data-guide-map-embed-url=', html)
+		self.assertNotIn('data-guide-map-link', html)
+		self.assertNotIn("Property Location", html)
+		self.assertNotIn("Open in Google Maps", html)
+		self.assertNotIn("Legacy Query", html)
+
+	def test_google_maps_url_without_embed_renders_no_property_location_section(self):
+		doc = self.make_instruction(
+			custom_map_embed_url="",
+			google_maps_url="https://www.google.com/maps/place/No+Embed",
+		)
+		html = self.render_instruction(doc)
+		self.assertNotIn('data-guide-map-card', html)
+		self.assertNotIn('data-guide-map-link', html)
+		self.assertNotIn("Open in Google Maps", html)
 
 	def test_rendered_html_contains_safe_main_and_block_pdf_map_attributes(self):
 		doc = self.make_instruction(
@@ -1095,7 +1205,7 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 
 	def test_template_includes_external_export_script_and_hooks(self):
 		self.set_property_management_setting("enable_guest_guide_google_translate", 1)
-		doc = self.make_instruction()
+		doc = self.make_instruction(custom_map_embed_url="https://www.google.com/maps/embed?pb=template-main")
 		html = self.render_instruction(doc)
 		self.assertIn("/assets/propms/js/property_instruction_export.js?v=test-build-version", html)
 		self.assertIn("translate.google.com/translate_a/element.js", html)

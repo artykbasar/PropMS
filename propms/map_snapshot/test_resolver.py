@@ -19,11 +19,10 @@ class TestMapSnapshotResolver(PropertyInstructionTestMixin, FrappeTestCase):
 		self.assertEqual(resolved.map_kind, "google-my-maps")
 		self.assertTrue(resolved.source_hash)
 
-	def test_main_map_resolution_rejects_generated_non_custom_map(self):
+	def test_main_map_resolution_rejects_empty_explicit_embed(self):
 		doc = self.make_instruction(
 			custom_map_embed_url="",
-			show_embedded_map=1,
-			map_search_query="99A Burlington Road",
+			google_maps_url="https://www.google.com/maps/place/99A+Burlington+Road",
 		)
 		with self.assertRaises(Exception):
 			resolve_capture_map(CaptureMapReference(doc.name, "property-location"))

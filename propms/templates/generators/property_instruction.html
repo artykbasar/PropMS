@@ -1,10 +1,8 @@
 {% extends "propms/templates/guest_guide_base.html" %}
 {% set google_translate = google_translate if google_translate is defined and google_translate else {"enabled": 0} %}
 {% set property_map = property_map if property_map is defined and property_map else {"embed_url": map_embed_url if map_embed_url is defined else None, "external_url": google_maps_url if google_maps_url is defined else None} %}
-{% set screen_map_query = ("place_id:" ~ google_maps_place_id) if google_maps_place_id else (map_search_query or address) %}
-{% set screen_map_zoom = map_zoom or 16 %}
-{% set screen_map_embed_url = property_map.embed_url if property_map and property_map.embed_url else (map_embed_url if map_embed_url is defined and map_embed_url else (("https://www.google.com/maps?q=" ~ (screen_map_query | urlencode) ~ "&z=" ~ screen_map_zoom ~ "&output=embed" ~ ("&t=k" if map_type == "satellite" else "")) if show_embedded_map and screen_map_query else None)) %}
-{% set screen_map_external_url = property_map.external_url if property_map and property_map.external_url else (google_maps_url if google_maps_url is defined and google_maps_url else (("https://www.google.com/maps/search/?api=1&query=" ~ (screen_map_query | urlencode)) if screen_map_query else None)) %}
+{% set screen_map_embed_url = property_map.embed_url if property_map and property_map.embed_url else (map_embed_url if map_embed_url is defined and map_embed_url else None) %}
+{% set screen_map_external_url = property_map.external_url if property_map and property_map.external_url else (google_maps_url if google_maps_url is defined and google_maps_url else None) %}
 {% set screen_map_embed_kind = property_map.embed_kind if property_map and property_map.embed_kind else "" %}
 {% set screen_map_embed_kind_class = property_map.embed_kind_class if property_map and property_map.embed_kind_class else screen_map_embed_kind %}
 
@@ -2101,11 +2099,11 @@
             {% endif %}
           </div>
 
+          {% if screen_map_embed_url and screen_map_external_url %}
           <div class="pi-actions">
-            {% if screen_map_external_url %}
             <a class="pi-btn pi-btn-primary" href="{{ screen_map_external_url }}" target="_blank" rel="noopener noreferrer nofollow">Open in Google Maps</a>
-            {% endif %}
           </div>
+          {% endif %}
         </div>
       </article>
 

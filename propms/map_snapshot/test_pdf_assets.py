@@ -120,22 +120,18 @@ class TestPdfMapAssets(PropertyInstructionTestMixin, FrappeTestCase):
 		self.assertEqual(representation.representation, PDF_MAP_REPRESENTATION_NONE)
 		self.assertFalse(representation.custom_map)
 
-	def test_generated_live_google_map_representation_is_none_with_live_link(self):
+	def test_no_custom_map_representation_stays_none_even_with_google_maps_url(self):
 		doc = self.make_instruction(
 			custom_map_embed_url="",
-			show_embedded_map=1,
-			google_maps_url="",
-			address="221B Baker Street",
-			map_search_query="221B Baker Street London",
+			google_maps_url="https://www.google.com/maps/place/221B+Baker+Street",
 		)
 		property_map = doc.get_property_map()
-		self.assertTrue(property_map.embed_url)
-		self.assertFalse(property_map.is_custom_embed)
+		self.assertFalse(property_map.embed_url)
 		representation = build_pdf_map_representation(doc, "property-location")
 		self.assertEqual(representation.representation, PDF_MAP_REPRESENTATION_NONE)
 		self.assertFalse(representation.custom_map)
 		self.assertEqual(representation.reason_code, "not-custom")
-		self.assertEqual(representation.open_url, property_map.external_url)
+		self.assertEqual(representation.open_url, property_map.external_url or "")
 
 	def test_public_parent_snapshot_endpoint_returns_png(self):
 		doc = self.make_instruction(custom_map_embed_url="https://www.google.com/maps/embed?pb=endpoint-parent")

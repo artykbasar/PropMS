@@ -10,7 +10,7 @@ import socket
 from datetime import timedelta
 from ipaddress import ip_address
 from urllib.error import HTTPError
-from urllib.parse import quote, unquote, urlencode, urljoin, urlparse, urlunparse
+from urllib.parse import quote, unquote, urljoin, urlparse, urlunparse
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 import frappe
@@ -61,15 +61,11 @@ SECTION_OPTIONS = [
 	"Emergency",
 ]
 
-MAP_TYPES = {"roadmap", "satellite"}
 WIFI_SECURITY_TYPES = {
 	"WPA": "WPA",
 	"WEP": "WEP",
 	"OPEN": "Open",
 }
-DEFAULT_MAP_ZOOM = 16
-MIN_MAP_ZOOM = 0
-MAX_MAP_ZOOM = 21
 GOOGLE_TRANSLATE_SCRIPT_BASE_URL = "https://translate.google.com/translate_a/element.js"
 TRUSTED_EXTERNAL_PDF_IMAGE_HOSTS = set()
 LANGUAGE_CODE_PATTERN = re.compile(r"^[a-z]{2,3}(?:-[a-z]{2,8})*$")
@@ -405,8 +401,22 @@ class PropertyInstruction(WebsiteGenerator):
 			value for value in removed_files if value
 		]
 
+	def _get_current_snapshot_urls(self):
+		urls = set()
+		main_snapshot = (self.get("custom_map_snapshot") or "").strip()
+		if main_snapshot:
+			urls.add(main_snapshot)
+		for row in self.instruction_blocks or []:
+			snapshot = (row.get("custom_map_snapshot") or "").strip()
+			if snapshot:
+				urls.add(snapshot)
+		return urls
+
 	def schedule_removed_map_snapshot_cleanup(self):
+		current_snapshot_urls = self._get_current_snapshot_urls()
 		for snapshot_url in self.flags.get("map_snapshot_removed_files") or []:
+			if snapshot_url in current_snapshot_urls:
+				continue
 			schedule_delete_generated_snapshot_file(snapshot_url, self.name)
 
 	def enqueue_pending_map_snapshot_jobs(self):
@@ -474,13 +484,7 @@ class PropertyInstruction(WebsiteGenerator):
 			map_embed_url=property_map.embed_url,
 			map_embed_enabled=bool(property_map.embed_url),
 			custom_map_embed_url=property_map.custom_embed_url,
-			map_display_query=self.get_map_display_query(),
-			map_zoom=self.map_zoom,
-			map_type=self.map_type,
 			instruction_block_maps=instruction_block_maps,
-			show_embedded_map=bool(cint(self.show_embedded_map or 0)),
-			google_maps_place_id=self.google_maps_place_id,
-			map_search_query=self.map_search_query,
 			property_map=property_map,
 			my_maps_header_crop_px=my_maps_presentation["my_maps_header_crop_px"],
 			my_maps_bottom_overscan_px=my_maps_presentation["my_maps_bottom_overscan_px"],
@@ -597,21 +601,7 @@ class PropertyInstruction(WebsiteGenerator):
 		return block_maps
 
 	def normalize_map_fields(self):
-		self.show_embedded_map = cint(self.show_embedded_map or 0)
 		self.set("custom_map_embed_url", self.normalize_google_maps_embed_input(self.get("custom_map_embed_url")))
-		self.google_maps_place_id = (self.google_maps_place_id or "").strip()
-		self.map_search_query = (self.map_search_query or "").strip()
-		self.map_zoom = self.normalize_map_zoom(self.map_zoom)
-		if (self.map_type or "").strip().lower() not in MAP_TYPES:
-			self.map_type = "roadmap"
-		else:
-			self.map_type = self.map_type.strip().lower()
-
-	def normalize_map_zoom(self, value):
-		zoom = cint(value or DEFAULT_MAP_ZOOM)
-		if zoom < MIN_MAP_ZOOM or zoom > MAX_MAP_ZOOM:
-			return DEFAULT_MAP_ZOOM
-		return zoom
 
 	def normalize_wifi_qr_fields(self):
 		self.show_wifi_qr_in_pdf = cint(self.show_wifi_qr_in_pdf or 0)
@@ -622,25 +612,17 @@ class PropertyInstruction(WebsiteGenerator):
 		security_type = (self.wifi_security_type or "WPA").strip().upper()
 		return WIFI_SECURITY_TYPES.get(security_type, "WPA")
 
-	def get_map_embed_api_key(self):
-		return frappe.conf.get("google_maps_embed_api_key") or os.environ.get("GOOGLE_MAPS_EMBED_API_KEY")
-
-	def get_map_display_query(self):
-		if self.google_maps_place_id:
-			return f"place_id:{self.google_maps_place_id}"
-		return (self.map_search_query or self.address or "").strip()
-
 	def get_property_map(self):
 		custom_embed_url = self.get_custom_property_map_embed_url()
-		embed_url = custom_embed_url or self.get_generated_map_embed_url()
+		embed_url = custom_embed_url
+		embed_kind = self.get_google_maps_embed_kind(embed_url)
 		return frappe._dict(
 			custom_embed_url=custom_embed_url,
 			embed_url=embed_url,
-			embed_kind=self.get_google_maps_embed_kind(embed_url),
-			embed_kind_class=get_map_kind_class(self.get_google_maps_embed_kind(embed_url)),
+			embed_kind=embed_kind,
+			embed_kind_class=get_map_kind_class(embed_kind),
 			external_url=self.get_map_external_url(embed_url),
-			map_zoom=self.normalize_map_zoom(self.map_zoom),
-			uses_api_key=bool(embed_url and "embed/v1/place" in embed_url),
+			uses_api_key=False,
 			is_custom_embed=bool(custom_embed_url),
 		)
 
@@ -656,54 +638,19 @@ class PropertyInstruction(WebsiteGenerator):
 		]
 
 	def get_map_external_url(self, effective_embed_url=None):
+		custom_embed_url = self.get_custom_property_map_embed_url()
+		embed_url = (custom_embed_url or effective_embed_url or "").strip()
+		if not embed_url:
+			return None
 		if self.google_maps_url:
 			return self.google_maps_url
-		custom_embed_url = self.get_custom_property_map_embed_url()
-		derived_embed_view_url = self.derive_google_maps_view_url(custom_embed_url or effective_embed_url)
-		if derived_embed_view_url:
-			return derived_embed_view_url
-
-		query = (self.map_search_query or self.address or "").strip()
-		if not query:
-			return effective_embed_url or self.get_map_embed_url() or None
-
-		params = {"api": 1, "query": query}
-		if self.google_maps_place_id:
-			params["query_place_id"] = self.google_maps_place_id
-		return f"https://www.google.com/maps/search/?{urlencode(params)}"
+		return self.derive_google_maps_view_url(embed_url)
 
 	def get_map_embed_url(self):
-		return self.get_custom_property_map_embed_url() or self.get_generated_map_embed_url()
+		return self.get_custom_property_map_embed_url() or None
 
 	def get_custom_property_map_embed_url(self):
 		return self.normalize_google_maps_embed_input(self.get("custom_map_embed_url"))
-
-	def get_generated_map_embed_url(self):
-		if not cint(self.show_embedded_map):
-			return None
-
-		query = self.get_map_display_query()
-		if not query:
-			return None
-
-		api_key = self.get_map_embed_api_key()
-		if api_key:
-			params = {
-				"key": api_key,
-				"q": query,
-				"zoom": self.normalize_map_zoom(self.map_zoom),
-				"maptype": self.map_type if self.map_type in MAP_TYPES else "roadmap",
-			}
-			return f"https://www.google.com/maps/embed/v1/place?{urlencode(params)}"
-
-		params = {
-			"q": query,
-			"z": self.normalize_map_zoom(self.map_zoom),
-			"output": "embed",
-		}
-		if self.map_type == "satellite":
-			params["t"] = "k"
-		return urlunparse(("https", "www.google.com", "/maps", "", urlencode(params), ""))
 
 	def get_google_translate_settings(self):
 		enabled = cint(self.get_property_management_setting("enable_guest_guide_google_translate") or 0)
