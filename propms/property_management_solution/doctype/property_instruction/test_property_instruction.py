@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import json
 import os
+import time
 import unittest
 import uuid
 from unittest.mock import patch
@@ -10,6 +11,8 @@ from urllib.parse import parse_qs, urlparse
 
 import frappe
 from frappe.tests.utils import FrappeTestCase
+from frappe.utils import get_assets_json
+from frappe.utils.file_manager import save_file
 from frappe.website.page_renderers.document_page import _find_matching_document_webview
 from frappe.website.router import clear_routing_cache, get_base_template
 from werkzeug.datastructures import Headers
@@ -24,11 +27,18 @@ from propms.property_management_solution.doctype.property_instruction.property_i
 	resolve_public_pdf_image_target,
 	validate_public_pdf_image_url,
 )
+from propms.map_snapshot.pdf_assets import PUBLIC_MAP_SNAPSHOT_IMAGE_ENDPOINT
+from propms.map_snapshot.manifest import MapSnapshotManifestEntry, build_manifest_hash
+from propms.map_snapshot.presentation import build_map_source_hash
+from propms.map_snapshot.storage import save_snapshot_png
 from propms.www.sitemap import get_filtered_public_pages_from_doctypes
 
 
 PNG_BYTES = base64.b64decode(
 	"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9sX7LQAAAABJRU5ErkJggg=="
+)
+ATTACHMENT_PNG_BYTES = base64.b64decode(
+	"iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAFElEQVR42mP8z8AARAwMjIzwHwAFgwJ/lzvN/wAAAABJRU5ErkJggg=="
 )
 EXPORT_SCRIPT_PATH = os.path.abspath(
 	os.path.join(
@@ -55,15 +65,23 @@ BLOCK_DOCTYPE_PATH = os.path.abspath(
 		"property_instruction_block.json",
 	)
 )
+PROPERTY_DOCTYPE_SCRIPT_PATH = os.path.abspath(
+	os.path.join(
+		os.path.dirname(__file__),
+		"property_instruction.js",
+	)
+)
 
 
 class PropertyInstructionTestMixin:
 	def setUp(self):
 		super().setUp()
 		frappe.set_user("Administrator")
+		self.conf_backup = {}
+		self.set_conf("developer_mode", 1)
+		frappe.local.bundled_assets = get_assets_json() or {}
 		self.to_delete = []
 		self.temp_files = []
-		self.conf_backup = {}
 		self.single_backup = {}
 		self.original_form_dict = frappe._dict(getattr(frappe.local, "form_dict", {}) or {})
 		self.original_request = getattr(frappe.local, "request", None)
@@ -76,8 +94,17 @@ class PropertyInstructionTestMixin:
 			if os.path.exists(file_path):
 				os.remove(file_path)
 		for doctype, name in reversed(self.to_delete):
-			if frappe.db.exists(doctype, name):
-				frappe.delete_doc(doctype, name, force=1)
+			if not frappe.db.exists(doctype, name):
+				continue
+			for attempt in range(15):
+				try:
+					frappe.delete_doc(doctype, name, force=1)
+					break
+				except frappe.QueryTimeoutError:
+					if attempt == 14:
+						raise
+					frappe.db.rollback()
+					time.sleep(1.0)
 		for key, value in self.conf_backup.items():
 			if value is None:
 				frappe.conf.pop(key, None)
@@ -97,6 +124,20 @@ class PropertyInstructionTestMixin:
 	def clear_route_cache(self):
 		_find_matching_document_webview.clear_cache()
 		clear_routing_cache()
+
+	def get_snapshot_state(self, doctype, name):
+		return frappe.db.get_value(
+			doctype,
+			name,
+			[
+				"custom_map_snapshot",
+				"custom_map_snapshot_status",
+				"custom_map_snapshot_source_hash",
+				"custom_map_snapshot_generated_at",
+				"custom_map_snapshot_error_log",
+			],
+			as_dict=True,
+		)
 
 	def set_conf(self, key, value):
 		if key not in self.conf_backup:
@@ -126,7 +167,7 @@ class PropertyInstructionTestMixin:
 		doc = frappe.get_doc(
 			{
 				"doctype": "Property Instruction",
-				"title": overrides.pop("title", "Test Guest Guide Property"),
+				"title": overrides.pop("title", f"Test Guest Guide Property {uuid.uuid4().hex[:8]}"),
 				"property": property_name,
 				"published": overrides.pop("published", 1),
 				"address": overrides.pop("address", "99A Burlington Road"),
@@ -214,6 +255,7 @@ class PropertyInstructionTestMixin:
 		context.show_language_picker = "false"
 		context._context_dict = context
 		frappe.local.response_headers = Headers()
+		frappe.local.bundled_assets = get_assets_json() or {}
 		out = doc.get_context(context)
 		if out:
 			context.update(out)
@@ -235,6 +277,10 @@ class PropertyInstructionTestMixin:
 		with open(BLOCK_DOCTYPE_PATH) as block_doctype_file:
 			return json.load(block_doctype_file)
 
+	def get_property_instruction_doctype_script(self):
+		with open(PROPERTY_DOCTYPE_SCRIPT_PATH) as doctype_script_file:
+			return doctype_script_file.read()
+
 	def make_site_file(self, filename, content=PNG_BYTES, private=False):
 		base_path = frappe.get_site_path("private" if private else "public", "files")
 		os.makedirs(base_path, exist_ok=True)
@@ -243,6 +289,17 @@ class PropertyInstructionTestMixin:
 			site_file.write(content)
 		self.temp_files.append(file_path)
 		return file_path
+
+	def attach_private_file(self, attached_to_name, filename, content=ATTACHMENT_PNG_BYTES):
+		file_doc = save_file(
+			filename,
+			content,
+			"Property Instruction",
+			attached_to_name,
+			is_private=1,
+		)
+		self.to_delete.append(("File", file_doc.name))
+		return file_doc
 
 	def make_external_file_record(self, url):
 		doc = frappe.get_doc(
@@ -455,6 +512,189 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 		self.assertEqual(embed_field["depends_on"], "eval:0")
 		self.assertEqual(embed_field["hidden"], 1)
 
+	def test_snapshot_fields_exist_in_parent_schema(self):
+		schema = self.get_property_instruction_schema()
+		fields_by_name = {field["fieldname"]: field for field in schema["fields"]}
+		self.assertEqual(fields_by_name["custom_map_snapshot"]["fieldtype"], "Attach Image")
+		self.assertEqual(fields_by_name["custom_map_snapshot_status"]["options"], "Not Required\nPending\nProcessing\nReady\nFailed")
+		self.assertEqual(fields_by_name["custom_map_snapshot_source_hash"]["hidden"], 1)
+		self.assertEqual(fields_by_name["custom_map_snapshot_generated_at"]["fieldtype"], "Datetime")
+		self.assertEqual(fields_by_name["custom_map_snapshot_error_log"]["options"], "Error Log")
+
+	def test_snapshot_fields_exist_in_block_schema(self):
+		schema = self.get_block_doctype_json()
+		fields_by_name = {field["fieldname"]: field for field in schema["fields"]}
+		self.assertEqual(fields_by_name["custom_map_snapshot"]["fieldtype"], "Attach Image")
+		self.assertEqual(fields_by_name["custom_map_snapshot_status"]["options"], "Not Required\nPending\nProcessing\nReady\nFailed")
+		self.assertEqual(fields_by_name["custom_map_snapshot_source_hash"]["hidden"], 1)
+		self.assertEqual(fields_by_name["custom_map_snapshot_generated_at"]["fieldtype"], "Datetime")
+		self.assertEqual(fields_by_name["custom_map_snapshot_error_log"]["options"], "Error Log")
+
+	def test_property_instruction_admin_form_actions_are_present(self):
+		source = self.get_property_instruction_doctype_script()
+		self.assertIn("Generate Map Snapshots", source)
+		self.assertIn("Regenerate Map Snapshots", source)
+		self.assertIn("Retry Failed Map Snapshots", source)
+
+	def test_new_custom_map_becomes_pending(self):
+		doc = self.make_instruction(custom_map_embed_url="https://www.google.com/maps/embed?pb=pending-main")
+		self.assertEqual(doc.custom_map_snapshot_status, "Pending")
+
+	def test_ready_matching_snapshot_remains_ready_on_unrelated_save(self):
+		doc = self.make_instruction(custom_map_embed_url="https://www.google.com/maps/embed?pb=stable-main")
+		doc.custom_map_snapshot = "/private/files/current.png"
+		doc.custom_map_snapshot_status = "Ready"
+		doc.custom_map_snapshot_source_hash = property_instruction_module.build_map_source_hash(
+			doc.custom_map_embed_url,
+			doc.get_property_map().embed_kind,
+		)
+		self.attach_private_file(doc.name, "current.png")
+		doc.emergency_contact = "Updated"
+		doc.save(ignore_permissions=True)
+		self.assertEqual(doc.custom_map_snapshot_status, "Ready")
+
+	def test_stale_parent_save_preserves_newer_ready_snapshot_state(self):
+		doc = self.make_instruction(custom_map_embed_url="https://www.google.com/maps/embed?pb=stale-parent")
+		stale_doc = frappe.get_doc("Property Instruction", doc.name)
+		expected_hash = property_instruction_module.build_map_source_hash(
+			doc.custom_map_embed_url,
+			doc.get_property_map().embed_kind,
+		)
+		capture_job = frappe.get_attr("propms.map_snapshot.jobs.capture_property_instruction_maps")
+		with patch("propms.map_snapshot.jobs.capture_map_png") as capture_mock:
+			capture_mock.return_value = frappe._dict(
+				png_bytes=PNG_BYTES,
+				pixel_width=2094,
+				pixel_height=1180,
+				map_kind="google-maps",
+				source_hash=expected_hash,
+				capture_duration_seconds=1.0,
+				settling_duration_seconds=1.0,
+				stability_score=0.0,
+				chromium_version="Chromium 150.0.7871.181",
+				cleanup_diagnostics={},
+			)
+			capture_job(
+				doc.name,
+				build_manifest_hash(
+					[
+						MapSnapshotManifestEntry(
+							map_key="property-location",
+							row_name=None,
+							map_kind="google-maps",
+							expected_source_hash=expected_hash,
+						)
+					]
+				),
+				[
+					{
+						"map_key": "property-location",
+						"row_name": None,
+						"map_kind": "google-maps",
+						"expected_source_hash": expected_hash,
+					}
+				],
+			)
+		frappe.db.commit()
+		ready_state = self.get_snapshot_state("Property Instruction", doc.name)
+		self.assertEqual(ready_state.custom_map_snapshot_status, "Ready")
+		stale_doc.emergency_contact = "Stale save"
+		stale_doc.save(ignore_permissions=True)
+		frappe.db.commit()
+		final_state = self.get_snapshot_state("Property Instruction", doc.name)
+		self.assertEqual(final_state.custom_map_snapshot_status, "Ready")
+		self.assertEqual(final_state.custom_map_snapshot, ready_state.custom_map_snapshot)
+		self.assertEqual(final_state.custom_map_snapshot_source_hash, ready_state.custom_map_snapshot_source_hash)
+
+	def test_stale_child_save_preserves_newer_ready_snapshot_state(self):
+		doc = self.make_instruction(
+			instruction_blocks=[
+				{
+					"section": "Finding the Property",
+					"block_type": "Map",
+					"title": "Door map",
+					"custom_map_embed_url": "https://www.google.com/maps/embed?pb=stale-child",
+				}
+			]
+		)
+		row_name = doc.instruction_blocks[0].name
+		stale_doc = frappe.get_doc("Property Instruction", doc.name)
+		block_map = doc.get_block_map_data(doc.instruction_blocks[0])
+		expected_hash = property_instruction_module.build_map_source_hash(
+			block_map.embed_url,
+			block_map.embed_kind,
+		)
+		capture_job = frappe.get_attr("propms.map_snapshot.jobs.capture_property_instruction_maps")
+		with patch("propms.map_snapshot.jobs.capture_map_png") as capture_mock:
+			capture_mock.return_value = frappe._dict(
+				png_bytes=PNG_BYTES,
+				pixel_width=2094,
+				pixel_height=1180,
+				map_kind="google-maps",
+				source_hash=expected_hash,
+				capture_duration_seconds=1.0,
+				settling_duration_seconds=1.0,
+				stability_score=0.0,
+				chromium_version="Chromium 150.0.7871.181",
+				cleanup_diagnostics={},
+			)
+			capture_job(
+				doc.name,
+				build_manifest_hash(
+					[
+						MapSnapshotManifestEntry(
+							map_key="block",
+							row_name=row_name,
+							map_kind="google-maps",
+							expected_source_hash=expected_hash,
+						)
+					]
+				),
+				[
+					{
+						"map_key": "block",
+						"row_name": row_name,
+						"map_kind": "google-maps",
+						"expected_source_hash": expected_hash,
+					}
+				],
+			)
+		frappe.db.commit()
+		ready_state = self.get_snapshot_state("Property Instruction Block", row_name)
+		self.assertEqual(ready_state.custom_map_snapshot_status, "Ready")
+		stale_doc.emergency_contact = "Stale child save"
+		stale_doc.save(ignore_permissions=True)
+		frappe.db.commit()
+		final_state = self.get_snapshot_state("Property Instruction Block", row_name)
+		self.assertEqual(final_state.custom_map_snapshot_status, "Ready")
+		self.assertEqual(final_state.custom_map_snapshot, ready_state.custom_map_snapshot)
+		self.assertEqual(final_state.custom_map_snapshot_source_hash, ready_state.custom_map_snapshot_source_hash)
+
+	def test_failed_unchanged_snapshot_does_not_auto_retry(self):
+		doc = self.make_instruction(custom_map_embed_url="https://www.google.com/maps/embed?pb=failed-main")
+		error_log = frappe.log_error(
+			title="Snapshot failed",
+			message="snapshot failed",
+			reference_doctype="Property Instruction",
+			reference_name=doc.name,
+		)
+		self.to_delete.append(("Error Log", error_log.name))
+		doc.custom_map_snapshot_status = "Failed"
+		doc.custom_map_snapshot_error_log = error_log.name
+		doc.save(ignore_permissions=True)
+		self.assertEqual(doc.custom_map_snapshot_status, "Failed")
+		self.assertEqual(doc.custom_map_snapshot_error_log, error_log.name)
+
+	def test_removed_custom_map_becomes_not_required(self):
+		doc = self.make_instruction(custom_map_embed_url="https://www.google.com/maps/embed?pb=remove-main")
+		doc.custom_map_snapshot = "/private/files/old-map.png"
+		doc.custom_map_snapshot_status = "Ready"
+		doc.custom_map_snapshot_source_hash = "old-hash"
+		doc.custom_map_embed_url = ""
+		doc.save(ignore_permissions=True)
+		self.assertEqual(doc.custom_map_snapshot_status, "Not Required")
+		self.assertFalse(doc.custom_map_snapshot)
+
 	def test_property_instruction_wifi_qr_fields_exist_in_schema(self):
 		schema = self.get_property_instruction_schema()
 		fields_by_name = {field["fieldname"]: field for field in schema["fields"]}
@@ -566,44 +806,7 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 		self.assertEqual(block.map_embed_kind, "google-my-maps")
 		self.assertEqual(block.map_external_url, "https://www.google.com/maps/d/viewer?mid=mid123&ehbc=2E312F")
 
-	def test_map_block_coordinate_parsing_supports_embed_formats(self):
-		doc = self.make_instruction()
-		for url in (
-			"https://www.google.com/maps/@51.399,-0.249,16z",
-			"https://www.google.com/maps?output=embed&q=51.399,-0.249",
-			"https://www.google.com/maps/embed?pb=!1m18!2m3!1d1!2d-0.249!3d51.399!3m2!1i1024!2i768!4f13.1",
-		):
-			coordinates = doc.parse_map_coordinates_from_url(url)
-			self.assertAlmostEqual(coordinates.latitude, 51.399)
-			self.assertAlmostEqual(coordinates.longitude, -0.249)
-
-	def test_map_block_prefers_embed_marker_coordinates_over_viewport_center(self):
-		doc = self.make_instruction()
-		url = (
-			"https://www.google.com/maps/embed?pb=!1m17!1m12!1m3!1d1279.5630588056072!"
-			"2d-0.24875145778959576!3d51.40036019312703!2m3!1f0!2f0!3f0!"
-			"3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x48760b63ea8c7a0d%3A0x17987c5fb2499918!"
-			"2s99A%20Burlington%20Rd%2C%20New Malden%20KT3%204LR!5e0!3m2!1sen!2suk!"
-			"4v1753776094216!5m2!1sen!2suk!2zNTHCsDI0JzAyLjEiTiAwwrAxNCc1MC4zIlc"
-		)
-		coordinates = doc.parse_map_coordinates_from_url(url)
-		center = doc.parse_map_center_coordinates_from_url(url)
-		self.assertAlmostEqual(center.latitude, 51.40036019312703)
-		self.assertAlmostEqual(center.longitude, -0.24875145778959576)
-		self.assertAlmostEqual(coordinates.latitude, 51.4005833333, places=6)
-		self.assertAlmostEqual(coordinates.longitude, -0.2473055556, places=6)
-		self.assertEqual(coordinates.source, "google_embed_dms_marker")
-
-	def test_google_embed_marker_coordinate_decoder_supports_urlsafe_and_padding(self):
-		doc = self.make_instruction()
-		token = "NTHCsDI0JzAyLjEiTiAwwrAxNCc1MC4zIlc".replace("+", "-").replace("/", "_").rstrip("=")
-		decoded = doc.decode_google_embed_marker_token(token)
-		self.assertIn('51°24\'02.1"N', decoded)
-		coordinates = doc.parse_map_coordinates_from_dms_text(decoded)
-		self.assertAlmostEqual(coordinates.latitude, 51.4005833333, places=6)
-		self.assertAlmostEqual(coordinates.longitude, -0.2473055556, places=6)
-
-	def test_map_block_counts_as_content_and_uses_link_fallback_without_coordinates(self):
+	def test_map_block_counts_as_content_and_uses_embed_or_view_link_fallback(self):
 		doc = self.make_instruction(
 			instruction_blocks=[
 				{
@@ -616,7 +819,6 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 		)
 		grouped_sections = doc.get_grouped_blocks()
 		self.assertEqual(grouped_sections[0].blocks[0].block_type, "Map")
-		self.assertIsNone(grouped_sections[0].blocks[0].map_latitude)
 		self.assertIn("https://www.google.com/maps", grouped_sections[0].blocks[0].map_external_url)
 
 	def test_step_block_with_embed_html_renders_a_validated_map(self):
@@ -638,9 +840,92 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 		html = self.render_instruction(doc)
 		self.assertIn('data-guide-block-map', html)
 		self.assertIn('class="pi-instruction-map"', html)
-		self.assertIn('data-guide-block-map-center-latitude="51.399"', html)
-		self.assertIn('data-guide-block-map-marker-latitude="51.399"', html)
-		self.assertIn('data-guide-block-map-coordinate-source="google_embed_viewport_center"', html)
+		self.assertNotIn("data-guide-block-map-center-latitude=", html)
+		self.assertNotIn("data-guide-block-map-coordinate-source=", html)
+
+	def test_public_render_context_exposes_safe_pdf_snapshot_fields(self):
+		doc = self.make_instruction(custom_map_embed_url="https://www.google.com/maps/embed?pb=context-snapshot")
+		source_hash = build_map_source_hash(doc.custom_map_embed_url, doc.get_property_map().embed_kind)
+		file_doc = save_snapshot_png(
+			property_instruction=doc.name,
+			map_key="property-location",
+			row_name=None,
+			source_hash=source_hash,
+			png_bytes=PNG_BYTES,
+		)
+		doc.custom_map_snapshot = file_doc.file_url
+		doc.custom_map_snapshot_status = "Ready"
+		doc.custom_map_snapshot_source_hash = source_hash
+		context = doc.get_public_render_context()
+		self.assertEqual(context.property_map.pdf_representation, "snapshot")
+		self.assertIn(PUBLIC_MAP_SNAPSHOT_IMAGE_ENDPOINT, context.property_map.pdf_snapshot_image_url)
+		self.assertNotIn("/private/files/", context.property_map.pdf_snapshot_image_url)
+		self.assertEqual(context.property_map.pdf_desired_source_hash, source_hash)
+
+	def test_generated_live_google_map_retains_live_iframe_and_has_no_pdf_representation(self):
+		doc = self.make_instruction(
+			custom_map_embed_url="",
+			google_maps_url="",
+			show_embedded_map=1,
+			address="10 Downing Street",
+			map_search_query="10 Downing Street London",
+		)
+		context = doc.get_public_render_context()
+		self.assertTrue(context.property_map.embed_url)
+		self.assertFalse(context.property_map.is_custom_embed)
+		self.assertEqual(context.property_map.pdf_representation, "none")
+		self.assertEqual(context.property_map.pdf_snapshot_image_url, "")
+		html = self.render_instruction(doc)
+		self.assertIn('data-guide-map-pdf-representation="none"', html)
+		self.assertIn('data-guide-map-custom-google="0"', html)
+		self.assertIn('data-guide-map-embed-url="https://www.google.com/maps?', html)
+		self.assertIn('class="pi-map"', html)
+		self.assertIn("Open in Google Maps", html)
+		self.assertNotIn("data-guide-map-latitude=", html)
+		self.assertNotIn("data-guide-map-image=", html)
+
+	def test_rendered_html_contains_safe_main_and_block_pdf_map_attributes(self):
+		doc = self.make_instruction(
+			custom_map_embed_url="https://www.google.com/maps/d/embed?mid=html-parent&ehbc=2E312F",
+			instruction_blocks=[
+				{
+					"section": "Finding the Property",
+					"block_type": "Map",
+					"title": "Arrival map",
+					"custom_map_embed_url": "https://www.google.com/maps/embed?pb=html-child",
+				}
+			]
+		)
+		parent_hash = build_map_source_hash(doc.custom_map_embed_url, doc.get_property_map().embed_kind)
+		parent_file = save_snapshot_png(
+			property_instruction=doc.name,
+			map_key="property-location",
+			row_name=None,
+			source_hash=parent_hash,
+			png_bytes=PNG_BYTES,
+		)
+		doc.custom_map_snapshot = parent_file.file_url
+		doc.custom_map_snapshot_status = "Ready"
+		doc.custom_map_snapshot_source_hash = parent_hash
+		row = doc.instruction_blocks[0]
+		block_map = doc.get_block_map_data(row)
+		block_hash = build_map_source_hash(block_map.embed_url, block_map.embed_kind)
+		block_file = save_snapshot_png(
+			property_instruction=doc.name,
+			map_key="block",
+			row_name=row.name,
+			source_hash=block_hash,
+			png_bytes=PNG_BYTES,
+		)
+		row.custom_map_snapshot = block_file.file_url
+		row.custom_map_snapshot_status = "Ready"
+		row.custom_map_snapshot_source_hash = block_hash
+		doc.save(ignore_permissions=True)
+		html = self.render_instruction(doc)
+		self.assertIn('data-guide-map-pdf-representation="snapshot"', html)
+		self.assertIn('data-guide-block-map-pdf-representation="snapshot"', html)
+		self.assertIn(PUBLIC_MAP_SNAPSHOT_IMAGE_ENDPOINT, html)
+		self.assertNotIn("/private/files/", html)
 
 	def test_text_block_with_embed_html_renders_a_validated_map(self):
 		embed_html = '<iframe src="https://www.google.com/maps?output=embed&q=51.399,-0.249"></iframe>'
@@ -658,10 +943,9 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 		block = doc.get_grouped_blocks()[0].blocks[0]
 		self.assertEqual(block.block_type, "Text")
 		self.assertEqual(block.map_embed_url, "https://www.google.com/maps?output=embed&q=51.399,-0.249")
-		self.assertAlmostEqual(block.map_latitude, 51.399)
-		self.assertAlmostEqual(block.map_longitude, -0.249)
+		self.assertIn("https://www.google.com/maps", block.map_external_url)
 
-	def test_block_map_external_url_uses_marker_coordinates(self):
+	def test_block_map_external_url_falls_back_to_embed_or_view_url_without_coordinates(self):
 		embed_html = (
 			'<iframe src="https://www.google.com/maps/embed?pb=!1m17!1m12!1m3!'
 			'1d1279.5630588056072!2d-0.24875145778959576!3d51.40036019312703!2m3!'
@@ -680,17 +964,9 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 			]
 		)
 		block = doc.get_grouped_blocks()[0].blocks[0]
-		self.assertAlmostEqual(block.map_center_latitude, 51.40036019312703)
-		self.assertAlmostEqual(block.map_center_longitude, -0.24875145778959576)
-		self.assertAlmostEqual(block.map_marker_latitude, 51.4005833333, places=6)
-		self.assertAlmostEqual(block.map_marker_longitude, -0.2473055556, places=6)
-		self.assertEqual(block.map_coordinate_source, "google_embed_dms_marker")
-		parsed = urlparse(block.map_external_url)
-		query = parse_qs(parsed.query or "")
-		self.assertEqual(query.get("api"), ["1"])
-		latitude_text, longitude_text = (query.get("query") or ["0,0"])[0].split(",", 1)
-		self.assertAlmostEqual(float(latitude_text), 51.4005833333, places=6)
-		self.assertAlmostEqual(float(longitude_text), -0.2473055556, places=6)
+		self.assertTrue(block.map_embed_url.startswith("https://www.google.com/maps/embed?pb="))
+		self.assertTrue(block.map_external_url)
+		self.assertIn("https://www.google.com/maps", block.map_external_url)
 
 	def test_non_map_blocks_do_not_require_embed_html(self):
 		doc = self.make_instruction(
@@ -719,20 +995,21 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 				]
 			)
 
-	def test_legacy_block_embed_field_is_canonicalized_to_custom_field(self):
+	def test_legacy_block_embed_field_is_preserved_until_migration(self):
+		legacy_html = '<iframe src="https://www.google.com/maps/embed?pb=legacy"></iframe>'
 		doc = self.make_instruction(
 			instruction_blocks=[
 				{
 					"section": "Finding the Property",
 					"block_type": "Map",
 					"title": "Legacy map",
-					"google_maps_embed_html": '<iframe src="https://www.google.com/maps/embed?pb=legacy"></iframe>',
+					"google_maps_embed_html": legacy_html,
 				},
 			]
 		)
 		row = doc.instruction_blocks[0]
-		self.assertEqual(row.custom_map_embed_url, "https://www.google.com/maps/embed?pb=legacy")
-		self.assertEqual(row.google_maps_embed_html, "https://www.google.com/maps/embed?pb=legacy")
+		self.assertFalse(row.custom_map_embed_url)
+		self.assertEqual(row.google_maps_embed_html, legacy_html)
 
 	def test_google_translate_widget_disabled_by_default(self):
 		self.set_property_management_setting("enable_guest_guide_google_translate", 0)
@@ -981,6 +1258,19 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 		self.assertIn("allowIdenticalLanguages.indexOf(expectedLanguage) !== -1", source)
 		self.assertNotIn('data-guide-allow-identical-languages="de"', html)
 		self.assertNotIn('data-guide-allow-identical-languages="tr"', html)
+
+	def test_export_script_ensures_qr_library_after_runtime_snapshot_fallback(self):
+		source = self.get_export_script_source()
+		prepare_assets_start = source.index("async function prepareGuideModelAssets(")
+		prepare_assets_end = source.index("async function prewarmPdfLibraries()", prepare_assets_start)
+		prepare_assets_source = source[prepare_assets_start:prepare_assets_end]
+		self.assertIn("var needsQrLibrary =", prepare_assets_source)
+		self.assertIn("await ensureQrCodeLibrary();", prepare_assets_source)
+		self.assertIn("assignQrImagesToEntries", prepare_assets_source)
+		self.assertLess(
+			prepare_assets_source.index("await ensureQrCodeLibrary();"),
+			prepare_assets_source.index("assignQrImagesToEntries"),
+		)
 
 	def test_export_script_does_not_use_legacy_cloned_print_layout(self):
 		source = self.get_export_script_source()
@@ -1390,16 +1680,14 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 		self.assertIn('showPdfFeedback("error"', source)
 		self.assertIn('showPdfFeedback("success"', source)
 
-	def test_export_script_projects_map_marker_separately_from_center(self):
+	def test_export_script_removes_legacy_coordinate_map_renderer(self):
 		source = self.get_export_script_source()
-		self.assertIn("centerLatitude", source)
-		self.assertIn("centerLongitude", source)
-		self.assertIn("markerLatitude", source)
-		self.assertIn("markerLongitude", source)
-		self.assertIn("projectedMarkerX", source)
-		self.assertIn("projectedMarkerY", source)
-		self.assertIn("markerInsideCanvas", source)
-		self.assertIn("map-marker-outside-canvas", source)
+		self.assertNotIn("legacy-coordinate-map", source)
+		self.assertNotIn("renderStaticMapSnapshot", source)
+		self.assertNotIn("projectLongitudeToWorldX", source)
+		self.assertNotIn("projectLatitudeToWorldY", source)
+		self.assertNotIn("map-marker-outside-canvas", source)
+		self.assertNotIn("tile.openstreetmap.org", source)
 
 	def test_export_script_uses_language_sync_without_relying_only_on_change_event(self):
 		source = self.get_export_script_source()
@@ -1771,7 +2059,9 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 		self.assertIn('renderers: ["default", "raster", "vector", "legacy"]', tool_source)
 		self.assertIn("acceptDownloads: true", tool_source)
 		self.assertIn('waitForEvent("download"', tool_source)
-		self.assertIn('waitForEvent("popup"', tool_source)
+		self.assertIn('page.on("popup"', tool_source)
+		self.assertIn("pollPrintSignal(page, popupObserver", tool_source)
+		self.assertIn("pollPopupAfterReadyPrint(page, popupObserver", tool_source)
 
 	def test_default_mode_resolves_to_adaptive_vector_and_legacy_route_remains_explicit(self):
 		source = self.get_export_script_source()
@@ -2040,9 +2330,11 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 		parsed = validate_public_pdf_image_url("https://guides.example/files/block.png")
 		self.assertEqual(parsed.hostname, "guides.example")
 
-	def test_validate_public_pdf_image_url_allows_openstreetmap_tile_host(self):
-		parsed = validate_public_pdf_image_url("https://tile.openstreetmap.org/16/32722/21824.png")
-		self.assertEqual(parsed.hostname, "tile.openstreetmap.org")
+	def test_validate_public_pdf_image_url_rejects_removed_legacy_map_hosts(self):
+		with self.assertRaises(frappe.ValidationError):
+			validate_public_pdf_image_url("https://tile.openstreetmap.org/16/32722/21824.png")
+		with self.assertRaises(frappe.ValidationError):
+			validate_public_pdf_image_url("https://maps.googleapis.com/maps/api/staticmap?center=99A")
 
 	def test_validate_public_pdf_image_url_rejects_arbitrary_external_host(self):
 		with self.assertRaises(frappe.ValidationError):
@@ -2064,7 +2356,7 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 		with patch.object(property_instruction_module, "build_opener", return_value=FakeOpener()):
 			with patch.object(property_instruction_module, "validate_remote_public_image_host", return_value=False):
 				with self.assertRaises(frappe.ValidationError):
-					fetch_remote_public_image("https://maps.googleapis.com/maps/api/staticmap?center=99A")
+					fetch_remote_public_image("https://guides.example/files/map.png")
 
 	def test_fetch_remote_public_image_rejects_oversized_response(self):
 		class FakeLargeResponse:
@@ -2087,7 +2379,7 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 		with patch.object(property_instruction_module, "build_opener", return_value=FakeOpener()):
 			with patch.object(property_instruction_module, "validate_remote_public_image_host", return_value=False):
 				with self.assertRaises(frappe.ValidationError):
-					fetch_remote_public_image("https://maps.googleapis.com/maps/api/staticmap?center=99A")
+					fetch_remote_public_image("https://guides.example/files/map.png")
 
 	def test_fetch_remote_public_image_rejects_non_image_response(self):
 		class FakeHtmlResponse:
@@ -2104,12 +2396,140 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 		with patch.object(property_instruction_module, "build_opener", return_value=FakeOpener()):
 			with patch.object(property_instruction_module, "validate_remote_public_image_host", return_value=False):
 				with self.assertRaises(frappe.ValidationError):
-					fetch_remote_public_image("https://maps.googleapis.com/maps/api/staticmap?center=99A")
+					fetch_remote_public_image("https://guides.example/files/map.png")
+
+
+@frappe.whitelist()
+def run_import_isolation_focused_tests():
+	module_names = [
+		"propms.map_snapshot.test_import_isolation",
+	]
+	suite = unittest.TestSuite(
+		unittest.defaultTestLoader.loadTestsFromName(module_name)
+		for module_name in module_names
+	)
+	result = unittest.TextTestRunner(verbosity=2).run(suite)
+	if not result.wasSuccessful():
+		raise frappe.ValidationError("Focused import-isolation tests failed")
+	return {
+		"tests_run": result.testsRun,
+		"failures": len(result.failures),
+		"errors": len(result.errors),
+	}
+
+
+@frappe.whitelist()
+def run_migration_focused_tests():
+	module_names = [
+		"propms.map_snapshot.test_import_isolation",
+		"propms.map_snapshot.test_validation",
+		"propms.map_snapshot.test_legacy_migration",
+	]
+	suite = unittest.TestSuite(
+		unittest.defaultTestLoader.loadTestsFromName(module_name)
+		for module_name in module_names
+	)
+	result = unittest.TextTestRunner(verbosity=2).run(suite)
+	if not result.wasSuccessful():
+		raise frappe.ValidationError("Focused migration tests failed")
+	return {
+		"tests_run": result.testsRun,
+		"failures": len(result.failures),
+		"errors": len(result.errors),
+	}
+
+
+@frappe.whitelist()
+def run_snapshot_focused_tests():
+	module_names = [
+		"propms.map_snapshot.test_presentation",
+		"propms.map_snapshot.test_import_isolation",
+		"propms.map_snapshot.test_validation",
+		"propms.map_snapshot.test_legacy_migration",
+		"propms.map_snapshot.test_security",
+		"propms.map_snapshot.test_resolver",
+		"propms.map_snapshot.test_route",
+		"propms.map_snapshot.test_capture",
+		"propms.map_snapshot.test_manifest",
+		"propms.map_snapshot.test_storage",
+		"propms.map_snapshot.test_jobs",
+		"propms.map_snapshot.test_pdf_assets",
+		"propms.map_snapshot.test_error_logging",
+	]
+	suite = unittest.TestSuite(
+		unittest.defaultTestLoader.loadTestsFromName(module_name)
+		for module_name in module_names
+	)
+	result = unittest.TextTestRunner(verbosity=2).run(suite)
+	if not result.wasSuccessful():
+		raise frappe.ValidationError("Focused snapshot tests failed")
+	return {
+		"tests_run": result.testsRun,
+		"failures": len(result.failures),
+		"errors": len(result.errors),
+	}
+
+
+@frappe.whitelist()
+def run_property_instruction_focused_tests():
+	module_names = [
+		__name__,
+	]
+	suite = unittest.TestSuite(
+		unittest.defaultTestLoader.loadTestsFromName(module_name)
+		for module_name in module_names
+	)
+	result = unittest.TextTestRunner(verbosity=2).run(suite)
+	if not result.wasSuccessful():
+		raise frappe.ValidationError("Focused Property Instruction tests failed")
+	return {
+		"tests_run": result.testsRun,
+		"failures": len(result.failures),
+		"errors": len(result.errors),
+	}
+
+
+@frappe.whitelist()
+def run_pdf_export_focused_tests():
+	module_names = [
+		"propms.map_snapshot.test_pdf_assets",
+	]
+	suite = unittest.TestSuite(
+		unittest.defaultTestLoader.loadTestsFromName(module_name)
+		for module_name in module_names
+	)
+	result = unittest.TextTestRunner(verbosity=2).run(suite)
+	if not result.wasSuccessful():
+		raise frappe.ValidationError("Focused PDF/export tests failed")
+	return {
+		"tests_run": result.testsRun,
+		"failures": len(result.failures),
+		"errors": len(result.errors),
+	}
 
 
 @frappe.whitelist()
 def run_codex_tests():
-	suite = unittest.defaultTestLoader.loadTestsFromName(__name__)
+	module_names = [
+		__name__,
+		"propms.map_snapshot.test_presentation",
+		"propms.map_snapshot.test_import_isolation",
+		"propms.map_snapshot.test_validation",
+		"propms.map_snapshot.test_legacy_migration",
+		"propms.map_snapshot.test_security",
+		"propms.map_snapshot.test_resolver",
+		"propms.map_snapshot.test_route",
+		"propms.map_snapshot.test_capture",
+		"propms.map_snapshot.test_manifest",
+		"propms.map_snapshot.test_storage",
+		"propms.map_snapshot.test_jobs",
+		"propms.map_snapshot.test_pdf_assets",
+		"propms.map_snapshot.test_error_logging",
+	]
+	suite = unittest.TestSuite(
+		unittest.defaultTestLoader.loadTestsFromName(module_name)
+		for module_name in module_names
+	)
 	result = unittest.TextTestRunner(verbosity=2).run(suite)
 	if not result.wasSuccessful():
 		raise frappe.ValidationError("Property Instruction tests failed")
