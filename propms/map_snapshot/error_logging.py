@@ -2,16 +2,40 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
+import traceback
 from datetime import datetime, timedelta
 
 import frappe
 
 
 ERROR_DEDUP_WINDOW_MINUTES = 30
+DATA_URL_REPLACEMENT = "<redacted-data-url>"
+URL_REPLACEMENT = "<redacted-url>"
 
 
 def _clean_text(value) -> str:
 	return (value or "").strip()
+
+
+def _sanitize_sensitive_text(value) -> str:
+	text = str(value or "")
+	if not text:
+		return ""
+	text = re.sub(r"data:text/html[^)\]>\s'\"\\]+", DATA_URL_REPLACEMENT, text, flags=re.IGNORECASE)
+	text = re.sub(r"https?://[^\s'\"<>]+", URL_REPLACEMENT, text, flags=re.IGNORECASE)
+	return text
+
+
+def sanitize_capture_failure_exception(exception: Exception) -> dict[str, str]:
+	trace = "".join(
+		traceback.format_exception(type(exception), exception, exception.__traceback__)
+	)
+	return {
+		"exception_type": type(exception).__name__,
+		"exception_message": _sanitize_sensitive_text(exception),
+		"traceback": _sanitize_sensitive_text(trace),
+	}
 
 
 def build_failure_fingerprint(
@@ -98,8 +122,9 @@ def log_map_snapshot_failure(
 		"capture_duration_seconds": capture_duration_seconds,
 		"attempt_number": attempt_number,
 		"cleanup_diagnostics": cleanup_diagnostics or {},
+		"exception": sanitize_capture_failure_exception(exception),
 	}
-	message = f"{frappe.get_traceback()}\n\nMap snapshot context:\n{frappe.as_json(context, indent=2)}"
+	message = f"Map snapshot failure.\n\nMap snapshot context:\n{frappe.as_json(context, indent=2)}"
 	error_log = frappe.log_error(
 		title=title,
 		message=message,

@@ -58,3 +58,28 @@ class TestMapSnapshotErrorLogging(PropertyInstructionTestMixin, FrappeTestCase):
 			)
 		self.to_delete.append(("Error Log", first))
 		self.assertEqual(first, second)
+
+	def test_capture_failure_sanitizes_data_urls_and_embed_urls(self):
+		doc = self.make_instruction(custom_map_embed_url="https://www.google.com/maps/embed?pb=error-redact")
+		sensitive_data_url = "data:text/html;charset=utf-8;base64,PHNjcmlwdD5hbGVydCgxKTwvc2NyaXB0Pg=="
+		try:
+			raise RuntimeError(
+				f"navigation failed for {sensitive_data_url} and https://www.google.com/maps/embed?pb=secret-map"
+			)
+		except RuntimeError as exc:
+			error_log_name = log_map_snapshot_failure(
+				property_instruction=doc.name,
+				map_key="property-location",
+				row_name=None,
+				source_hash="hash-three",
+				map_kind="google-maps",
+				stage="capture",
+				exception=exc,
+			)
+		self.to_delete.append(("Error Log", error_log_name))
+		error_log = frappe.get_doc("Error Log", error_log_name)
+		self.assertNotIn("data:text/html", error_log.error)
+		self.assertNotIn("secret-map", error_log.error)
+		self.assertNotIn("<script>", error_log.error)
+		self.assertIn("<redacted-data-url>", error_log.error)
+		self.assertIn("<redacted-url>", error_log.error)
