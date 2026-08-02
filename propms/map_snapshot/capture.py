@@ -100,10 +100,6 @@ def _sanitize_sensitive_text(value: str | None) -> str:
 	return text
 
 
-def sanitize_capture_exception_message(exception: Exception) -> str:
-	return _sanitize_sensitive_text(str(exception))
-
-
 def _start_network_trace(page: Page, enabled: bool, max_events: int = 200) -> list[dict[str, object]]:
 	trace: list[dict[str, object]] = []
 	if not enabled:
