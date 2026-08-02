@@ -17,6 +17,11 @@
   "link_url",
   "link_label",
   "custom_map_embed_url",
+  "custom_map_snapshot",
+  "custom_map_snapshot_status",
+  "custom_map_snapshot_source_hash",
+  "custom_map_snapshot_generated_at",
+  "custom_map_snapshot_error_log",
   "google_maps_embed_html"
  ],
  "fields": [
@@ -87,13 +92,52 @@
    "mandatory_depends_on": "eval:doc.block_type == \"Map\""
   },
   {
+   "depends_on": "eval:doc.custom_map_embed_url",
+   "fieldname": "custom_map_snapshot",
+   "fieldtype": "Attach Image",
+   "label": "Generated Google Map Snapshot",
+   "read_only": 1
+  },
+  {
+   "default": "Not Required",
+   "depends_on": "eval:doc.custom_map_embed_url",
+   "fieldname": "custom_map_snapshot_status",
+   "fieldtype": "Select",
+   "label": "Google Map Snapshot Status",
+   "options": "Not Required\nPending\nProcessing\nReady\nFailed",
+   "read_only": 1
+  },
+  {
+   "fieldname": "custom_map_snapshot_source_hash",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "label": "Google Map Snapshot Source Hash",
+   "read_only": 1
+  },
+  {
+   "depends_on": "eval:doc.custom_map_embed_url",
+   "fieldname": "custom_map_snapshot_generated_at",
+   "fieldtype": "Datetime",
+   "label": "Google Map Snapshot Generated At",
+   "read_only": 1
+  },
+  {
+   "depends_on": "eval:doc.custom_map_embed_url",
+   "fieldname": "custom_map_snapshot_error_log",
+   "fieldtype": "Link",
+   "label": "Google Map Snapshot Error Log",
+   "options": "Error Log",
+   "read_only": 1
+  },
+  {
    "depends_on": "eval:0",
-   "description": "Legacy field retained for backward compatibility. New saves canonicalise embed input into Google Maps Embed iframe or URL.",
+   "description": "Deprecated legacy field retained read-only for backward compatibility and migration. Use the canonical Google Maps Embed iframe or URL field instead.",
    "fieldname": "google_maps_embed_html",
    "fieldtype": "Code",
    "hidden": 1,
    "label": "Google Maps Embed HTML (Legacy)",
-   "options": "HTML"
+   "options": "HTML",
+   "read_only": 1
   }
  ],
  "index_web_pages_for_search": 1,

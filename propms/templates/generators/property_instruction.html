@@ -6,6 +6,7 @@
 {% set screen_map_embed_url = property_map.embed_url if property_map and property_map.embed_url else (map_embed_url if map_embed_url is defined and map_embed_url else (("https://www.google.com/maps?q=" ~ (screen_map_query | urlencode) ~ "&z=" ~ screen_map_zoom ~ "&output=embed" ~ ("&t=k" if map_type == "satellite" else "")) if show_embedded_map and screen_map_query else None)) %}
 {% set screen_map_external_url = property_map.external_url if property_map and property_map.external_url else (google_maps_url if google_maps_url is defined and google_maps_url else (("https://www.google.com/maps/search/?api=1&query=" ~ (screen_map_query | urlencode)) if screen_map_query else None)) %}
 {% set screen_map_embed_kind = property_map.embed_kind if property_map and property_map.embed_kind else "" %}
+{% set screen_map_embed_kind_class = property_map.embed_kind_class if property_map and property_map.embed_kind_class else screen_map_embed_kind %}
 
 {% block navbar %}{% endblock %}
 {% block footer %}{% endblock %}
@@ -400,6 +401,17 @@
     height: 100%;
     border: 0;
     display: block;
+  }
+  .pi-map-shell--google-my-maps,
+  .pi-instruction-map-shell--google-my-maps {
+    position: relative;
+    overflow: hidden;
+  }
+  .pi-map-shell--google-my-maps .pi-map,
+  .pi-instruction-map-shell--google-my-maps .pi-instruction-map {
+    height: calc(100% + var(--pi-my-maps-header-crop));
+    transform: translateY(calc(-1 * var(--pi-my-maps-header-crop)));
+    transform-origin: top center;
   }
   .pi-guide-toolbar {
     position: sticky;
@@ -1859,21 +1871,18 @@
 
   {% if block_map and block_map.embed_url %}
     <div
-      class="pi-instruction-map-shell notranslate"
+      class="pi-instruction-map-shell pi-instruction-map-shell--{{ block_map.embed_kind_class or block_map.embed_kind or 'unknown' }} notranslate"
       translate="no"
       data-guide-block-map
       data-guide-block-map-embed-url="{{ block_map.embed_url }}"
       data-guide-block-map-kind="{{ block_map.embed_kind or '' }}"
-      data-guide-block-map-latitude="{{ block_map.latitude if block_map.latitude is not none else '' }}"
-      data-guide-block-map-longitude="{{ block_map.longitude if block_map.longitude is not none else '' }}"
-      data-guide-block-map-center-latitude="{{ block_map.center_latitude if block_map.center_latitude is not none else '' }}"
-      data-guide-block-map-center-longitude="{{ block_map.center_longitude if block_map.center_longitude is not none else '' }}"
-      data-guide-block-map-marker-latitude="{{ block_map.marker_latitude if block_map.marker_latitude is not none else '' }}"
-      data-guide-block-map-marker-longitude="{{ block_map.marker_longitude if block_map.marker_longitude is not none else '' }}"
-      data-guide-block-map-coordinate-source="{{ block_map.coordinate_source or '' }}"
-      data-guide-block-map-zoom="{{ block_map.zoom if block_map.zoom is not none else '' }}"
       data-guide-block-map-external-url="{{ block_map.external_url or '' }}"
-      data-guide-block-map-attribution="{{ block_map.attribution or '© OpenStreetMap contributors' }}">
+      data-guide-block-map-pdf-representation="{{ block_map.pdf_representation or 'none' }}"
+      data-guide-block-map-snapshot-image="{{ block_map.pdf_snapshot_image_url or '' }}"
+      data-guide-block-map-open-url="{{ block_map.pdf_open_url or '' }}"
+      data-guide-block-map-source-hash="{{ block_map.pdf_desired_source_hash or '' }}"
+      data-guide-block-map-reason="{{ block_map.pdf_reason_code or '' }}"
+      data-guide-block-map-custom-google="{{ 1 if block_map.is_custom_google_map else 0 }}">
       <iframe
         src="{{ block_map.embed_url }}"
         loading="lazy"
@@ -1903,8 +1912,10 @@
 <div
   class="pi-page"
   lang="{{ selected_language_code or 'en' }}"
+  style="--pi-my-maps-header-crop: {{ my_maps_header_crop_px or 60 }}px;"
   data-guide-root
   data-guide-identity="{{ route or slug or title }}"
+  data-my-maps-presentation-version="{{ my_maps_presentation_version or 1 }}"
   data-guide-show-wifi-qr="{{ 1 if show_wifi_qr_in_pdf else 0 }}"
   data-guide-wifi-security-type="{{ wifi_security_type or 'WPA' }}"
   data-guide-wifi-hidden-network="{{ 1 if wifi_hidden_network else 0 }}">
@@ -2106,16 +2117,16 @@
         class="pi-card pi-map-card"
         aria-label="Property map"
         data-guide-map-card
-        data-guide-map-image="{{ map_static_image_url or '' }}"
         data-guide-map-embed-url="{{ screen_map_embed_url }}"
         data-guide-map-kind="{{ screen_map_embed_kind }}"
-        data-guide-map-latitude="{{ property_map.latitude if property_map and property_map.latitude is not none else '' }}"
-        data-guide-map-longitude="{{ property_map.longitude if property_map and property_map.longitude is not none else '' }}"
-        data-guide-map-zoom="{{ property_map.map_zoom if property_map and property_map.map_zoom is not none else (map_zoom or 16) }}"
-        data-guide-map-parking-zoom="{{ property_map.parking_zoom if property_map and property_map.parking_zoom is not none else 15 }}"
-        data-guide-map-attribution="© OpenStreetMap contributors">
+        data-guide-map-pdf-representation="{{ property_map.pdf_representation or 'none' }}"
+        data-guide-map-snapshot-image="{{ property_map.pdf_snapshot_image_url or '' }}"
+        data-guide-map-open-url="{{ property_map.pdf_open_url or '' }}"
+        data-guide-map-source-hash="{{ property_map.pdf_desired_source_hash or '' }}"
+        data-guide-map-reason="{{ property_map.pdf_reason_code or '' }}"
+        data-guide-map-custom-google="{{ 1 if property_map and property_map.is_custom_google_map else 0 }}">
         <span class="pi-label" data-guide-map-title data-guide-signature data-guide-translation-kind="translatable">Property Location</span>
-        <div class="pi-map-shell">
+        <div class="pi-map-shell pi-map-shell--{{ screen_map_embed_kind_class or 'unknown' }}">
           <iframe
             class="pi-map"
             title="Map showing the property location"
