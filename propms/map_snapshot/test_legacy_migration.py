@@ -14,6 +14,12 @@ from propms.map_snapshot.legacy_migration import (
 	migrate_google_maps_embed_html_to_custom_map_embed_url,
 	plan_legacy_map_migration,
 )
+from propms.patches.v1_0.drop_obsolete_property_instruction_map_columns import (
+	OBSOLETE_PROPERTY_MAP_COLUMNS,
+	PROPERTY_INSTRUCTION_DOCTYPE,
+	PROPERTY_INSTRUCTION_TABLE,
+	execute as drop_obsolete_property_instruction_map_columns,
+)
 from propms.property_management_solution.doctype.property_instruction.test_property_instruction import (
 	PropertyInstructionTestMixin,
 )
@@ -384,3 +390,60 @@ class TestLegacyMapMigration(PropertyInstructionTestMixin, FrappeTestCase):
 		next_cursor = result["next_cursor"]
 		follow_up = enqueue_pending_migrated_map_snapshots(batch_size=1000, cursor=next_cursor, dry_run=True)
 		self.assertLessEqual(follow_up["batch_size"], 50)
+
+	def test_drop_obsolete_property_instruction_map_columns_targets_only_allowlist(self):
+		self.assertEqual(
+			OBSOLETE_PROPERTY_MAP_COLUMNS,
+			(
+				"google_maps_place_id",
+				"map_search_query",
+				"map_zoom",
+				"map_type",
+				"show_embedded_map",
+			),
+		)
+		self.assertEqual(PROPERTY_INSTRUCTION_DOCTYPE, "Property Instruction")
+		self.assertEqual(PROPERTY_INSTRUCTION_TABLE, "`tabProperty Instruction`")
+
+	def test_drop_obsolete_property_instruction_map_columns_skips_missing_table(self):
+		with patch("propms.patches.v1_0.drop_obsolete_property_instruction_map_columns.frappe.db.table_exists", return_value=False), patch(
+			"propms.patches.v1_0.drop_obsolete_property_instruction_map_columns.frappe.db.has_column"
+		) as has_column_mock, patch(
+			"propms.patches.v1_0.drop_obsolete_property_instruction_map_columns.frappe.db.sql_ddl"
+		) as sql_ddl_mock:
+			drop_obsolete_property_instruction_map_columns()
+		has_column_mock.assert_not_called()
+		sql_ddl_mock.assert_not_called()
+
+	def test_drop_obsolete_property_instruction_map_columns_skips_absent_columns(self):
+		with patch("propms.patches.v1_0.drop_obsolete_property_instruction_map_columns.frappe.db.table_exists", return_value=True), patch(
+			"propms.patches.v1_0.drop_obsolete_property_instruction_map_columns.frappe.db.has_column",
+			return_value=False,
+		) as has_column_mock, patch(
+			"propms.patches.v1_0.drop_obsolete_property_instruction_map_columns.frappe.db.sql_ddl"
+		) as sql_ddl_mock:
+			drop_obsolete_property_instruction_map_columns()
+		self.assertEqual(has_column_mock.call_count, len(OBSOLETE_PROPERTY_MAP_COLUMNS))
+		sql_ddl_mock.assert_not_called()
+
+	def test_drop_obsolete_property_instruction_map_columns_drops_only_present_columns(self):
+		present_columns = {"map_search_query", "map_type"}
+
+		def has_column(_doctype, column):
+			return column in present_columns
+
+		with patch("propms.patches.v1_0.drop_obsolete_property_instruction_map_columns.frappe.db.table_exists", return_value=True), patch(
+			"propms.patches.v1_0.drop_obsolete_property_instruction_map_columns.frappe.db.has_column",
+			side_effect=has_column,
+		), patch(
+			"propms.patches.v1_0.drop_obsolete_property_instruction_map_columns.frappe.db.sql_ddl"
+		) as sql_ddl_mock:
+			drop_obsolete_property_instruction_map_columns()
+
+		self.assertEqual(
+			[call.args[0] for call in sql_ddl_mock.call_args_list],
+			[
+				f"alter table {PROPERTY_INSTRUCTION_TABLE} drop column `map_search_query`",
+				f"alter table {PROPERTY_INSTRUCTION_TABLE} drop column `map_type`",
+			],
+		)

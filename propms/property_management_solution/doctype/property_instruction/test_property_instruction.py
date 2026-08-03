@@ -231,31 +231,6 @@ class PropertyInstructionTestMixin:
 		self.clear_route_cache()
 		return doc
 
-	def set_legacy_main_map_columns(self, doc, **values):
-		allowed_fields = {
-			"google_maps_place_id",
-			"map_search_query",
-			"map_zoom",
-			"map_type",
-			"show_embedded_map",
-		}
-		assignments = []
-		params = []
-		for fieldname, value in values.items():
-			if fieldname not in allowed_fields:
-				raise AssertionError(f"Unsupported legacy field: {fieldname}")
-			assignments.append(f"`{fieldname}` = %s")
-			params.append(value)
-		if not assignments:
-			return
-		params.append(doc.name)
-		frappe.db.sql(
-			f"update `tabProperty Instruction` set {', '.join(assignments)} where name = %s",
-			tuple(params),
-		)
-		frappe.db.commit()
-		doc.reload()
-
 	def get_context(self, doc):
 		doc.reload()
 		frappe.local.form_dict = frappe._dict({})
@@ -444,14 +419,12 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 			google_maps_url="",
 			address="99A Burlington Road",
 		)
-		self.set_legacy_main_map_columns(
-			doc,
-			show_embedded_map=1,
-			google_maps_place_id="ChIJ123",
-			map_search_query="Legacy Query",
-			map_zoom=19,
-			map_type="satellite",
-		)
+		meta = frappe.get_meta("Property Instruction")
+		self.assertFalse(meta.has_field("google_maps_place_id"))
+		self.assertFalse(meta.has_field("map_search_query"))
+		self.assertFalse(meta.has_field("map_zoom"))
+		self.assertFalse(meta.has_field("map_type"))
+		self.assertFalse(meta.has_field("show_embedded_map"))
 		self.assertIsNone(doc.get_map_embed_url())
 		context = doc.get_public_render_context()
 		self.assertFalse(context.map_embed_enabled)
@@ -968,13 +941,6 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 			custom_map_embed_url="",
 			google_maps_url="",
 			address="10 Downing Street",
-		)
-		self.set_legacy_main_map_columns(
-			doc,
-			show_embedded_map=1,
-			map_search_query="10 Downing Street London",
-			map_zoom=17,
-			map_type="satellite",
 		)
 		context = doc.get_public_render_context()
 		self.assertFalse(context.property_map.embed_url)
