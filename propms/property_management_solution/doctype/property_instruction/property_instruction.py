@@ -233,7 +233,7 @@ class PropertyInstruction(WebsiteGenerator):
 		for block in self.instruction_blocks or []:
 			if not block.sort_order:
 				block.sort_order = block.idx
-			embed_input = self.get_block_map_canonical_embed_input(block)
+			embed_input = self.get_block_map_embed_input(block)
 			canonical_embed_url = (
 				self.normalize_google_maps_embed_input(embed_input)
 				if embed_input
@@ -266,16 +266,15 @@ class PropertyInstruction(WebsiteGenerator):
 			frappe.throw(_("Google Maps URL must use a trusted Google Maps hostname."))
 
 	def validate_map_block(self, row):
-		canonical_input = self.get_block_map_canonical_embed_input(row)
-		legacy_input = self.get_block_map_legacy_embed_input(row)
-		if row.block_type == "Map" and not (canonical_input or legacy_input):
+		embed_input = self.get_block_map_embed_input(row)
+		if row.block_type == "Map" and not embed_input:
 			frappe.throw(
 				_("Instruction Block #{0} is missing a Google Maps embed iframe or URL.").format(row.idx)
 			)
-		if not canonical_input:
+		if not embed_input:
 			return
 		try:
-			canonical_embed_url = self.extract_google_maps_embed_url(canonical_input)
+			canonical_embed_url = self.extract_google_maps_embed_url(embed_input)
 			row.set("custom_map_embed_url", canonical_embed_url)
 		except frappe.ValidationError:
 			raise
@@ -586,7 +585,6 @@ class PropertyInstruction(WebsiteGenerator):
 				if row.block_type == "Step":
 					step_counter += 1
 				block_row = row.as_dict()
-				block_row.pop("google_maps_embed_html", None)
 				block_row.pop("custom_map_embed_url", None)
 				block_map = self.get_block_map_data(row)
 				block_pdf = self.get_pdf_map_representation("block", row.name)
@@ -871,21 +869,14 @@ class PropertyInstruction(WebsiteGenerator):
 				row.caption,
 				row.link_url,
 				row.get("custom_map_embed_url"),
-				row.get("google_maps_embed_html"),
 			]
 		)
 
 	def normalize_google_maps_embed_input(self, value):
 		return normalize_google_maps_embed_input_value(value)
 
-	def get_block_map_canonical_embed_input(self, row):
-		return (row.get("custom_map_embed_url") or "").strip()
-
-	def get_block_map_legacy_embed_input(self, row):
-		return (row.get("google_maps_embed_html") or "").strip()
-
 	def get_block_map_embed_input(self, row):
-		return self.get_block_map_canonical_embed_input(row) or self.get_block_map_legacy_embed_input(row)
+		return (row.get("custom_map_embed_url") or "").strip()
 
 	def extract_google_maps_embed_url(self, embed_input):
 		return extract_google_maps_embed_url_value(embed_input)

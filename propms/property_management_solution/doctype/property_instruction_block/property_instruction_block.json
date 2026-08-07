@@ -21,8 +21,7 @@
   "custom_map_snapshot_status",
   "custom_map_snapshot_source_hash",
   "custom_map_snapshot_generated_at",
-  "custom_map_snapshot_error_log",
-  "google_maps_embed_html"
+  "custom_map_snapshot_error_log"
  ],
  "fields": [
   {
@@ -133,16 +132,6 @@
    "in_list_view": 0,
    "label": "Google Map Snapshot Error Log",
    "options": "Error Log",
-   "read_only": 1
-  },
-  {
-   "depends_on": "eval:0",
-   "description": "Deprecated legacy field retained read-only for backward compatibility and migration. Use the canonical Google Maps Embed iframe or URL field instead.",
-   "fieldname": "google_maps_embed_html",
-   "fieldtype": "Code",
-   "hidden": 1,
-   "label": "Google Maps Embed HTML (Legacy)",
-   "options": "HTML",
    "read_only": 1
   }
  ],
