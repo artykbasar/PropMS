@@ -105,6 +105,8 @@
   {
    "fieldname": "custom_map_snapshot",
    "fieldtype": "Attach Image",
+   "hidden": 1,
+   "in_list_view": 0,
    "label": "Generated Google Map Snapshot",
    "read_only": 1
   },
@@ -112,6 +114,7 @@
    "default": "Not Required",
    "fieldname": "custom_map_snapshot_status",
    "fieldtype": "Select",
+   "in_list_view": 0,
    "label": "Google Map Snapshot Status",
    "options": "Not Required\nPending\nProcessing\nReady\nFailed",
    "read_only": 1
@@ -120,18 +123,21 @@
    "fieldname": "custom_map_snapshot_source_hash",
    "fieldtype": "Data",
    "hidden": 1,
+   "in_list_view": 0,
    "label": "Google Map Snapshot Source Hash",
    "read_only": 1
   },
   {
    "fieldname": "custom_map_snapshot_generated_at",
    "fieldtype": "Datetime",
+   "in_list_view": 0,
    "label": "Google Map Snapshot Generated At",
    "read_only": 1
   },
   {
    "fieldname": "custom_map_snapshot_error_log",
    "fieldtype": "Link",
+   "in_list_view": 0,
    "label": "Google Map Snapshot Error Log",
    "options": "Error Log",
    "read_only": 1

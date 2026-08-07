@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from contextlib import contextmanager
 import json
 import mimetypes
 import os
@@ -91,6 +92,28 @@ PUBLIC_PDF_IMAGE_ALLOWED_CONTENT_TYPES = {
 	"image/gif",
 	"image/avif",
 }
+SNAPSHOT_SYSTEM_FIELDNAMES = (
+	"custom_map_snapshot",
+	"custom_map_snapshot_status",
+	"custom_map_snapshot_source_hash",
+	"custom_map_snapshot_generated_at",
+	"custom_map_snapshot_error_log",
+)
+SNAPSHOT_SYSTEM_UPDATE_FLAG = "propms_allow_snapshot_system_field_update"
+
+
+@contextmanager
+def allow_snapshot_system_field_update():
+	"""Limit lifecycle-field writes to server-owned code paths."""
+	previous_value = frappe.flags.get(SNAPSHOT_SYSTEM_UPDATE_FLAG)
+	frappe.flags[SNAPSHOT_SYSTEM_UPDATE_FLAG] = True
+	try:
+		yield
+	finally:
+		if previous_value is None:
+			frappe.flags.pop(SNAPSHOT_SYSTEM_UPDATE_FLAG, None)
+		else:
+			frappe.flags[SNAPSHOT_SYSTEM_UPDATE_FLAG] = previous_value
 
 class PropertyInstruction(WebsiteGenerator):
 	website = frappe._dict(
@@ -107,6 +130,7 @@ class PropertyInstruction(WebsiteGenerator):
 		self.ensure_single_instruction_per_property()
 		self.set_slug()
 		self.set_route_from_slug()
+		self.validate_system_managed_fields()
 		self.validate_unique_slug_and_route()
 		self.normalize_map_fields()
 		self.normalize_wifi_qr_fields()
@@ -130,6 +154,46 @@ class PropertyInstruction(WebsiteGenerator):
 
 	def set_route_from_slug(self):
 		self.route = f"instructions/{self.slug}"
+
+	def validate_system_managed_fields(self):
+		if frappe.flags.get(SNAPSHOT_SYSTEM_UPDATE_FLAG):
+			return
+
+		previous_doc = None if self.is_new() else self.get_doc_before_save()
+		if not previous_doc:
+			self.validate_new_snapshot_target(self)
+			for row in self.instruction_blocks or []:
+				self.validate_new_snapshot_target(row)
+			return
+
+		self.validate_existing_snapshot_target(self, previous_doc)
+		previous_rows = {row.name: row for row in previous_doc.instruction_blocks or [] if row.name}
+		for row in self.instruction_blocks or []:
+			previous_row = previous_rows.get(row.name)
+			if previous_row:
+				self.validate_existing_snapshot_target(row, previous_row)
+			else:
+				self.validate_new_snapshot_target(row)
+
+	def validate_new_snapshot_target(self, target):
+		for fieldname in SNAPSHOT_SYSTEM_FIELDNAMES:
+			value = self.get_normalized_snapshot_system_value(target, fieldname)
+			expected_value = SNAPSHOT_STATUS_NOT_REQUIRED if fieldname == "custom_map_snapshot_status" else ""
+			if value != expected_value:
+				frappe.throw(_("Map snapshot lifecycle fields are system managed."))
+
+	def validate_existing_snapshot_target(self, target, previous_target):
+		for fieldname in SNAPSHOT_SYSTEM_FIELDNAMES:
+			if self.get_normalized_snapshot_system_value(target, fieldname) != self.get_normalized_snapshot_system_value(
+				previous_target, fieldname
+			):
+				frappe.throw(_("Map snapshot lifecycle fields are system managed."))
+
+	def get_normalized_snapshot_system_value(self, target, fieldname):
+		value = target.get(fieldname)
+		if not value:
+			return ""
+		return str(value).strip()
 
 	def ensure_single_instruction_per_property(self):
 		existing = frappe.db.exists(
