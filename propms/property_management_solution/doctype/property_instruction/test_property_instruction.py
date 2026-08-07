@@ -1280,17 +1280,18 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 		self.assertLess(export_index, google_index)
 		self.assertIn("__propertyInstructionGoogleScriptRequestedAt = Date.now()", html)
 
-	def test_export_script_uses_per_page_html2canvas_and_direct_jspdf(self):
+	def test_export_script_uses_adaptive_vector_jspdf_without_html2canvas(self):
 		source = self.get_export_script_source()
 		ensure_original_snapshot_start = source.index("function ensureOriginalSnapshotCaptured()")
 		ensure_original_snapshot_end = source.index("function sleep(", ensure_original_snapshot_start)
 		ensure_original_snapshot_source = source[ensure_original_snapshot_start:ensure_original_snapshot_end]
 		self.assertIn("function buildPdfExportDocument(model)", source)
 		self.assertIn('querySelectorAll("[data-pdf-page]")', source)
-		self.assertIn("function ensureCaptureFrame()", source)
-		self.assertIn("function prepareCaptureFramePage(pageNode, performanceState)", source)
-		self.assertIn("window.html2canvas(captureTarget.page", source)
 		self.assertIn("new jsPDF({", source)
+		self.assertIn('var PDF_RENDERER_ID = "adaptive-vector";', source)
+		self.assertIn("function renderExportPagesToVectorPdf(exportState, pageNodes, performanceState)", source)
+		self.assertNotIn("html2canvas", source)
+		self.assertNotIn("renderExportPagesToRasterPdf", source)
 		self.assertNotIn("html2" + "pdf().from(", source)
 		self.assertIn("destroyExportRoot", source)
 		self.assertIn("getVisibleText(", source)
@@ -1406,7 +1407,7 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 		self.assertIn('throw new Error("PDF export content does not match the visible guide")', source)
 		self.assertIn('throw new Error("Guide translation changed before PDF download")', source)
 
-	def test_export_script_resolves_images_through_same_origin_proxy_and_validates_painting(self):
+	def test_export_script_resolves_images_through_same_origin_proxy_for_vector_embedding(self):
 		source = self.get_export_script_source()
 		self.assertIn("function resolveExportImageUrl(sourceUrl)", source)
 		self.assertIn("PUBLIC_PDF_IMAGE_ENDPOINT", source)
@@ -1419,27 +1420,22 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 		self.assertNotIn("temporarilyInlineDocumentProxyImages(exportState.exportRoot, exportImageDataCache)", source)
 		self.assertNotIn("data-export-inline-proxy-src", source)
 		self.assertIn("assertExportImageSourcesAreCapturable", source)
-		self.assertIn("validateExportImagesCanPaintToCanvas", source)
-		self.assertIn("validateCanvasPaintedImages(pageNode, canvas, index)", source)
-		self.assertIn('throw new Error("image-not-painted")', source)
+		self.assertIn("function prepareVectorImageAssets(layoutModel)", source)
+		self.assertIn("function drawVectorImageElement(pdf, element, preparedAssets)", source)
+		self.assertNotIn("validateExportImagesCanPaintToCanvas", source)
+		self.assertNotIn("validateCanvasPaintedImages", source)
 
 	def test_export_script_records_pdf_performance_and_ignores_non_current_pages(self):
 		source = self.get_export_script_source()
 		self.assertIn("window.__propertyInstructionPdfPerformance", source)
 		self.assertIn("window.__propertyInstructionPdfLifecycle", source)
 		self.assertIn("translationReadyMs", source)
-		self.assertIn("pageCaptureMs", source)
-		self.assertIn("frameCreatedAt", source)
-		self.assertIn("frameStylesReadyMs", source)
-		self.assertIn("frameFontsReadyMs", source)
-		self.assertIn("pageDomReplacementMs", source)
-		self.assertIn("captureTarget = await prepareCaptureFramePage(pageNode, performanceState)", source)
-		self.assertIn("destroyCaptureFrame(captureFrame)", source)
-		self.assertIn("prepareCaptureClone(clonedDocument)", source)
+		self.assertIn("vectorLayoutExtractionMs", source)
+		self.assertIn("fontReadinessMs", source)
 		self.assertNotIn("function applyCaptureIgnoreAttributes(", source)
 		self.assertNotIn("function clearCaptureIgnoreAttributes(", source)
-		self.assertIn("canvas.width = 1;", source)
-		self.assertIn("await sleep(isSafariFamily() ? 16 : 0);", source)
+		self.assertNotIn("pageCaptureMs", source)
+		self.assertNotIn("isSafariFamily", source)
 
 	def test_export_script_preserves_toolbar_icon_buttons_during_progress_updates(self):
 		source = self.get_export_script_source()
@@ -1519,7 +1515,7 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 		self.assertIn('blockId: linkEntry.blockId || ""', source)
 		self.assertIn("pi-export-card-qr-panel", source)
 		self.assertIn("data-pdf-section-item", source)
-		self.assertIn("pageImageBlobs.push(jpegBlob)", source)
+		self.assertNotIn("pageImageBlobs", source)
 		self.assertIn("PDF pagination dropped export content", source)
 		self.assertNotIn("pi-export-section--quick-links", source)
 		self.assertIn("data-pdf-download-anchor", html)
@@ -1576,11 +1572,11 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 		self.assertIn('/assets/frappe/css/fonts/inter/Inter-SemiBold.woff2', html)
 		self.assertIn('/assets/frappe/css/fonts/inter/Inter-Bold.woff2', html)
 		self.assertIn("PDF_EXPORT_FONT_LOADS", source)
-		self.assertIn("frameDocument.fonts.load(fontSpec)", source)
-		self.assertIn("frameDocument.fonts.check(fontSpec)", source)
-		self.assertIn('setTranslationAbortReason("PDF font load failed", "pdf-font-load-failed")', source)
-		self.assertIn("window.__propertyInstructionPdfTypographyDiagnostics", source)
-		self.assertIn("collectTypographyDiagnostics", source)
+		self.assertIn("VECTOR_PDF_FONT_MANIFEST", source)
+		self.assertIn("function ensureVectorPdfFontsRegistered(pdf)", source)
+		self.assertIn('pdf.addFont(fontEntry.file, fontEntry.family, fontEntry.style, "Identity-H");', source)
+		self.assertIn("VECTOR_PDF_FONT_FAMILY_ARABIC", source)
+		self.assertNotIn("frameDocument.fonts", source)
 		self.assertIn("word-spacing: 0.08em;", html)
 		self.assertIn("word-spacing: 0.07em;", html)
 		self.assertIn("word-spacing: normal;", html)
@@ -1620,15 +1616,15 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 		self.assertIn("markExportNodeNotranslate(viewport);", source)
 		self.assertIn("markExportNodeNotranslate(footer);", source)
 
-	def test_export_script_checks_export_dom_parity_after_mount_and_before_canvas(self):
+	def test_export_script_checks_export_dom_parity_through_vector_rendering(self):
 		source = self.get_export_script_source()
 		self.assertIn('validateExportDomParity(exportState.exportRoot, preMountParity.modelParityMap, "detached-build")', source)
 		self.assertIn('validateExportDomParity(exportState.exportRoot, preMountParity.modelParityMap, "post-mount")', source)
 		self.assertIn('validateExportDomParity(exportState.exportRoot, preMountParity.modelParityMap, "post-pagination")', source)
 		self.assertIn('validateExportDomParity(exportState.exportRoot, modelParityMap, "pre-render", mutationGuardState)', source)
 		self.assertIn('validateExportDomParity(exportState.exportRoot, modelParityMap, "post-fonts-images", mutationGuardState)', source)
-		self.assertIn('validateExportDomParity(exportState.exportRoot, modelParityMap, "before-canvas-page-" + (index + 1), mutationGuardState)', source)
 		self.assertIn('validateExportDomParity(exportState.exportRoot, modelParityMap, "post-render", mutationGuardState)', source)
+		self.assertNotIn("before-canvas-page-", source)
 		self.assertIn('setTranslationAbortReason("Export DOM mutated after translation", "export-dom-mutated-after-translation")', source)
 
 	def test_export_script_syncs_sticky_toolbar_offset_and_active_nav(self):
@@ -1793,11 +1789,9 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 		self.assertIn('setToolbarButtonLabel(downloadButton, currentLabel + "…");', source)
 		self.assertIn('statusElement.textContent = statusMessage || "…";', source)
 
-	def test_export_script_supports_adaptive_a4_pdf_layout_flag(self):
+	def test_export_script_uses_the_adaptive_a4_pdf_layout(self):
 		source = self.get_export_script_source()
 		html = self.render_instruction(self.make_instruction())
-		self.assertIn('function isAdaptivePdfLayoutEnabled()', source)
-		self.assertIn('propms_pdf_layout', source)
 		self.assertIn('PDF_ADAPTIVE_LAYOUT_VERSION', source)
 		self.assertIn('PDF_EXPORT_WIDTH = 794', source)
 		self.assertIn('PDF_EXPORT_PAGE_HEIGHT = 1122', source)
@@ -1810,6 +1804,8 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 		self.assertIn('getAdaptivePageOverflowPixels(pageNode)', source)
 		self.assertIn('window.__propertyInstructionPdfAdaptiveLayoutSummary', source)
 		self.assertIn('data-guide-progress-copy="continued_suffix"', html)
+		self.assertNotIn('propms_pdf_layout', source)
+		self.assertNotIn('legacy pagination', source)
 
 	def test_export_script_builds_adaptive_rows_and_orientation_aware_cards(self):
 		source = self.get_export_script_source()
@@ -2036,7 +2032,6 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 		self.assertIn('status: "complete"', source)
 		self.assertIn('status: "failed"', source)
 		self.assertIn('propms-pdf-artifact-ready', source)
-		self.assertIn('pageImages: (renderResult.pageImages || []).map', source)
 		self.assertIn('createPdfArtifactModeBlobUrl(artifact.pdfBlob)', source)
 		self.assertIn('clearPdfArtifactModeResult("api-regenerate")', source)
 		self.assertIn('clearPdfArtifactModeResult("pagehide")', source)
@@ -2047,16 +2042,9 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 		self.assertIn('triggerAutomaticPdfDownload(artifact.pdfBlob, getPdfFilename(downloadButton))', source)
 		self.assertIn('showAutomaticDownloadFallback(artifact, {', source)
 
-	def test_export_script_supports_experimental_vector_pdf_renderer(self):
+	def test_export_script_uses_the_vector_pdf_renderer(self):
 		source = self.get_export_script_source()
-		self.assertIn('var PDF_DEFAULT_LAYOUT = "adaptive";', source)
-		self.assertIn('var PDF_ADAPTIVE_DEFAULT_RENDERER = "vector";', source)
-		self.assertIn('function resolvePdfExportMode(options)', source)
-		self.assertIn('function getResolvedPdfExportMode()', source)
-		self.assertIn('function getAdaptivePdfRenderer()', source)
-		self.assertIn('function isAdaptiveVectorPdfRendererEnabled()', source)
-		self.assertIn('propms_pdf_renderer', source)
-		self.assertIn('propms_pdf_layout', source)
+		self.assertIn('var PDF_RENDERER_ID = "adaptive-vector";', source)
 		self.assertIn('VECTOR_PDF_FONT_MANIFEST', source)
 		self.assertIn('VECTOR_PDF_FONT_FAMILY_LATIN', source)
 		self.assertIn('VECTOR_PDF_FONT_FAMILY_ARABIC', source)
@@ -2069,14 +2057,14 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 		self.assertIn('function prepareVectorImageAssets(layoutModel)', source)
 		self.assertIn('function renderExportPagesToVectorPdf(exportState, pageNodes, performanceState)', source)
 		self.assertIn('unit: "pt"', source)
-		self.assertIn('window.__propertyInstructionPdfRenderer = "jspdf-vector";', source)
+		self.assertIn('window.__propertyInstructionPdfRenderer = PDF_RENDERER_ID;', source)
 		self.assertIn('layoutModel: renderResult.layoutModel || null', source)
 		self.assertIn('embeddedFonts: renderResult.embeddedFonts || []', source)
-		self.assertIn('renderer: String(artifact.renderer || "raster")', source)
+		self.assertIn('renderer: String(artifact.renderer || PDF_RENDERER_ID)', source)
 		self.assertIn('vectorTextDiagnostics', source)
 		self.assertIn('preparedImageAssets', source)
 		self.assertIn('isPdfArtifactModeEnabled()', source)
-		self.assertIn('? await captureDiagnosticPageImages(pageNodes, performanceState)', source)
+		self.assertNotIn('captureDiagnosticPageImages', source)
 		self.assertIn('setPdfSemantic(badge, "badge", "step-badge"', source)
 		self.assertIn('setPdfSemantic(badgeText, "text", "step-badge-text"', source)
 		self.assertIn('function buildVectorLineCharacters(node, pageRect, scaleMetrics)', source)
@@ -2085,19 +2073,15 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 		self.assertIn('direction: "neutral"', source)
 		self.assertNotIn('var matcher = /\\S+\\s*/g;', source)
 
-	def test_export_script_centralises_adaptive_renderer_routing(self):
+	def test_export_script_removes_renderer_and_layout_switches(self):
 		source = self.get_export_script_source()
-		self.assertIn('renderer: "legacy"', source)
-		self.assertIn('layout: "adaptive"', source)
-		self.assertIn('layout: "legacy"', source)
-		self.assertIn('var explicitRenderer = requestedRenderer === "vector" || requestedRenderer === "raster";', source)
-		self.assertIn('var renderer = explicitRenderer ? requestedRenderer : adaptiveDefaultRenderer;', source)
-		self.assertIn('requestedLayout === "adaptive" || requestedLayout === "legacy"', source)
-		self.assertIn('defaultLayout: PDF_DEFAULT_LAYOUT', source)
-		self.assertIn('adaptiveDefaultRenderer: PDF_ADAPTIVE_DEFAULT_RENDERER', source)
-		self.assertIn('return resolvePdfExportMode({', source)
-		self.assertIn('return getResolvedPdfExportMode().layout === "adaptive";', source)
-		self.assertIn('return getResolvedPdfExportMode().renderer;', source)
+		self.assertIn('var PDF_RENDERER_ID = "adaptive-vector";', source)
+		self.assertNotIn('propms_pdf_layout', source)
+		self.assertNotIn('propms_pdf_renderer', source)
+		self.assertNotIn('resolvePdfExportMode', source)
+		self.assertNotIn('isLegacyPdfLayoutEnabled', source)
+		self.assertNotIn('isAdaptiveVectorPdfRendererEnabled', source)
+		self.assertNotIn('renderExportPagesToRasterPdf', source)
 
 	def test_font_inventory_documents_vector_pdf_font_provenance(self):
 		font_readme_path = os.path.abspath(
@@ -2135,22 +2119,26 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 		with open(tool_path) as tool_file:
 			tool_source = tool_file.read()
 		self.assertIn("playwright", tool_source)
-		self.assertIn("propms_pdf_layout", tool_source)
-		self.assertIn("propms_pdf_renderer", tool_source)
-		self.assertIn('renderers: ["default", "raster", "vector", "legacy"]', tool_source)
+		self.assertIn('renderer: "adaptive-vector"', tool_source)
+		self.assertIn('browsers: ["chromium", "firefox", "webkit"]', tool_source)
+		self.assertIn('token === "--viewport-width"', tool_source)
+		self.assertIn('token === "--viewport-height"', tool_source)
+		self.assertNotIn("propms_pdf_layout", tool_source)
+		self.assertNotIn("propms_pdf_renderer", tool_source)
+		self.assertNotIn("--renderers", tool_source)
 		self.assertIn("acceptDownloads: true", tool_source)
 		self.assertIn('waitForEvent("download"', tool_source)
 		self.assertIn('page.on("popup"', tool_source)
 		self.assertIn("pollPrintSignal(page, popupObserver", tool_source)
 		self.assertIn("pollPopupAfterReadyPrint(page, popupObserver", tool_source)
 
-	def test_default_mode_resolves_to_adaptive_vector_and_legacy_route_remains_explicit(self):
+	def test_pdf_export_has_one_adaptive_vector_mode(self):
 		source = self.get_export_script_source()
-		self.assertIn('var PDF_DEFAULT_LAYOUT = "adaptive";', source)
-		self.assertIn('var PDF_ADAPTIVE_DEFAULT_RENDERER = "vector";', source)
-		self.assertIn('renderer = "vector";', source)
-		self.assertIn('requestedLayout === "adaptive" || requestedLayout === "legacy"', source)
-		self.assertIn('return getResolvedPdfExportMode().layout === "legacy";', source)
+		self.assertIn('var PDF_RENDERER_ID = "adaptive-vector";', source)
+		self.assertIn('var renderResult = await renderExportPagesToVectorPdf(exportState, pageNodes, performanceState);', source)
+		self.assertNotIn('renderExportPagesToRasterPdf', source)
+		self.assertNotIn('propms_pdf_layout', source)
+		self.assertNotIn('propms_pdf_renderer', source)
 
 	def test_vector_renderer_uses_inter_for_latin_and_preserves_weight_faces(self):
 		source = self.get_export_script_source()

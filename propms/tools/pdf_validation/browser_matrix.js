@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-const { chromium, webkit } = require("playwright");
+const { chromium, firefox, webkit } = require("playwright");
 const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
@@ -8,8 +8,8 @@ const path = require("path");
 const DEFAULTS = {
   baseUrl: "http://127.0.0.1:8000",
   propertySlug: "99a-burlington-road",
-  browsers: ["chromium", "webkit"],
-  renderers: ["default", "raster", "vector", "legacy"],
+  browsers: ["chromium", "firefox", "webkit"],
+  renderer: "adaptive-vector",
   actions: ["download", "print"],
   languages: ["en"],
   outputDir: "/tmp/propms_pdf_matrix",
@@ -37,9 +37,6 @@ function parseArgs(argv) {
     } else if (token === "--browsers" && nextValue) {
       options.browsers = nextValue.split(",").map((value) => value.trim()).filter(Boolean);
       index += 1;
-    } else if (token === "--renderers" && nextValue) {
-      options.renderers = nextValue.split(",").map((value) => value.trim()).filter(Boolean);
-      index += 1;
     } else if (token === "--actions" && nextValue) {
       options.actions = nextValue.split(",").map((value) => value.trim()).filter(Boolean);
       index += 1;
@@ -51,6 +48,12 @@ function parseArgs(argv) {
       index += 1;
     } else if (token === "--timeout-ms" && nextValue) {
       options.timeoutMs = Number(nextValue) || DEFAULTS.timeoutMs;
+      index += 1;
+    } else if (token === "--viewport-width" && nextValue) {
+      options.viewportWidth = Number(nextValue) || DEFAULTS.viewportWidth;
+      index += 1;
+    } else if (token === "--viewport-height" && nextValue) {
+      options.viewportHeight = Number(nextValue) || DEFAULTS.viewportHeight;
       index += 1;
     } else if (token === "--case-id" && nextValue) {
       options.caseId = nextValue.trim();
@@ -89,7 +92,7 @@ function sha256(filePath) {
   return digest.digest("hex");
 }
 
-function collectLegacyMapRequestDiagnostics(requests) {
+function collectMapRequestDiagnostics(requests) {
   const openStreetMapMatches = requests.filter((requestUrl) => /tile\.openstreetmap\.org/i.test(requestUrl));
   const googleStaticMapMatches = requests.filter((requestUrl) => /maps\.googleapis\.com\/maps\/api\/staticmap/i.test(requestUrl));
   return {
@@ -104,6 +107,9 @@ function collectLegacyMapRequestDiagnostics(requests) {
 function getBrowserType(name) {
   if (name === "chromium") {
     return chromium;
+  }
+  if (name === "firefox") {
+    return firefox;
   }
   if (name === "webkit") {
     return webkit;
@@ -139,20 +145,8 @@ function buildCaseId(propertySlug, browserName, renderer, action, language) {
   ].join("__");
 }
 
-function buildGuideUrl(baseUrl, propertySlug, renderer, language) {
+function buildGuideUrl(baseUrl, propertySlug, language) {
   const guideUrl = new URL(`/instructions/${propertySlug}`, baseUrl);
-  if (renderer === "legacy") {
-    guideUrl.searchParams.set("propms_pdf_layout", "legacy");
-  }
-  if (renderer === "raster" || renderer === "vector") {
-    guideUrl.searchParams.set("propms_pdf_layout", "adaptive");
-  }
-  if (renderer === "vector") {
-    guideUrl.searchParams.set("propms_pdf_renderer", "vector");
-  }
-  if (renderer === "raster") {
-    guideUrl.searchParams.set("propms_pdf_renderer", "raster");
-  }
   if (language && language !== "en") {
     guideUrl.searchParams.set("lang", language);
   }
@@ -401,7 +395,7 @@ async function runOne(options, browserName, renderer, action, language, caseId) 
     renderer,
     action,
     language,
-    url: buildGuideUrl(options.baseUrl, options.propertySlug, renderer, language),
+    url: buildGuideUrl(options.baseUrl, options.propertySlug, language),
     startedAt: startedAtIso,
     stages: []
   };
@@ -545,7 +539,10 @@ async function runOne(options, browserName, renderer, action, language, caseId) 
     await page.waitForTimeout(1500);
     markStage("state-captured");
     result.state = await snapshotState(page);
-    result.legacyMapRequestDiagnostics = collectLegacyMapRequestDiagnostics(requests);
+    if (result.state.renderer !== options.renderer) {
+      throw new Error(`Unexpected PDF renderer: ${result.state.renderer || "missing"}`);
+    }
+    result.mapRequestDiagnostics = collectMapRequestDiagnostics(requests);
     result.vectorFontRequests = requests.filter((requestUrl) => /\/assets\/propms\/js\/vendor\/fonts\//.test(requestUrl));
     result.browserFontRequests = requests.filter((requestUrl) => /\/assets\/frappe\/css\/fonts\/inter\//.test(requestUrl));
     result.consoleMessages = consoleMessages;
@@ -568,7 +565,7 @@ async function runOne(options, browserName, renderer, action, language, caseId) 
         result.stateCaptureError = snapshotError && snapshotError.message ? snapshotError.message : String(snapshotError);
       }
     }
-    result.legacyMapRequestDiagnostics = collectLegacyMapRequestDiagnostics(requests);
+    result.mapRequestDiagnostics = collectMapRequestDiagnostics(requests);
   } finally {
     result.finishedAt = new Date().toISOString();
     try {
@@ -606,12 +603,11 @@ async function main() {
   const resultsByCaseId = new Map();
   const cases = [];
   for (const browserName of options.browsers) {
-    for (const renderer of options.renderers) {
-      for (const action of options.actions) {
-        for (const language of options.languages) {
-          const caseId = buildCaseId(options.propertySlug, browserName, renderer, action, language);
-          cases.push({ browserName, renderer, action, language, caseId });
-        }
+    for (const action of options.actions) {
+      for (const language of options.languages) {
+        const renderer = options.renderer;
+        const caseId = buildCaseId(options.propertySlug, browserName, renderer, action, language);
+        cases.push({ browserName, renderer, action, language, caseId });
       }
     }
   }
