@@ -1,6 +1,8 @@
 [pre_model_sync]
 propms.patches.v1_0.remove_property_instruction_translation_doctypes
+propms.patches.v1_0.preflight_google_maps_embed_html_removal
 
 [post_model_sync]
 propms.patches.v1_0.migrate_google_maps_embed_html_to_custom_map_embed_url
 propms.patches.v1_0.drop_obsolete_property_instruction_map_columns
+propms.patches.v1_0.drop_google_maps_embed_html_from_property_instruction_block
