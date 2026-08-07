@@ -4,7 +4,6 @@
   }
   window.__propertyInstructionUiBound = true;
 
-  var HTML2CANVAS_LIBRARY_URL = "/assets/propms/js/vendor/html2canvas.min.js";
   var JSPDF_LIBRARY_URL = "/assets/propms/js/vendor/jspdf.umd.min.js";
   var QRCODE_LIBRARY_URL = "/assets/propms/js/vendor/qrcodegen.js";
   var VECTOR_PDF_FONT_TARGET_DPI = 260;
@@ -63,10 +62,8 @@
   ];
   var PUBLIC_PDF_IMAGE_ENDPOINT = "/api/method/propms.property_management_solution.doctype.property_instruction.property_instruction.public_pdf_image";
   var PUBLIC_MAP_SNAPSHOT_IMAGE_ENDPOINT = "/api/method/propms.map_snapshot.pdf_assets.public_map_snapshot_image";
-  var PDF_LAYOUT_VERSION = "2026-07-25-contents-qr-v1";
   var PDF_ADAPTIVE_LAYOUT_VERSION = "2026-07-27-adaptive-a4-v1";
-  var PDF_DEFAULT_LAYOUT = "adaptive";
-  var PDF_ADAPTIVE_DEFAULT_RENDERER = "vector";
+  var PDF_RENDERER_ID = "adaptive-vector";
   var PDF_EXPORT_WIDTH = 794;
   var PDF_EXPORT_PAGE_HEIGHT = 1122;
   var PDF_EXPORT_OFFSCREEN_LEFT = -20000;
@@ -247,77 +244,6 @@
   var vectorPdfImageAssetState = {
     preparedAssets: null
   };
-  function getRequestedPdfExportOptions() {
-    var requestedLayout = "";
-    var requestedRenderer = "";
-    try {
-      var params = new URLSearchParams(window.location.search || "");
-      requestedLayout = String(params.get("propms_pdf_layout") || "").toLowerCase();
-      requestedRenderer = String(params.get("propms_pdf_renderer") || "").toLowerCase();
-    } catch (error) {
-      requestedLayout = "";
-      requestedRenderer = "";
-    }
-    return {
-      requestedLayout: requestedLayout,
-      requestedRenderer: requestedRenderer
-    };
-  }
-
-  function resolvePdfExportMode(options) {
-    var settings = options || {};
-    var requestedLayout = String(settings.requestedLayout || "").toLowerCase();
-    var requestedRenderer = String(settings.requestedRenderer || "").toLowerCase();
-    var defaultLayout = String(settings.defaultLayout || "adaptive").toLowerCase() === "legacy"
-      ? "legacy"
-      : "adaptive";
-    var adaptiveDefaultRenderer = String(settings.adaptiveDefaultRenderer || "vector").toLowerCase() === "raster"
-      ? "raster"
-      : "vector";
-    var explicitLayout = requestedLayout === "adaptive" || requestedLayout === "legacy";
-    var explicitRenderer = requestedRenderer === "vector" || requestedRenderer === "raster";
-    var layout = explicitLayout ? requestedLayout : defaultLayout;
-    if (layout !== "legacy") {
-      layout = "adaptive";
-    }
-    if (layout === "legacy") {
-      return {
-        layout: "legacy",
-        renderer: "legacy",
-        explicitLayout: explicitLayout,
-        explicitRenderer: false
-      };
-    }
-    var renderer = explicitRenderer ? requestedRenderer : adaptiveDefaultRenderer;
-    if (renderer !== "raster") {
-      renderer = "vector";
-    }
-    return {
-      layout: "adaptive",
-      renderer: renderer,
-      explicitLayout: explicitLayout,
-      explicitRenderer: explicitRenderer
-    };
-  }
-
-  function getResolvedPdfExportMode() {
-    var requestedOptions = getRequestedPdfExportOptions();
-    return resolvePdfExportMode({
-      requestedLayout: requestedOptions.requestedLayout,
-      requestedRenderer: requestedOptions.requestedRenderer,
-      defaultLayout: PDF_DEFAULT_LAYOUT,
-      adaptiveDefaultRenderer: PDF_ADAPTIVE_DEFAULT_RENDERER
-    });
-  }
-
-  function isAdaptivePdfLayoutEnabled() {
-    return getResolvedPdfExportMode().layout === "adaptive";
-  }
-
-  function isLegacyPdfLayoutEnabled() {
-    return getResolvedPdfExportMode().layout === "legacy";
-  }
-
   function isPdfArtifactModeEnabled() {
     try {
       var params = new URLSearchParams(window.location.search || "");
@@ -325,14 +251,6 @@
     } catch (error) {
       return false;
     }
-  }
-
-  function getAdaptivePdfRenderer() {
-    return getResolvedPdfExportMode().renderer;
-  }
-
-  function isAdaptiveVectorPdfRendererEnabled() {
-    return getAdaptivePdfRenderer() === "vector";
   }
 
   function isParkingMutationDiagnosticBypassEnabled() {
@@ -356,11 +274,7 @@
   }
 
   function getCurrentPdfLayoutVersion() {
-    var resolvedMode = getResolvedPdfExportMode();
-    var baseVersion = resolvedMode.layout === "adaptive"
-      ? PDF_ADAPTIVE_LAYOUT_VERSION
-      : PDF_LAYOUT_VERSION;
-    return baseVersion;
+    return PDF_ADAPTIVE_LAYOUT_VERSION;
   }
 
   function clearPdfArtifactModeResult(reason) {
@@ -896,13 +810,6 @@
       mapPreparationMs: 0,
       paginationMs: 0,
       fontReadinessMs: 0,
-      frameCreatedAt: 0,
-      frameStylesReadyMs: 0,
-      frameFontsReadyMs: 0,
-      pageDomReplacementMs: [],
-      pageCaptureMs: [],
-      encodingMs: 0,
-      jsPdfAssemblyMs: 0,
       blobCreationMs: 0,
       qrGenerationMs: 0,
       contentsResolutionMs: 0,
@@ -926,10 +833,6 @@
       return "WebKit";
     }
     return "Chromium";
-  }
-
-  function isSafariFamily() {
-    return getBrowserFamily() === "WebKit";
   }
 
   function setPdfExportLifecycle(stageName) {
@@ -959,7 +862,7 @@
     window.__propertyInstructionPdfGenerationDiagnostics = {
       startedAt: Date.now(),
       browserFamily: getBrowserFamily(),
-      renderer: String(renderer || getAdaptivePdfRenderer() || "raster"),
+      renderer: String(renderer || PDF_RENDERER_ID),
       language: translationState.requestedLanguage || SOURCE_LANGUAGE,
       currentStage: "idle",
       events: [],
@@ -977,7 +880,7 @@
   }
 
   function getPdfGenerationDiagnostics() {
-    return window.__propertyInstructionPdfGenerationDiagnostics || resetPdfGenerationDiagnostics(getAdaptivePdfRenderer());
+    return window.__propertyInstructionPdfGenerationDiagnostics || resetPdfGenerationDiagnostics(PDF_RENDERER_ID);
   }
 
   function recordPdfGenerationStage(stageName, extraDetails) {
@@ -985,7 +888,7 @@
     var nextStage = String(stageName || "idle");
     diagnostics.currentStage = nextStage;
     diagnostics.language = translationState.requestedLanguage || SOURCE_LANGUAGE;
-    diagnostics.renderer = String(getAdaptivePdfRenderer() || diagnostics.renderer || "raster");
+    diagnostics.renderer = PDF_RENDERER_ID;
     diagnostics.events.push(Object.assign({
       stage: nextStage,
       at: Date.now(),
@@ -1076,11 +979,6 @@
       qrGenerationMs: performanceState.qrGenerationMs || 0,
       contentsResolutionMs: performanceState.contentsResolutionMs || 0,
       paginationMs: performanceState.paginationMs || 0,
-      pageCaptureMs: (performanceState.pageCaptureMs || []).reduce(function (sum, value) {
-        return sum + (Number(value) || 0);
-      }, 0),
-      encodingMs: performanceState.encodingMs || 0,
-      jsPdfAssemblyMs: performanceState.jsPdfAssemblyMs || 0,
       blobCreationMs: performanceState.blobCreationMs || 0
     });
     writeProgressHistory(pageCount, renderScale, history);
@@ -1102,9 +1000,6 @@
       "qrGenerationMs",
       "contentsResolutionMs",
       "paginationMs",
-      "pageCaptureMs",
-      "encodingMs",
-      "jsPdfAssemblyMs",
       "blobCreationMs"
     ];
     var averages = {};
@@ -5132,6 +5027,10 @@
       if (!descendantNode || !descendantNode.getBoundingClientRect) {
         return;
       }
+      // Step badges intentionally overlap the card edge and are drawn separately by jsPDF.
+      if (descendantNode.closest(".pi-export-step-badge")) {
+        return;
+      }
       var descendantStyles = window.getComputedStyle(descendantNode);
       if (descendantStyles.display === "none" || descendantStyles.visibility === "hidden") {
         return;
@@ -5435,13 +5334,10 @@
     }
 
     if (relationship === "stacked") {
+      // Stacked cards are naturally top- or bottom-weighted when translated copy
+      // changes the header height. Keep this as a diagnostic warning rather than
+      // rejecting an otherwise valid vector PDF.
       if (
-        bottomBlank > PDF_ADAPTIVE_MEDIA_BALANCE_GAP_BLOCKER_PX &&
-        bottomBlank > (topBlank * PDF_ADAPTIVE_MEDIA_BALANCE_WARNING_RATIO) &&
-        frameToCardCenterDeltaY > 32
-      ) {
-        blockers.push("media-top-heavy");
-      } else if (
         bottomBlank > PDF_ADAPTIVE_MEDIA_BALANCE_GAP_WARNING_PX &&
         bottomBlank > (topBlank * PDF_ADAPTIVE_MEDIA_BALANCE_WARNING_RATIO) &&
         frameToCardCenterDeltaY > 18
@@ -5450,12 +5346,6 @@
       }
 
       if (
-        topBlank > PDF_ADAPTIVE_MEDIA_BALANCE_GAP_BLOCKER_PX &&
-        topBlank > (bottomBlank * PDF_ADAPTIVE_MEDIA_BALANCE_WARNING_RATIO) &&
-        frameToCardCenterDeltaY > 32
-      ) {
-        blockers.push("media-bottom-heavy");
-      } else if (
         topBlank > PDF_ADAPTIVE_MEDIA_BALANCE_GAP_WARNING_PX &&
         topBlank > (bottomBlank * PDF_ADAPTIVE_MEDIA_BALANCE_WARNING_RATIO) &&
         frameToCardCenterDeltaY > 18
@@ -8177,7 +8067,7 @@
   }
 
   function rebalanceAdaptivePages(exportState) {
-    if (!isAdaptivePdfLayoutEnabled() || !exportState || !exportState.exportPages) {
+    if (!exportState || !exportState.exportPages) {
       return;
     }
     var pageNodes = Array.prototype.slice.call(exportState.exportPages.querySelectorAll(".pi-export-page"));
@@ -8295,7 +8185,7 @@
       var cardNode = role === "card" ? img.closest(".pi-export-card") : null;
       var chosenLayout = null;
       var mediaWidth = availableWidth;
-      var adaptivePdfMode = isAdaptivePdfLayoutEnabled() && adaptiveLayoutMode === "adaptive";
+      var adaptivePdfMode = adaptiveLayoutMode === "adaptive";
       var adaptiveLayout = adaptivePdfMode && cardNode;
       var adaptiveManagedMedia = adaptivePdfMode && (role === "qr" || role === "map" || !!cardNode);
 
@@ -8499,9 +8389,6 @@
   }
 
   function validateAdaptiveCardContainment(exportRoot) {
-    if (!isAdaptivePdfLayoutEnabled()) {
-      return [];
-    }
     var diagnostics = Array.prototype.slice.call(exportRoot.querySelectorAll(".pi-export-card--adaptive")).map(function (cardNode) {
       var cardDiagnostics = collectAdaptiveCardContainment(cardNode);
       return {
@@ -8551,9 +8438,6 @@
   }
 
   function validateAdaptiveMediaVisualPlacement(exportRoot) {
-    if (!isAdaptivePdfLayoutEnabled()) {
-      return [];
-    }
     var diagnostics = Array.prototype.slice.call(exportRoot.querySelectorAll(".pi-export-card--adaptive")).map(function (cardNode) {
       var visualPlacement = collectAdaptiveMediaVisualPlacement(cardNode);
       if (!visualPlacement) {
@@ -9621,7 +9505,7 @@
     }
 
     var sectionTitle = titleNode.cloneNode(true);
-    if (isContinuation && isAdaptivePdfLayoutEnabled()) {
+    if (isContinuation) {
       sectionTitle.classList.add("pi-export-section-title--continued");
       sectionTitle.removeAttribute("data-export-source-id");
       sectionTitle.textContent = [
@@ -9649,28 +9533,26 @@
     var adaptiveSectionPlans = null;
     var adaptiveEvaluatedPlans = null;
 
-    if (isAdaptivePdfLayoutEnabled()) {
-      adaptiveChildNodes = Array.from(exportState.exportDocument.children);
-      var adaptiveFirstSectionIndex = adaptiveChildNodes.findIndex(function (childNode) {
+    adaptiveChildNodes = Array.from(exportState.exportDocument.children);
+    var adaptiveFirstSectionIndex = adaptiveChildNodes.findIndex(function (childNode) {
+      return childNode.classList && childNode.classList.contains("pi-export-section");
+    });
+    adaptivePreludeNodes = adaptiveFirstSectionIndex >= 0
+      ? adaptiveChildNodes.slice(0, adaptiveFirstSectionIndex)
+      : adaptiveChildNodes.slice();
+    adaptiveSectionNodes = adaptiveFirstSectionIndex >= 0
+      ? adaptiveChildNodes.slice(adaptiveFirstSectionIndex).filter(function (childNode) {
         return childNode.classList && childNode.classList.contains("pi-export-section");
-      });
-      adaptivePreludeNodes = adaptiveFirstSectionIndex >= 0
-        ? adaptiveChildNodes.slice(0, adaptiveFirstSectionIndex)
-        : adaptiveChildNodes.slice();
-      adaptiveSectionNodes = adaptiveFirstSectionIndex >= 0
-        ? adaptiveChildNodes.slice(adaptiveFirstSectionIndex).filter(function (childNode) {
-          return childNode.classList && childNode.classList.contains("pi-export-section");
-        })
-        : [];
-      if (adaptiveSectionNodes.length) {
-        adaptiveSectionPlans = collectAdaptivePlanningSections(
-          exportState.exportRoot,
-          exportState.exportDocument
-        );
-        adaptiveEvaluatedPlans = evaluateAdaptivePagePlans(exportState, adaptiveSectionPlans);
-        exportState.adaptiveLayoutSummary = exportState.adaptiveLayoutSummary || {};
-        exportState.adaptiveLayoutSummary.plannerDiagnostics = adaptiveEvaluatedPlans.diagnostics;
-      }
+      })
+      : [];
+    if (adaptiveSectionNodes.length) {
+      adaptiveSectionPlans = collectAdaptivePlanningSections(
+        exportState.exportRoot,
+        exportState.exportDocument
+      );
+      adaptiveEvaluatedPlans = evaluateAdaptivePagePlans(exportState, adaptiveSectionPlans);
+      exportState.adaptiveLayoutSummary = exportState.adaptiveLayoutSummary || {};
+      exportState.adaptiveLayoutSummary.plannerDiagnostics = adaptiveEvaluatedPlans.diagnostics;
     }
 
     var exportPages = documentNode.createElement("div");
@@ -9698,8 +9580,7 @@
       pageState.hasContent = true;
     }
 
-    if (isAdaptivePdfLayoutEnabled()) {
-      function renderAdaptivePlan(planPages) {
+    function renderAdaptivePlan(planPages) {
         exportPages.innerHTML = "";
         pageState = createExportPageShell(documentNode, exportState.exportDocument);
         exportPages.appendChild(pageState.page);
@@ -9778,52 +9659,6 @@
         throw new Error("PDF pagination dropped export content");
       }
       return exportState;
-    }
-
-    Array.from(exportState.exportDocument.children).forEach(function (childNode) {
-      if (childNode.classList.contains("pi-export-section")) {
-        var sectionTitle = childNode.querySelector(".pi-export-section-title");
-        var sourceItems = Array.from(childNode.children).filter(function (sectionChild) {
-          return sectionChild !== sectionTitle && sectionChild.getAttribute("data-pdf-section-item") === "1";
-        });
-        var sectionSlice = createSectionSlice(documentNode, sectionTitle, false);
-        pageState.body.appendChild(sectionSlice.section);
-
-        sourceItems.forEach(function (sourceItem) {
-          sectionSlice.items.appendChild(sourceItem);
-
-          if (pageBodyOverflows(pageState)) {
-            var hadPreviousItems = sectionSlice.items.children.length > 1;
-            sectionSlice.items.removeChild(sourceItem);
-
-            if (!sectionSlice.items.children.length) {
-              pageState.body.removeChild(sectionSlice.section);
-            }
-
-            newPage();
-            sectionSlice = createSectionSlice(documentNode, sectionTitle, hadPreviousItems);
-            pageState.body.appendChild(sectionSlice.section);
-            sectionSlice.items.appendChild(sourceItem);
-          }
-
-          pageState.hasContent = true;
-        });
-
-        if (!sectionSlice.items.children.length && sectionSlice.section.parentNode === pageState.body) {
-          pageState.body.removeChild(sectionSlice.section);
-        }
-        return;
-      }
-
-      appendStandaloneNode(childNode);
-    });
-
-    exportState.exportPages = exportPages;
-    var paginatedItemCount = exportPages.querySelectorAll("[data-pdf-section-item='1']").length;
-    if (sourcePaginatableItemCount !== paginatedItemCount) {
-      throw new Error("PDF pagination dropped export content");
-    }
-    return exportState;
   }
 
   function populatePageFooters(exportState, guideTitle) {
@@ -10151,13 +9986,10 @@
   }
 
   async function ensurePdfLibrary() {
-    await loadScriptOnce("propms-html2canvas", HTML2CANVAS_LIBRARY_URL, function () {
-      return typeof window.html2canvas === "function";
-    });
     await loadScriptOnce("propms-jspdf", JSPDF_LIBRARY_URL, function () {
       return !!(window.jspdf && typeof window.jspdf.jsPDF === "function");
     });
-    if (!(window.html2canvas && window.jspdf && window.jspdf.jsPDF)) {
+    if (!(window.jspdf && window.jspdf.jsPDF)) {
       throw new Error("PDF library unavailable");
     }
   }
@@ -10960,152 +10792,6 @@
     });
   }
 
-  function verifyImageCanPaintToCanvas(img) {
-    var source = String(img.getAttribute("data-export-image-resolved-src") || img.currentSrc || img.src || "").trim();
-    var testCanvas = document.createElement("canvas");
-    testCanvas.width = 4;
-    testCanvas.height = 4;
-    var context = testCanvas.getContext("2d", { willReadFrequently: true });
-
-    try {
-      context.drawImage(img, 0, 0, 4, 4);
-      var imageData = context.getImageData(0, 0, 4, 4);
-      var values = Array.prototype.slice.call(imageData.data || []);
-      var alphaPixels = 0;
-      var samples = [];
-      for (var index = 0; index < values.length; index += 4) {
-        var alpha = values[index + 3] || 0;
-        if (alpha > 0) {
-          alphaPixels += 1;
-        }
-        samples.push((values[index] || 0) + (values[index + 1] || 0) + (values[index + 2] || 0));
-      }
-      var mean = samples.reduce(function (sum, value) {
-        return sum + value;
-      }, 0) / Math.max(samples.length, 1);
-      var variance = samples.reduce(function (sum, value) {
-        var delta = value - mean;
-        return sum + (delta * delta);
-      }, 0) / Math.max(samples.length, 1);
-      return {
-        image: summarizeDiagnosticImageSource(
-          source,
-          String(img.getAttribute("data-export-image-role") || "image"),
-          {
-            originalSourceKind: summarizeDiagnosticImageSource(
-              img.getAttribute("data-export-image-original-src") || "",
-              String(img.getAttribute("data-export-image-role") || "image")
-            ).sourceKind
-          }
-        ),
-        paintable: alphaPixels > 0 && variance > 0.5,
-        alphaPixels: alphaPixels,
-        sampleVariance: Number(variance.toFixed(4))
-      };
-    } catch (error) {
-      throw new Error("Export image could not be painted to canvas");
-    }
-  }
-
-  function validateExportImagesCanPaintToCanvas(exportRoot) {
-    return Array.prototype.slice.call(exportRoot.querySelectorAll("img")).map(function (img) {
-      var diagnostics = verifyImageCanPaintToCanvas(img);
-      if (!diagnostics.paintable) {
-        throw new Error("Export image could not be painted to canvas");
-      }
-      return diagnostics;
-    });
-  }
-
-  function analyzeCanvasRegion(canvasContext, sourceCanvas, left, top, width, height) {
-    var pixels = canvasContext.getImageData(left, top, width, height).data;
-    var brightnessValues = [];
-    var nonWhitePixels = 0;
-    for (var index = 0; index < pixels.length; index += 4) {
-      var red = pixels[index] || 0;
-      var green = pixels[index + 1] || 0;
-      var blue = pixels[index + 2] || 0;
-      var alpha = pixels[index + 3] || 0;
-      if (!alpha) {
-        continue;
-      }
-      var brightness = (red + green + blue) / 3;
-      brightnessValues.push(brightness);
-      if (brightness < 248) {
-        nonWhitePixels += 1;
-      }
-    }
-
-    var mean = brightnessValues.reduce(function (sum, value) {
-      return sum + value;
-    }, 0) / Math.max(brightnessValues.length, 1);
-    var variance = brightnessValues.reduce(function (sum, value) {
-      var delta = value - mean;
-      return sum + (delta * delta);
-    }, 0) / Math.max(brightnessValues.length, 1);
-
-    return {
-      width: width,
-      height: height,
-      variance: Number(variance.toFixed(4)),
-      nonWhiteCoverage: Number((nonWhitePixels / Math.max(brightnessValues.length, 1)).toFixed(4))
-    };
-  }
-
-  function validateCanvasPaintedImages(pageNode, canvas, pageIndex) {
-    var pageRect = pageNode.getBoundingClientRect();
-    var canvasContext = canvas.getContext("2d", { willReadFrequently: true });
-    var diagnostics = [];
-
-    Array.prototype.slice.call(pageNode.querySelectorAll("img")).forEach(function (img) {
-      var imageRect = img.getBoundingClientRect();
-      if (imageRect.width <= 0 || imageRect.height <= 0) {
-        return;
-      }
-
-      var left = Math.max(0, Math.round(((imageRect.left - pageRect.left) / pageRect.width) * canvas.width));
-      var top = Math.max(0, Math.round(((imageRect.top - pageRect.top) / pageRect.height) * canvas.height));
-      var width = Math.max(1, Math.round((imageRect.width / pageRect.width) * canvas.width));
-      var height = Math.max(1, Math.round((imageRect.height / pageRect.height) * canvas.height));
-      var clampedWidth = Math.min(width, canvas.width - left);
-      var clampedHeight = Math.min(height, canvas.height - top);
-      var region = analyzeCanvasRegion(canvasContext, canvas, left, top, clampedWidth, clampedHeight);
-      var isPlaceholder = img.getAttribute("data-export-image-placeholder") === "1";
-      var painted = isPlaceholder
-        ? (region.nonWhiteCoverage > 0.02 && region.variance > 0.1)
-        : (region.variance > 12 && region.nonWhiteCoverage > 0.05);
-      diagnostics.push({
-        image: summarizeDiagnosticImageSource(
-          img.getAttribute("data-export-image-resolved-src") || img.currentSrc || img.src || "",
-          String(img.getAttribute("data-export-image-role") || "image"),
-          {
-            originalSourceKind: summarizeDiagnosticImageSource(
-              img.getAttribute("data-export-image-original-src") || "",
-              String(img.getAttribute("data-export-image-role") || "image")
-            ).sourceKind
-          }
-        ),
-        page: pageIndex + 1,
-        canvasRegion: {
-          left: left,
-          top: top,
-          width: clampedWidth,
-          height: clampedHeight
-        },
-        variance: region.variance,
-        nonWhiteCoverage: region.nonWhiteCoverage,
-        placeholder: isPlaceholder,
-        painted: painted
-      });
-
-      if (!painted) {
-        throw new Error("image-not-painted");
-      }
-    });
-
-    return diagnostics;
-  }
-
   function validateImageAspectRatios(exportRoot) {
     var diagnostics = [];
     Array.prototype.slice.call(exportRoot.querySelectorAll("img")).forEach(function (img) {
@@ -11114,7 +10800,6 @@
       var fitPolicy = String(img.getAttribute("data-export-media-fit-policy") || (mediaType === "photo" ? "contain" : "contain"));
       var frameNode = img.closest("[data-export-image-frame]");
       if (
-        isAdaptivePdfLayoutEnabled() &&
         exportRoot &&
         exportRoot.querySelector &&
         exportRoot.querySelector(".pi-export-document[data-pdf-layout-mode='adaptive']") &&
@@ -11175,36 +10860,6 @@
           }
         }
       }
-      if (
-        isLegacyPdfLayoutEnabled() &&
-        frameNode &&
-        fitPolicy !== "cover" &&
-        (mediaType === "photo" || mediaType === "map" || mediaType === "qr")
-      ) {
-        var legacyFrameRect = getFrameRectWithFallback(
-          frameNode,
-          frameNode.clientWidth || img.getBoundingClientRect().width || 1,
-          frameNode.clientHeight || img.getBoundingClientRect().height || 1,
-          true
-        );
-        var legacyMaxHeight = mediaType === "qr"
-          ? legacyFrameRect.width
-          : (legacyFrameRect.height || getPdfImageMaxHeight(img));
-        var legacyFitted = fitMediaWithinBounds(
-          img.naturalWidth,
-          img.naturalHeight,
-          legacyFrameRect.width || img.getBoundingClientRect().width || 1,
-          legacyMaxHeight || img.getBoundingClientRect().height || 1,
-          false
-        );
-        if (mediaType === "qr") {
-          img.style.width = legacyFitted.width + "px";
-          img.style.height = legacyFitted.height + "px";
-        } else {
-          img.style.width = legacyFitted.width + "px";
-          img.style.height = legacyFitted.height + "px";
-        }
-      }
       var computedStyles = window.getComputedStyle(img);
       var rect = img.getBoundingClientRect();
       if (!img.naturalWidth || !img.naturalHeight || !rect.width || !rect.height) {
@@ -11255,206 +10910,6 @@
     return diagnostics;
   }
 
-  function prepareCaptureClone(clonedDocument) {
-    if (!clonedDocument || !clonedDocument.querySelectorAll) {
-      return;
-    }
-    Array.prototype.slice.call(clonedDocument.querySelectorAll("[data-guide-root], .goog-te-banner-frame, .skiptranslate")).forEach(function (node) {
-      if (node && node.parentNode) {
-        node.parentNode.removeChild(node);
-      }
-    });
-    var currentClonePage = clonedDocument.querySelector("[data-pdf-page][data-capture-current='1']");
-    Array.prototype.slice.call(clonedDocument.querySelectorAll("[data-pdf-page]")).forEach(function (pageNode) {
-      if (currentClonePage && pageNode !== currentClonePage && pageNode.parentNode) {
-        pageNode.parentNode.removeChild(pageNode);
-      }
-    });
-  }
-
-  function ensureCaptureFrame() {
-    var existingFrame = document.getElementById("pi-pdf-capture-frame");
-    if (existingFrame && existingFrame.contentDocument) {
-      return existingFrame;
-    }
-    var frame = document.createElement("iframe");
-    frame.id = "pi-pdf-capture-frame";
-    frame.setAttribute("aria-hidden", "true");
-    frame.style.position = "fixed";
-    frame.style.left = PDF_EXPORT_OFFSCREEN_LEFT + "px";
-    frame.style.top = "0";
-    frame.style.width = PDF_EXPORT_WIDTH + "px";
-    frame.style.height = PDF_EXPORT_PAGE_HEIGHT + "px";
-    frame.style.border = "0";
-    frame.style.opacity = "0";
-    frame.style.visibility = "visible";
-    frame.style.pointerEvents = "none";
-    frame.style.background = "#ffffff";
-    frame.style.zIndex = "-2147483647";
-    document.body.appendChild(frame);
-    return frame;
-  }
-
-  function initializeCaptureFrameHead(frameDocument, performanceState, startedAt) {
-    if (!frameDocument || frameDocument.__propertyInstructionExportHeadReady) {
-      return Promise.resolve();
-    }
-    var charset = frameDocument.createElement("meta");
-    charset.setAttribute("charset", "utf-8");
-    frameDocument.head.appendChild(charset);
-    var viewport = frameDocument.createElement("meta");
-    viewport.setAttribute("name", "viewport");
-    viewport.setAttribute("content", "width=device-width, initial-scale=1");
-    frameDocument.head.appendChild(viewport);
-    var style = frameDocument.createElement("style");
-    style.id = "property-instruction-pdf-export-frame-css";
-    style.textContent = [
-      "html, body { margin: 0; padding: 0; background: #ffffff; min-height: 0; height: auto; overflow: hidden; }",
-      "body { width: " + PDF_EXPORT_WIDTH + "px; }",
-      getPdfExportStylesheetText()
-    ].join("\n");
-    frameDocument.head.appendChild(style);
-    frameDocument.__propertyInstructionExportHeadReady = true;
-    if (performanceState) {
-      performanceState.frameCreatedAt = startedAt || Date.now();
-      recordPdfPerformance(performanceState, "frameStylesReadyMs", startedAt || Date.now());
-    }
-    return ensureCaptureFrameFonts(frameDocument, performanceState, startedAt || Date.now());
-  }
-
-  async function ensureCaptureFrameFonts(frameDocument, performanceState, startedAt) {
-    if (!frameDocument || !frameDocument.fonts) {
-      setTranslationAbortReason("PDF font load failed", "pdf-font-load-failed");
-      throw new Error("PDF font load failed");
-    }
-
-    await Promise.all(PDF_EXPORT_FONT_LOADS.map(function (fontSpec) {
-      return frameDocument.fonts.load(fontSpec);
-    }));
-    await frameDocument.fonts.ready;
-
-    var allFontsLoaded = PDF_EXPORT_FONT_LOADS.every(function (fontSpec) {
-      return frameDocument.fonts.check(fontSpec);
-    });
-
-    if (!allFontsLoaded) {
-      setTranslationAbortReason("PDF font load failed", "pdf-font-load-failed");
-      throw new Error("PDF font load failed");
-    }
-
-    if (performanceState) {
-      recordPdfPerformance(performanceState, "frameFontsReadyMs", startedAt || Date.now());
-    }
-  }
-
-  function collectTypographyDiagnostics(rootNode, languageCode) {
-    var view = rootNode && rootNode.ownerDocument ? rootNode.ownerDocument.defaultView : window;
-    function readTypography(selector, label) {
-      var node = rootNode && rootNode.querySelector ? rootNode.querySelector(selector) : null;
-      if (!node) {
-        return null;
-      }
-      var styles = view.getComputedStyle(node);
-      return {
-        label: label,
-        language: languageCode || SOURCE_LANGUAGE,
-        semanticNodeId: node.getAttribute("data-export-source-id") || "",
-        fontFamily: styles.fontFamily,
-        fontWeight: styles.fontWeight,
-        letterSpacing: styles.letterSpacing,
-        wordSpacing: styles.wordSpacing,
-        lineHeight: styles.lineHeight
-      };
-    }
-
-    return [
-      readTypography(".pi-export-card-body", "body"),
-      readTypography(".pi-export-card-title", "card-title"),
-      readTypography(".pi-export-section-title", "section-title"),
-      readTypography(".pi-export-label", "meta-label"),
-      readTypography(".pi-export-footer", "footer")
-    ].filter(Boolean);
-  }
-
-  function createCaptureRootNode(frameDocument, pageNode) {
-    var exportRoot = frameDocument.createElement("div");
-    exportRoot.className = "pi-pdf-export-root";
-    exportRoot.setAttribute("data-property-instruction-export", "root");
-    exportRoot.setAttribute("aria-hidden", "true");
-    exportRoot.setAttribute("lang", pageNode.getAttribute("lang") || "en");
-    exportRoot.setAttribute("dir", pageNode.getAttribute("dir") || "ltr");
-    markExportNodeNotranslate(exportRoot);
-    exportRoot.style.position = "absolute";
-    exportRoot.style.left = "0";
-    exportRoot.style.top = "0";
-    exportRoot.style.width = PDF_EXPORT_WIDTH + "px";
-    exportRoot.style.background = "#ffffff";
-    exportRoot.style.pointerEvents = "none";
-    exportRoot.style.overflow = "visible";
-    exportRoot.style.visibility = "visible";
-    exportRoot.style.opacity = "1";
-    exportRoot.style.zIndex = "0";
-
-    var exportWrapper = frameDocument.createElement("div");
-    exportWrapper.className = "pi-pdf-export";
-    markExportNodeNotranslate(exportWrapper);
-
-    var exportPages = frameDocument.createElement("div");
-    exportPages.className = "pi-export-pages";
-    markExportNodeNotranslate(exportPages);
-
-    var pageClone = frameDocument.importNode(pageNode, true);
-    exportPages.appendChild(pageClone);
-    exportWrapper.appendChild(exportPages);
-    exportRoot.appendChild(exportWrapper);
-
-    return {
-      root: exportRoot,
-      page: pageClone
-    };
-  }
-
-  async function prepareCaptureFramePage(pageNode, performanceState) {
-    var frameStartedAt = Date.now();
-    var frame = ensureCaptureFrame();
-    var frameDocument = frame.contentDocument;
-    if (!frameDocument) {
-      throw new Error("Unable to prepare PDF capture frame.");
-    }
-    await initializeCaptureFrameHead(frameDocument, performanceState, frameStartedAt);
-    var domStartedAt = Date.now();
-    while (frameDocument.body.firstChild) {
-      frameDocument.body.removeChild(frameDocument.body.firstChild);
-    }
-    frameDocument.body.style.margin = "0";
-    frameDocument.body.style.background = "#ffffff";
-    frameDocument.body.style.minHeight = "0";
-    frameDocument.body.style.height = "auto";
-    var captureNodes = createCaptureRootNode(frameDocument, pageNode);
-    frameDocument.body.appendChild(captureNodes.root);
-    await waitForImages(captureNodes.root);
-    await waitForTwoAnimationFrames();
-    window.__propertyInstructionPdfTypographyDiagnostics = collectTypographyDiagnostics(
-      captureNodes.root,
-      captureNodes.page.getAttribute("lang") || SOURCE_LANGUAGE
-    );
-    if (performanceState) {
-      performanceState.pageDomReplacementMs.push(Date.now() - domStartedAt);
-    }
-    return {
-      frame: frame,
-      document: frameDocument,
-      root: captureNodes.root,
-      page: captureNodes.page
-    };
-  }
-
-  function destroyCaptureFrame(frame) {
-    if (frame && frame.parentNode) {
-      frame.parentNode.removeChild(frame);
-    }
-  }
-
   function addPageLinkAnnotations(pdf, pageNode, pdfWidth, pdfHeight) {
     var pageRect = pageNode.getBoundingClientRect();
     Array.prototype.slice.call(pageNode.querySelectorAll("a[href]")).forEach(function (anchor) {
@@ -11481,26 +10936,6 @@
         }
         pdf.link(x, y, width, height, { url: href });
       });
-    });
-  }
-
-  async function encodeCanvasToJpegBlob(canvas) {
-    if (!canvas) {
-      throw new Error("Unable to encode PDF page image.");
-    }
-    if (!canvas.toBlob) {
-      var fallbackDataUrl = canvas.toDataURL("image/jpeg", 0.95);
-      var response = await fetch(fallbackDataUrl);
-      return response.blob();
-    }
-    return new Promise(function (resolve, reject) {
-      canvas.toBlob(function (blob) {
-        if (!blob) {
-          reject(new Error("Unable to encode PDF page image."));
-          return;
-        }
-        resolve(blob);
-      }, "image/jpeg", 0.95);
     });
   }
 
@@ -12592,59 +12027,6 @@
     }
   }
 
-  async function captureDiagnosticPageImages(pageNodes, performanceState) {
-    var captureFrame = null;
-    var pageImages = [];
-    var pageImageBlobs = [];
-    try {
-      for (var index = 0; index < pageNodes.length; index += 1) {
-        var captureTarget = await prepareCaptureFramePage(pageNodes[index], performanceState);
-        captureFrame = captureTarget.frame;
-        var captureStartedAt = Date.now();
-        var canvas = await window.html2canvas(captureTarget.page, {
-          scale: 1.8,
-          useCORS: true,
-          allowTaint: false,
-          backgroundColor: "#ffffff",
-          logging: false,
-          imageTimeout: 20000,
-          scrollX: 0,
-          scrollY: 0,
-          width: captureTarget.page.offsetWidth,
-          height: captureTarget.page.offsetHeight,
-          windowWidth: captureTarget.page.offsetWidth,
-          windowHeight: captureTarget.page.offsetHeight,
-          onclone: function (clonedDocument) {
-            prepareCaptureClone(clonedDocument);
-          }
-        });
-        performanceState.pageCaptureMs[index] = Date.now() - captureStartedAt;
-        var jpegBlob = await encodeCanvasToJpegBlob(canvas);
-        var jpegDataUrl = await blobToDataUri(jpegBlob);
-        pageImageBlobs.push(jpegBlob);
-        pageImages.push({
-          pageNumber: index + 1,
-          width: canvas.width,
-          height: canvas.height,
-          dataUrl: jpegDataUrl
-        });
-        if (captureTarget && captureTarget.document && captureTarget.document.body) {
-          while (captureTarget.document.body.firstChild) {
-            captureTarget.document.body.removeChild(captureTarget.document.body.firstChild);
-          }
-        }
-        canvas.width = 1;
-        canvas.height = 1;
-      }
-    } finally {
-      destroyCaptureFrame(captureFrame);
-    }
-    return {
-      pageImages: pageImages,
-      pageImageBlobs: pageImageBlobs
-    };
-  }
-
   async function renderExportPagesToVectorPdf(exportState, pageNodes, performanceState) {
     recordPdfGenerationStage("vector-renderer-entered", {
       pageCount: pageNodes.length
@@ -12706,7 +12088,7 @@
     var preparedAssets = await prepareVectorImageAssets(layoutModel);
     performanceState.vectorLayoutExtractionMs = Date.now() - modelStartedAt;
     var textDiagnostics = [];
-    window.__propertyInstructionPdfRenderer = "jspdf-vector";
+    window.__propertyInstructionPdfRenderer = PDF_RENDERER_ID;
     window.__propertyInstructionPdfVectorLayoutModel = layoutModel;
 
     layoutModel.pages.forEach(function (pageModel, pageIndex) {
@@ -12733,16 +12115,10 @@
       addPageLinkAnnotations(pdf, pageNodes[pageIndex], pdfWidth, pdfHeight);
     });
 
-    var diagnosticPageImages = isPdfArtifactModeEnabled()
-      ? await captureDiagnosticPageImages(pageNodes, performanceState)
-      : { pageImageBlobs: [], pageImages: [] };
     return {
       pdf: pdf,
-      pageImageBlobs: diagnosticPageImages.pageImageBlobs,
-      pageImages: diagnosticPageImages.pageImages,
       pageCount: pageNodes.length,
       pageDiagnostics: pageNodes.map(collectPageDiagnostics),
-      paintedImageDiagnostics: [],
       layoutModel: layoutModel,
       vectorTextDiagnostics: textDiagnostics,
       embeddedFonts: embeddedFonts,
@@ -12753,149 +12129,7 @@
     };
   }
 
-  async function renderExportPagesToRasterPdf(exportState, pageNodes, modelParityMap, mutationGuardState, progressContext, performanceState, imageDiagnostics, imageRatioDiagnostics) {
-    var jsPDF = window.jspdf.jsPDF;
-    var pdf = new jsPDF({
-      orientation: "portrait",
-      unit: "mm",
-      format: "a4",
-      compress: true
-    });
-    if (typeof pdf.setProperties === "function") {
-      pdf.setProperties({
-        title: [exportState.model && exportState.model.title, exportState.model && exportState.model.kicker].filter(Boolean).join(" - "),
-        subject: exportState.model && exportState.model.languageCode ? exportState.model.languageCode : SOURCE_LANGUAGE,
-        creator: "PropMS guest guide PDF export"
-      });
-    }
-
-    var pdfWidth = pdf.internal.pageSize.getWidth();
-    var pdfHeight = pdf.internal.pageSize.getHeight();
-    var pageDiagnostics = [];
-    var pageImageBlobs = [];
-    var pageImages = [];
-    var paintedImageDiagnostics = [];
-    window.__propertyInstructionPdfRenderer = "html2canvas+jspdf";
-
-    var renderScale = 1.8;
-    var averageHistory = getAverageProgressHistory(pageNodes.length, renderScale);
-    var captureFrame = null;
-
-    try {
-      for (var index = 0; index < pageNodes.length; index += 1) {
-        var pageNode = pageNodes[index];
-        validateExportDomParity(exportState.exportRoot, modelParityMap, "before-canvas-page-" + (index + 1), mutationGuardState);
-        var diagnostics = collectPageDiagnostics(pageNode);
-        window.__propertyInstructionPdfStep = "render-page-" + (index + 1);
-        if (progressContext) {
-          updateExportProgress(
-            progressContext.downloadButton,
-            progressContext.statusElement,
-            null,
-            null,
-            "render-pdf",
-            {
-              pageIndex: index + 1,
-              pageCount: pageNodes.length,
-              averageHistory: averageHistory,
-              elapsedMs: Date.now() - progressContext.clickStartedAt
-            }
-          );
-        }
-        if (diagnostics.viewportScrollHeight > diagnostics.viewportHeight + 2) {
-          window.__propertyInstructionLastPdfDiagnostics = {
-            shellCount: pageNodes.length,
-            failingPage: index + 1,
-            failingDiagnostics: diagnostics,
-            imageDiagnostics: imageDiagnostics,
-            imageRatioDiagnostics: imageRatioDiagnostics,
-            pageDiagnostics: pageDiagnostics
-          };
-          throw new Error("PDF page " + (index + 1) + " overflowed its shell");
-        }
-        if (!diagnostics.textLength) {
-          window.__propertyInstructionLastPdfDiagnostics = {
-            shellCount: pageNodes.length,
-            failingPage: index + 1,
-            failingDiagnostics: diagnostics,
-            imageDiagnostics: imageDiagnostics,
-            imageRatioDiagnostics: imageRatioDiagnostics,
-            pageDiagnostics: pageDiagnostics
-          };
-          throw new Error("PDF page " + (index + 1) + " is empty");
-        }
-
-        var pageCaptureStartedAt = Date.now();
-        var captureTarget = await prepareCaptureFramePage(pageNode, performanceState);
-        captureFrame = captureTarget.frame;
-        var canvas = await window.html2canvas(captureTarget.page, {
-          scale: renderScale,
-          useCORS: true,
-          allowTaint: false,
-          backgroundColor: "#ffffff",
-          logging: false,
-          imageTimeout: 20000,
-          scrollX: 0,
-          scrollY: 0,
-          width: captureTarget.page.offsetWidth,
-          height: captureTarget.page.offsetHeight,
-          windowWidth: captureTarget.page.offsetWidth,
-          windowHeight: captureTarget.page.offsetHeight,
-          onclone: function (clonedDocument) {
-            prepareCaptureClone(clonedDocument);
-          }
-        });
-        performanceState.pageCaptureMs[index] = Date.now() - pageCaptureStartedAt;
-        diagnostics.canvasWidth = canvas.width;
-        diagnostics.canvasHeight = canvas.height;
-        if (!canvas.width || !canvas.height) {
-          throw new Error("Page " + (index + 1) + " produced an empty canvas.");
-        }
-        paintedImageDiagnostics = paintedImageDiagnostics.concat(validateCanvasPaintedImages(pageNode, canvas, index));
-        if (index > 0) {
-          pdf.addPage("a4", "portrait");
-        }
-        var encodingStartedAt = Date.now();
-        var jpegBlob = await encodeCanvasToJpegBlob(canvas);
-        var jpegDataUrl = await blobToDataUri(jpegBlob);
-        performanceState.encodingMs += Date.now() - encodingStartedAt;
-        pageImageBlobs.push(jpegBlob);
-        pageImages.push({
-          pageNumber: index + 1,
-          width: canvas.width,
-          height: canvas.height,
-          dataUrl: jpegDataUrl
-        });
-        var assemblyStartedAt = Date.now();
-        pdf.addImage(jpegDataUrl, "JPEG", 0, 0, pdfWidth, pdfHeight, undefined, "FAST");
-        addPageLinkAnnotations(pdf, pageNode, pdfWidth, pdfHeight);
-        performanceState.jsPdfAssemblyMs += Date.now() - assemblyStartedAt;
-        pageDiagnostics.push(diagnostics);
-        jpegDataUrl = null;
-        canvas.width = 1;
-        canvas.height = 1;
-        if (captureTarget && captureTarget.document && captureTarget.document.body) {
-          while (captureTarget.document.body.firstChild) {
-            captureTarget.document.body.removeChild(captureTarget.document.body.firstChild);
-          }
-        }
-        await sleep(isSafariFamily() ? 16 : 0);
-      }
-    } finally {
-      destroyCaptureFrame(captureFrame);
-    }
-
-    return {
-      pdf: pdf,
-      pageImageBlobs: pageImageBlobs,
-      pageImages: pageImages,
-      pageCount: pageNodes.length,
-      pageDiagnostics: pageDiagnostics,
-      paintedImageDiagnostics: paintedImageDiagnostics
-    };
-  }
-
-  async function renderExportPagesToPdf(exportState, filename, modelParityMap, mutationGuardState, progressContext) {
+  async function renderExportPagesToPdf(exportState, modelParityMap, mutationGuardState) {
     var pageNodes = Array.prototype.slice.call(exportState.exportRoot.querySelectorAll("[data-pdf-page]"));
     if (!pageNodes.length) {
       throw new Error("No PDF pages were created.");
@@ -12907,7 +12141,6 @@
     recordPdfPerformance(performanceState, "fontReadinessMs", fontStartedAt);
     var imageSourceDiagnostics = assertExportImageSourcesAreCapturable(exportState.exportRoot);
     var imageDiagnostics = await waitForImages(exportState.exportRoot);
-    var canvasPaintabilityDiagnostics = validateExportImagesCanPaintToCanvas(exportState.exportRoot);
     await waitForTwoAnimationFrames();
     recordPdfGenerationStage("adaptive-validation-started", {
       pageCount: pageNodes.length
@@ -12923,18 +12156,7 @@
     });
     validateExportDomParity(exportState.exportRoot, modelParityMap, "post-fonts-images", mutationGuardState);
 
-    var renderResult = isAdaptiveVectorPdfRendererEnabled()
-      ? await renderExportPagesToVectorPdf(exportState, pageNodes, performanceState)
-      : await renderExportPagesToRasterPdf(
-          exportState,
-          pageNodes,
-          modelParityMap,
-          mutationGuardState,
-          progressContext,
-          performanceState,
-          imageDiagnostics,
-          imageRatioDiagnostics
-        );
+    var renderResult = await renderExportPagesToVectorPdf(exportState, pageNodes, performanceState);
 
     if (renderResult.pdf.internal.getNumberOfPages() !== pageNodes.length) {
       throw new Error("PDF page count did not match export page count.");
@@ -12944,12 +12166,10 @@
     window.__propertyInstructionLastPdfDiagnostics = {
       imageSourceDiagnostics: imageSourceDiagnostics,
       imageDiagnostics: imageDiagnostics,
-      canvasPaintabilityDiagnostics: canvasPaintabilityDiagnostics,
       cardContainmentDiagnostics: cardContainmentDiagnostics,
       mediaVisualPlacementDiagnostics: mediaVisualPlacementDiagnostics,
       imageRatioDiagnostics: imageRatioDiagnostics,
       imageClipDiagnostics: imageClipDiagnostics,
-      paintedImageDiagnostics: renderResult.paintedImageDiagnostics || [],
       preparedImageAssets: renderResult.preparedImageAssets || [],
       pageDiagnostics: renderResult.pageDiagnostics || pageNodes.map(collectPageDiagnostics),
       vectorLayoutModel: renderResult.layoutModel || null,
@@ -12961,8 +12181,6 @@
 
     return {
       pdf: renderResult.pdf,
-      pageImageBlobs: renderResult.pageImageBlobs || [],
-      pageImages: renderResult.pageImages || [],
       pageCount: pageNodes.length,
       cardContainmentDiagnostics: cardContainmentDiagnostics,
       mediaVisualPlacementDiagnostics: mediaVisualPlacementDiagnostics,
@@ -12989,17 +12207,16 @@
       blob: artifact.pdfBlob,
       blobUrl: blobUrl,
       pageCount: Number(artifact.pageCount || 0),
-      pageImages: Array.isArray(artifact.pageImages) ? artifact.pageImages.slice() : [],
       adaptiveSummary: adaptiveSummary,
       plannerDiagnostics: plannerDiagnostics,
       performance: artifact.performance || {},
       language: String(artifact.languageCode || SOURCE_LANGUAGE),
       direction: String(artifact.direction || "ltr"),
-      renderer: String(artifact.renderer || "raster"),
+      renderer: String(artifact.renderer || PDF_RENDERER_ID),
       embeddedFonts: Array.isArray(artifact.embeddedFonts) ? artifact.embeddedFonts.slice() : [],
       layoutModel: artifact.layoutModel ? {
         version: artifact.layoutModel.version || 1,
-        renderer: artifact.layoutModel.renderer || String(artifact.renderer || "raster"),
+        renderer: artifact.layoutModel.renderer || String(artifact.renderer || PDF_RENDERER_ID),
         pageSize: artifact.layoutModel.pageSize || null,
         pageCount: Array.isArray(artifact.layoutModel.pages) ? artifact.layoutModel.pages.length : 0,
         elementCount: Array.isArray(artifact.layoutModel.pages)
@@ -13061,7 +12278,7 @@
     var performanceState = startPdfPerformance();
     var exportImageDataCache = new Map();
     var clickStartedAt = Date.now();
-    resetPdfGenerationDiagnostics(getAdaptivePdfRenderer());
+    resetPdfGenerationDiagnostics(PDF_RENDERER_ID);
     recordPdfGenerationStage("generation-entered", {
       action: triggerElement && triggerElement.classList && triggerElement.classList.contains("property-instruction-print") ? "print" : "download"
     });
@@ -13240,13 +12457,11 @@
       await waitForFonts();
       recordPdfGenerationStage("browser-fonts-completed");
       await waitForTwoAnimationFrames();
-      if (isAdaptivePdfLayoutEnabled()) {
-        recordPdfGenerationStage("adaptive-layout-started");
-        applyAdaptiveSectionRows(exportState);
-        recordPdfGenerationStage("adaptive-layout-completed", {
-          pageCount: exportState && exportState.exportPages ? exportState.exportPages.querySelectorAll(".pi-export-page").length : 0
-        });
-      }
+      recordPdfGenerationStage("adaptive-layout-started");
+      applyAdaptiveSectionRows(exportState);
+      recordPdfGenerationStage("adaptive-layout-completed", {
+        pageCount: exportState && exportState.exportPages ? exportState.exportPages.querySelectorAll(".pi-export-page").length : 0
+      });
       recordPdfGenerationStage("adaptive-final-sizing-started");
       var prePaginationRatioDiagnostics = validateImageAspectRatios(exportState.exportRoot);
       var prePaginationClipDiagnostics = validateExportImageClipping(exportState.exportRoot);
@@ -13255,27 +12470,21 @@
       updateExportProgress(triggerElement, statusElement, null, null, "paginate");
       var paginationStartedAt = Date.now();
       paginateExportDocument(exportState);
-      if (isAdaptivePdfLayoutEnabled()) {
-        applyAdaptiveFinalMediaSizing(exportState.exportRoot);
-      }
+      applyAdaptiveFinalMediaSizing(exportState.exportRoot);
       recordPdfGenerationStage("adaptive-final-sizing-completed");
       populatePageFooters(exportState, guideModel.title || guideTitle);
       populatePdfContentsDestinations(exportState);
       recordPdfPerformance(performanceState, "paginationMs", paginationStartedAt);
       var layoutDiagnostics = collectCardLayoutDiagnostics(exportState.exportRoot);
-      if (isAdaptivePdfLayoutEnabled()) {
-        exportState.adaptiveLayoutSummary = exportState.adaptiveLayoutSummary || {};
-        exportState.adaptiveLayoutSummary.pageOccupancy = collectAdaptivePageSummary(exportState.exportPages);
-        exportState.adaptiveLayoutSummary.pageCount = exportState.exportPages.querySelectorAll(".pi-export-page").length;
-        exportState.adaptiveLayoutSummary.sparsePageWarnings = exportState.adaptiveLayoutSummary.pageOccupancy.filter(function (pageSummary) {
-          return pageSummary.occupancy < PDF_ADAPTIVE_SPARSE_PAGE_THRESHOLD && pageSummary.rowCount <= 1;
-        }).map(function (pageSummary) {
-          return pageSummary.pageNumber;
-        });
-        window.__propertyInstructionPdfAdaptiveLayoutSummary = exportState.adaptiveLayoutSummary;
-      } else {
-        window.__propertyInstructionPdfAdaptiveLayoutSummary = null;
-      }
+      exportState.adaptiveLayoutSummary = exportState.adaptiveLayoutSummary || {};
+      exportState.adaptiveLayoutSummary.pageOccupancy = collectAdaptivePageSummary(exportState.exportPages);
+      exportState.adaptiveLayoutSummary.pageCount = exportState.exportPages.querySelectorAll(".pi-export-page").length;
+      exportState.adaptiveLayoutSummary.sparsePageWarnings = exportState.adaptiveLayoutSummary.pageOccupancy.filter(function (pageSummary) {
+        return pageSummary.occupancy < PDF_ADAPTIVE_SPARSE_PAGE_THRESHOLD && pageSummary.rowCount <= 1;
+      }).map(function (pageSummary) {
+        return pageSummary.pageNumber;
+      });
+      window.__propertyInstructionPdfAdaptiveLayoutSummary = exportState.adaptiveLayoutSummary;
       validateExportDomParity(exportState.exportRoot, preMountParity.modelParityMap, "post-pagination");
       mutationGuardState = startExportMutationGuard(exportState.exportRoot);
       updateExportProgress(triggerElement, statusElement, null, null, "validate");
@@ -13298,7 +12507,7 @@
 
       setPdfExportLifecycle("rendering-pages");
       recordPdfGenerationStage("renderer-selection-completed", {
-        renderer: getAdaptivePdfRenderer()
+        renderer: PDF_RENDERER_ID
       });
       if (isPdfArtifactModeEnabled()) {
         setPdfArtifactModeResult({
@@ -13310,14 +12519,8 @@
       var renderResult = await withTimeout(
         renderExportPagesToPdf(
           exportState,
-          getPdfFilename(triggerElement),
           preMountParity.modelParityMap,
-          mutationGuardState,
-          {
-            downloadButton: triggerElement,
-            statusElement: statusElement,
-            clickStartedAt: clickStartedAt
-          }
+          mutationGuardState
         ),
         PDF_EXPORT_TIMEOUT_MS,
         "PDF export timed out"
@@ -13360,21 +12563,6 @@
       recordProgressHistory(renderResult.pageCount, 1.8, performanceState);
       var artifact = {
         pdfBlob: pdfBlob,
-        pageImageBlobs: (renderResult.pageImageBlobs || []).slice(),
-        pageImages: (renderResult.pageImages || []).map(function (pageImage, index) {
-          var pageSummary = exportState && exportState.adaptiveLayoutSummary && Array.isArray(exportState.adaptiveLayoutSummary.pageOccupancy)
-            ? exportState.adaptiveLayoutSummary.pageOccupancy[index] || null
-            : null;
-          return Object.assign({}, pageImage, {
-            occupancy: pageSummary ? Number(pageSummary.occupancy || 0) : 0,
-            rows: pageSummary ? (pageSummary.rowPlan || []) : [],
-            cards: pageSummary ? (pageSummary.rowPlan || []).reduce(function (cards, row) {
-              return cards.concat((row.cards || []).map(function (card) {
-                return Object.assign({}, card);
-              }));
-            }, []) : []
-          });
-        }),
         pageCount: renderResult.pageCount,
         languageCode: guideModel.languageCode || SOURCE_LANGUAGE,
         cacheKey: cacheKey,
@@ -13385,7 +12573,7 @@
           ? JSON.parse(JSON.stringify(exportState.adaptiveLayoutSummary.plannerDiagnostics))
           : null,
         filename: getPdfFilename(triggerElement),
-        renderer: getAdaptivePdfRenderer(),
+        renderer: PDF_RENDERER_ID,
         embeddedFonts: (renderResult.embeddedFonts || []).slice(),
         preparedImageAssets: Array.isArray(renderResult.preparedImageAssets)
           ? JSON.parse(JSON.stringify(renderResult.preparedImageAssets))
@@ -13647,11 +12835,10 @@
         return {
           blob: artifact.pdfBlob,
           blobUrl: pdfArtifactModeController.objectUrl || createPdfArtifactModeBlobUrl(artifact.pdfBlob),
-          pageImages: Array.isArray(artifact.pageImages) ? artifact.pageImages.slice() : [],
           summary: artifact.adaptiveSummary || null,
           plannerDiagnostics: artifact.plannerDiagnostics || null,
           performance: artifact.performance || {},
-          renderer: artifact.renderer || "raster",
+          renderer: artifact.renderer || PDF_RENDERER_ID,
           embeddedFonts: Array.isArray(artifact.embeddedFonts) ? artifact.embeddedFonts.slice() : [],
           preparedImageAssets: Array.isArray(artifact.preparedImageAssets) ? artifact.preparedImageAssets.slice() : [],
           layoutModel: artifact.layoutModel || null,
