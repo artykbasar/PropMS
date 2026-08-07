@@ -26,6 +26,10 @@ from propms.property_management_solution.doctype.property_instruction.test_prope
 
 
 class TestLegacyMapMigration(PropertyInstructionTestMixin, FrappeTestCase):
+	def _require_active_legacy_field(self):
+		if not frappe.get_meta("Property Instruction Block").has_field(LEGACY_FIELD_NAME):
+			self.skipTest("historical legacy-field integration test requires the pre-Release-3C2 schema")
+
 	def _current_instruction_cursor(self):
 		return frappe.db.get_value("Property Instruction", {}, "name", order_by="name desc")
 
@@ -57,6 +61,7 @@ class TestLegacyMapMigration(PropertyInstructionTestMixin, FrappeTestCase):
 		)
 
 	def test_audit_classifies_legacy_only_valid_block(self):
+		self._require_active_legacy_field()
 		doc = self.make_instruction(
 			instruction_blocks=[
 				{
@@ -72,6 +77,7 @@ class TestLegacyMapMigration(PropertyInstructionTestMixin, FrappeTestCase):
 		self.assertEqual(candidate["canonical_url"], "https://www.google.com/maps/embed?pb=legacy-only")
 
 	def test_audit_classifies_equivalent_legacy_and_canonical_values(self):
+		self._require_active_legacy_field()
 		doc = self.make_instruction(
 			instruction_blocks=[
 				{
@@ -87,6 +93,7 @@ class TestLegacyMapMigration(PropertyInstructionTestMixin, FrappeTestCase):
 		self.assertEqual(candidate["classification"], "BOTH_EQUIVALENT")
 
 	def test_audit_classifies_conflicting_legacy_and_canonical_values(self):
+		self._require_active_legacy_field()
 		doc = self.make_instruction(
 			instruction_blocks=[
 				{
@@ -102,6 +109,7 @@ class TestLegacyMapMigration(PropertyInstructionTestMixin, FrappeTestCase):
 		self.assertEqual(candidate["classification"], "BOTH_CONFLICT")
 
 	def test_audit_classifies_invalid_legacy_variants(self):
+		self._require_active_legacy_field()
 		cases = [
 			(
 				"LEGACY_MULTIPLE_IFRAMES",
@@ -131,6 +139,7 @@ class TestLegacyMapMigration(PropertyInstructionTestMixin, FrappeTestCase):
 			self.assertEqual(candidate["classification"], expected)
 
 	def test_invalid_legacy_block_is_preserved_and_runtime_safe(self):
+		self._require_active_legacy_field()
 		doc = self.make_instruction(
 			instruction_blocks=[
 				{
@@ -147,6 +156,7 @@ class TestLegacyMapMigration(PropertyInstructionTestMixin, FrappeTestCase):
 		self.assertEqual(row.google_maps_embed_html, '<iframe src="https://evil.example/maps/embed?pb=invalid"></iframe>')
 
 	def test_plan_hash_is_deterministic(self):
+		self._require_active_legacy_field()
 		doc = self.make_instruction(
 			instruction_blocks=[
 				{
@@ -164,6 +174,7 @@ class TestLegacyMapMigration(PropertyInstructionTestMixin, FrappeTestCase):
 		self.assertTrue(any(candidate.row_name == doc.instruction_blocks[0].name for candidate in first_plan.candidates))
 
 	def test_apply_migration_updates_canonical_field_and_preserves_legacy_html(self):
+		self._require_active_legacy_field()
 		doc = self.make_instruction(
 			instruction_blocks=[
 				{
@@ -193,6 +204,7 @@ class TestLegacyMapMigration(PropertyInstructionTestMixin, FrappeTestCase):
 		self.assertEqual(reloaded.custom_map_snapshot_error_log, "")
 
 	def test_apply_migration_tolerates_missing_snapshot_columns(self):
+		self._require_active_legacy_field()
 		doc = self.make_instruction(
 			instruction_blocks=[
 				{
@@ -220,6 +232,7 @@ class TestLegacyMapMigration(PropertyInstructionTestMixin, FrappeTestCase):
 		)
 
 	def test_apply_migration_skips_changed_record(self):
+		self._require_active_legacy_field()
 		doc = self.make_instruction(
 			instruction_blocks=[
 				{
@@ -244,6 +257,7 @@ class TestLegacyMapMigration(PropertyInstructionTestMixin, FrappeTestCase):
 		self.assertEqual(result["skipped"][0]["reason"], "changed-after-plan")
 
 	def test_migration_rerun_is_idempotent(self):
+		self._require_active_legacy_field()
 		self.make_instruction(
 			instruction_blocks=[
 				{

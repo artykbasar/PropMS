@@ -610,20 +610,19 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 			"https://www.google.com/maps/d/viewer?mid=derive-main&ehbc=2E312F",
 		)
 
-	def test_map_block_option_and_embed_field_exist_in_schema(self):
+	def test_map_block_option_and_canonical_embed_field_exist_in_schema(self):
 		schema = self.get_block_doctype_json()
-		block_type_field = next(field for field in schema["fields"] if field["fieldname"] == "block_type")
-		custom_embed_field = next(field for field in schema["fields"] if field["fieldname"] == "custom_map_embed_url")
-		embed_field = next(field for field in schema["fields"] if field["fieldname"] == "google_maps_embed_html")
+		fields_by_name = {field["fieldname"]: field for field in schema["fields"]}
+		block_type_field = fields_by_name["block_type"]
+		custom_embed_field = fields_by_name["custom_map_embed_url"]
 		self.assertIn("Map", block_type_field["options"].splitlines())
 		self.assertEqual(custom_embed_field["fieldtype"], "Small Text")
 		self.assertEqual(custom_embed_field["depends_on"], 'eval:doc.block_type')
 		self.assertEqual(custom_embed_field["mandatory_depends_on"], 'eval:doc.block_type == "Map"')
 		self.assertIn("Paste a Google Maps embed iframe or its src URL.", custom_embed_field["description"])
-		self.assertEqual(embed_field["fieldtype"], "Code")
-		self.assertEqual(embed_field["options"], "HTML")
-		self.assertEqual(embed_field["depends_on"], "eval:0")
-		self.assertEqual(embed_field["hidden"], 1)
+		self.assertNotIn("google_maps_embed_html", fields_by_name)
+		self.assertNotIn("google_maps_embed_html", schema["field_order"])
+		self.assertEqual(len(schema["fields"]), 16)
 
 	def test_snapshot_fields_exist_in_parent_schema(self):
 		schema = self.get_property_instruction_schema()
@@ -1212,21 +1211,17 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 				]
 			)
 
-	def test_legacy_block_embed_field_is_preserved_until_migration(self):
-		legacy_html = '<iframe src="https://www.google.com/maps/embed?pb=legacy"></iframe>'
-		doc = self.make_instruction(
-			instruction_blocks=[
-				{
-					"section": "Finding the Property",
-					"block_type": "Map",
-					"title": "Legacy map",
-					"google_maps_embed_html": legacy_html,
-				},
-			]
+	def test_legacy_block_embed_value_is_not_a_runtime_fallback(self):
+		doc = self.make_instruction()
+		row = frappe._dict(
+			section="Finding the Property",
+			block_type="Map",
+			title="Legacy map",
+			custom_map_embed_url="",
+			google_maps_embed_html='<iframe src="https://www.google.com/maps/embed?pb=legacy"></iframe>',
 		)
-		row = doc.instruction_blocks[0]
-		self.assertFalse(row.custom_map_embed_url)
-		self.assertEqual(row.google_maps_embed_html, legacy_html)
+		self.assertEqual(doc.get_block_map_embed_input(row), "")
+		self.assertFalse(doc.get_block_map_data(row).embed_url)
 
 	def test_google_translate_widget_disabled_by_default(self):
 		self.set_property_management_setting("enable_guest_guide_google_translate", 0)
@@ -2629,6 +2624,7 @@ def run_migration_focused_tests():
 		"propms.map_snapshot.test_import_isolation",
 		"propms.map_snapshot.test_validation",
 		"propms.map_snapshot.test_legacy_migration",
+		"propms.map_snapshot.test_legacy_field_cleanup",
 	]
 	suite = unittest.TestSuite(
 		unittest.defaultTestLoader.loadTestsFromName(module_name)
@@ -2651,6 +2647,7 @@ def run_snapshot_focused_tests():
 		"propms.map_snapshot.test_import_isolation",
 		"propms.map_snapshot.test_validation",
 		"propms.map_snapshot.test_legacy_migration",
+		"propms.map_snapshot.test_legacy_field_cleanup",
 		"propms.map_snapshot.test_resolver",
 		"propms.map_snapshot.test_capture",
 		"propms.map_snapshot.test_manifest",
@@ -2719,6 +2716,7 @@ def run_codex_tests():
 		"propms.map_snapshot.test_import_isolation",
 		"propms.map_snapshot.test_validation",
 		"propms.map_snapshot.test_legacy_migration",
+		"propms.map_snapshot.test_legacy_field_cleanup",
 		"propms.map_snapshot.test_resolver",
 		"propms.map_snapshot.test_capture",
 		"propms.map_snapshot.test_manifest",

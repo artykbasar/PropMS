@@ -42,7 +42,10 @@ class TestMapSnapshotImportIsolation(FrappeTestCase):
 			sys.modules["PIL.Image"] = None
 
 			importlib.import_module("propms.patches.v1_0.migrate_google_maps_embed_html_to_custom_map_embed_url")
+			importlib.import_module("propms.patches.v1_0.preflight_google_maps_embed_html_removal")
+			importlib.import_module("propms.patches.v1_0.drop_google_maps_embed_html_from_property_instruction_block")
 			importlib.import_module("propms.map_snapshot.legacy_migration")
+			importlib.import_module("propms.map_snapshot.legacy_field_cleanup")
 
 			print(json.dumps({
 			    "capture_loaded": "propms.map_snapshot.capture" in sys.modules,
