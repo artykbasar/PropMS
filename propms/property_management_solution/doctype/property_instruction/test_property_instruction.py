@@ -139,6 +139,15 @@ class PropertyInstructionTestMixin:
 			as_dict=True,
 		)
 
+	def save_snapshot_system_state(self, doc):
+		with property_instruction_module.allow_snapshot_system_field_update():
+			doc.save(ignore_permissions=True)
+
+	def make_snapshot_error_log(self):
+		error_log = frappe.log_error(title="Snapshot lifecycle test", message="Test-only snapshot lifecycle reference")
+		self.to_delete.append(("Error Log", error_log.name))
+		return error_log.name
+
 	def set_conf(self, key, value):
 		if key not in self.conf_backup:
 			self.conf_backup[key] = frappe.conf.get(key)
@@ -322,6 +331,99 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 	def test_route_generation(self):
 		doc = self.make_instruction(slug="my-custom-slug")
 		self.assertEqual(doc.route, "instructions/my-custom-slug")
+
+	def test_user_supplied_route_is_replaced_by_the_slug_derived_route(self):
+		doc = self.make_instruction(slug="server-route")
+		doc.route = "arbitrary-public-route"
+		doc.save(ignore_permissions=True)
+		self.assertEqual(doc.route, "instructions/server-route")
+
+	def test_existing_parent_snapshot_fields_reject_ordinary_save(self):
+		doc = self.make_instruction()
+		error_log_name = self.make_snapshot_error_log()
+		for fieldname, value in {
+			"custom_map_snapshot": "/private/files/forged.png",
+			"custom_map_snapshot_status": "Ready",
+			"custom_map_snapshot_source_hash": "forged-source-hash",
+			"custom_map_snapshot_generated_at": "2099-01-01 00:00:00",
+			"custom_map_snapshot_error_log": error_log_name,
+		}.items():
+			attempt = frappe.get_doc("Property Instruction", doc.name)
+			attempt.set(fieldname, value)
+			with self.assertRaisesRegex(frappe.ValidationError, "system managed"):
+				attempt.save(ignore_permissions=True)
+
+	def test_new_parent_rejects_prepopulated_snapshot_lifecycle_state(self):
+		error_log_name = self.make_snapshot_error_log()
+		doc = frappe.get_doc(
+			{
+				"doctype": "Property Instruction",
+				"title": "Forged lifecycle guide",
+				"property": self.make_property().name,
+				"custom_map_snapshot": "/private/files/forged.png",
+				"custom_map_snapshot_status": "Ready",
+				"custom_map_snapshot_source_hash": "forged-source-hash",
+				"custom_map_snapshot_generated_at": "2099-01-01 00:00:00",
+				"custom_map_snapshot_error_log": error_log_name,
+			}
+		)
+		with self.assertRaisesRegex(frappe.ValidationError, "system managed"):
+			doc.insert(ignore_permissions=True)
+
+	def test_existing_child_snapshot_fields_reject_ordinary_parent_save(self):
+		doc = self.make_instruction(
+			instruction_blocks=[
+				{
+					"section": "Parking",
+					"block_type": "Map",
+					"title": "Parking map",
+					"custom_map_embed_url": "https://www.google.com/maps/embed?pb=child-forgery",
+				}
+			]
+		)
+		attempt = frappe.get_doc("Property Instruction", doc.name)
+		attempt.instruction_blocks[0].custom_map_snapshot_status = "Ready"
+		with self.assertRaisesRegex(frappe.ValidationError, "system managed"):
+			attempt.save(ignore_permissions=True)
+
+	def test_new_child_rejects_prepopulated_snapshot_lifecycle_state(self):
+		doc = self.make_instruction()
+		error_log_name = self.make_snapshot_error_log()
+		doc.append(
+			"instruction_blocks",
+			{
+				"section": "Parking",
+				"block_type": "Map",
+				"title": "Forged map",
+				"custom_map_embed_url": "https://www.google.com/maps/embed?pb=new-child-forgery",
+				"custom_map_snapshot": "/private/files/forged.png",
+				"custom_map_snapshot_status": "Ready",
+				"custom_map_snapshot_source_hash": "forged-source-hash",
+				"custom_map_snapshot_generated_at": "2099-01-01 00:00:00",
+				"custom_map_snapshot_error_log": error_log_name,
+			},
+		)
+		with self.assertRaisesRegex(frappe.ValidationError, "system managed"):
+			doc.save(ignore_permissions=True)
+
+	def test_client_set_value_cannot_bypass_snapshot_protection(self):
+		doc = self.make_instruction()
+		with self.assertRaisesRegex(frappe.ValidationError, "system managed"):
+			frappe.get_attr("frappe.client.set_value")(
+				doctype="Property Instruction",
+				name=doc.name,
+				fieldname="custom_map_snapshot_status",
+				value="Ready",
+			)
+
+	def test_normal_parent_and_block_edits_remain_allowed(self):
+		doc = self.make_instruction()
+		doc.emergency_contact = "Updated contact"
+		doc.instruction_blocks[0].title = "Updated block title"
+		doc.save(ignore_permissions=True)
+		doc.reload()
+		self.assertEqual(doc.emergency_contact, "Updated contact")
+		self.assertEqual(doc.instruction_blocks[0].title, "Updated block title")
 
 	def test_duplicate_slug_rejection(self):
 		self.make_instruction(slug="same-slug")
@@ -535,19 +637,52 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 		):
 			self.assertNotIn(removed_field, fields_by_name)
 		self.assertEqual(fields_by_name["custom_map_snapshot"]["fieldtype"], "Attach Image")
+		self.assertEqual(fields_by_name["custom_map_snapshot"]["hidden"], 1)
+		self.assertEqual(fields_by_name["custom_map_snapshot"]["read_only"], 1)
 		self.assertEqual(fields_by_name["custom_map_snapshot_status"]["options"], "Not Required\nPending\nProcessing\nReady\nFailed")
+		self.assertEqual(fields_by_name["custom_map_snapshot_status"]["read_only"], 1)
 		self.assertEqual(fields_by_name["custom_map_snapshot_source_hash"]["hidden"], 1)
+		self.assertEqual(fields_by_name["custom_map_snapshot_source_hash"]["read_only"], 1)
 		self.assertEqual(fields_by_name["custom_map_snapshot_generated_at"]["fieldtype"], "Datetime")
+		self.assertEqual(fields_by_name["custom_map_snapshot_generated_at"]["read_only"], 1)
 		self.assertEqual(fields_by_name["custom_map_snapshot_error_log"]["options"], "Error Log")
+		self.assertEqual(fields_by_name["custom_map_snapshot_error_log"]["read_only"], 1)
+		self.assertEqual(fields_by_name["route"]["read_only"], 1)
+		for fieldname in (
+			"custom_map_snapshot",
+			"custom_map_snapshot_status",
+			"custom_map_snapshot_source_hash",
+			"custom_map_snapshot_generated_at",
+			"custom_map_snapshot_error_log",
+		):
+			self.assertEqual(fields_by_name[fieldname]["in_list_view"], 0)
+		for fieldname in ("slug", "custom_map_embed_url", "google_maps_url"):
+			self.assertNotEqual(fields_by_name[fieldname].get("read_only"), 1)
 
 	def test_snapshot_fields_exist_in_block_schema(self):
 		schema = self.get_block_doctype_json()
 		fields_by_name = {field["fieldname"]: field for field in schema["fields"]}
 		self.assertEqual(fields_by_name["custom_map_snapshot"]["fieldtype"], "Attach Image")
+		self.assertEqual(fields_by_name["custom_map_snapshot"]["hidden"], 1)
+		self.assertEqual(fields_by_name["custom_map_snapshot"]["read_only"], 1)
 		self.assertEqual(fields_by_name["custom_map_snapshot_status"]["options"], "Not Required\nPending\nProcessing\nReady\nFailed")
+		self.assertEqual(fields_by_name["custom_map_snapshot_status"]["read_only"], 1)
 		self.assertEqual(fields_by_name["custom_map_snapshot_source_hash"]["hidden"], 1)
+		self.assertEqual(fields_by_name["custom_map_snapshot_source_hash"]["read_only"], 1)
 		self.assertEqual(fields_by_name["custom_map_snapshot_generated_at"]["fieldtype"], "Datetime")
+		self.assertEqual(fields_by_name["custom_map_snapshot_generated_at"]["read_only"], 1)
 		self.assertEqual(fields_by_name["custom_map_snapshot_error_log"]["options"], "Error Log")
+		self.assertEqual(fields_by_name["custom_map_snapshot_error_log"]["read_only"], 1)
+		for fieldname in (
+			"custom_map_snapshot",
+			"custom_map_snapshot_status",
+			"custom_map_snapshot_source_hash",
+			"custom_map_snapshot_generated_at",
+			"custom_map_snapshot_error_log",
+		):
+			self.assertEqual(fields_by_name[fieldname]["in_list_view"], 0)
+		for fieldname in ("custom_map_embed_url", "step_number", "sort_order"):
+			self.assertNotEqual(fields_by_name[fieldname].get("read_only"), 1)
 
 	def test_property_instruction_admin_form_actions_are_present(self):
 		source = self.get_property_instruction_doctype_script()
@@ -569,7 +704,7 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 		)
 		self.attach_private_file(doc.name, "current.png")
 		doc.emergency_contact = "Updated"
-		doc.save(ignore_permissions=True)
+		self.save_snapshot_system_state(doc)
 		self.assertEqual(doc.custom_map_snapshot_status, "Ready")
 
 	def test_stale_parent_save_preserves_newer_ready_snapshot_state(self):
@@ -618,7 +753,7 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 		ready_state = self.get_snapshot_state("Property Instruction", doc.name)
 		self.assertEqual(ready_state.custom_map_snapshot_status, "Ready")
 		stale_doc.emergency_contact = "Stale save"
-		stale_doc.save(ignore_permissions=True)
+		self.save_snapshot_system_state(stale_doc)
 		frappe.db.commit()
 		final_state = self.get_snapshot_state("Property Instruction", doc.name)
 		self.assertEqual(final_state.custom_map_snapshot_status, "Ready")
@@ -682,7 +817,7 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 		ready_state = self.get_snapshot_state("Property Instruction Block", row_name)
 		self.assertEqual(ready_state.custom_map_snapshot_status, "Ready")
 		stale_doc.emergency_contact = "Stale child save"
-		stale_doc.save(ignore_permissions=True)
+		self.save_snapshot_system_state(stale_doc)
 		frappe.db.commit()
 		final_state = self.get_snapshot_state("Property Instruction Block", row_name)
 		self.assertEqual(final_state.custom_map_snapshot_status, "Ready")
@@ -700,7 +835,7 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 		self.to_delete.append(("Error Log", error_log.name))
 		doc.custom_map_snapshot_status = "Failed"
 		doc.custom_map_snapshot_error_log = error_log.name
-		doc.save(ignore_permissions=True)
+		self.save_snapshot_system_state(doc)
 		self.assertEqual(doc.custom_map_snapshot_status, "Failed")
 		self.assertEqual(doc.custom_map_snapshot_error_log, error_log.name)
 
@@ -718,6 +853,7 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 		doc.custom_map_snapshot_source_hash = build_map_source_hash(
 			doc.custom_map_embed_url, doc.get_property_map().embed_kind
 		)
+		self.save_snapshot_system_state(doc)
 		doc.custom_map_embed_url = ""
 		doc.save(ignore_permissions=True)
 		frappe.db.commit()
@@ -752,7 +888,7 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 		block_row.custom_map_snapshot = file_doc.file_url
 		block_row.custom_map_snapshot_status = "Ready"
 		block_row.custom_map_snapshot_source_hash = source_hash
-		doc.save(ignore_permissions=True)
+		self.save_snapshot_system_state(doc)
 		doc.custom_map_embed_url = ""
 		doc.save(ignore_permissions=True)
 		frappe.db.commit()
@@ -1001,7 +1137,7 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 		row.custom_map_snapshot = block_file.file_url
 		row.custom_map_snapshot_status = "Ready"
 		row.custom_map_snapshot_source_hash = block_hash
-		doc.save(ignore_permissions=True)
+		self.save_snapshot_system_state(doc)
 		html = self.render_instruction(doc)
 		self.assertIn('data-guide-map-pdf-representation="snapshot"', html)
 		self.assertIn('data-guide-block-map-pdf-representation="snapshot"', html)

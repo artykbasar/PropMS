@@ -39,7 +39,7 @@ class TestMapSnapshotJobs(PropertyInstructionTestMixin, FrappeTestCase):
 	def test_retry_failed_snapshot_targets_failed_rows_only(self):
 		doc = self.make_instruction(custom_map_embed_url="https://www.google.com/maps/embed?pb=retry-main")
 		doc.custom_map_snapshot_status = SNAPSHOT_STATUS_FAILED
-		doc.save(ignore_permissions=True)
+		self.save_snapshot_system_state(doc)
 		with patch("propms.map_snapshot.jobs.enqueue") as enqueue_mock:
 			result = queue_snapshot_generation(doc.name, retry_failed_only=True)
 		self.assertTrue(result["queued"])

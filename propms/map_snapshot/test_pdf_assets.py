@@ -33,7 +33,7 @@ class TestPdfMapAssets(PropertyInstructionTestMixin, FrappeTestCase):
 		doc.custom_map_snapshot = file_doc.file_url
 		doc.custom_map_snapshot_status = "Ready"
 		doc.custom_map_snapshot_source_hash = source_hash
-		doc.save(ignore_permissions=True)
+		self.save_snapshot_system_state(doc)
 		return source_hash, file_doc
 
 	def _set_ready_block_snapshot(self, doc, row):
@@ -49,7 +49,7 @@ class TestPdfMapAssets(PropertyInstructionTestMixin, FrappeTestCase):
 		row.custom_map_snapshot = file_doc.file_url
 		row.custom_map_snapshot_status = "Ready"
 		row.custom_map_snapshot_source_hash = source_hash
-		doc.save(ignore_permissions=True)
+		self.save_snapshot_system_state(doc)
 		return source_hash, file_doc
 
 	def _reset_response(self):
