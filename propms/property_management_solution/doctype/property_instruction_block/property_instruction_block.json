@@ -8,7 +8,6 @@
  "field_order": [
   "section",
   "block_type",
-  "sort_order",
   "step_number",
   "title",
   "body",
@@ -39,12 +38,6 @@
    "label": "Block Type",
    "options": "Text\nStep\nImage\nWarning\nLink\nMap",
    "reqd": 1
-  },
-  {
-   "fieldname": "sort_order",
-   "fieldtype": "Int",
-   "in_list_view": 1,
-   "label": "Sort Order"
   },
   {
    "fieldname": "step_number",

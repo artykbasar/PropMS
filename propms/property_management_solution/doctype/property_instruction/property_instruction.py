@@ -231,8 +231,6 @@ class PropertyInstruction(WebsiteGenerator):
 
 	def normalize_blocks(self):
 		for block in self.instruction_blocks or []:
-			if not block.sort_order:
-				block.sort_order = block.idx
 			embed_input = self.get_block_map_embed_input(block)
 			canonical_embed_url = (
 				self.normalize_google_maps_embed_input(embed_input)
@@ -573,7 +571,7 @@ class PropertyInstruction(WebsiteGenerator):
 		grouped = []
 		sorted_rows = sorted(
 			self.instruction_blocks or [],
-			key=lambda row: ((row.sort_order or row.idx or 0), row.idx or 0),
+			key=lambda row: row.idx or 0,
 		)
 
 		for section in SECTION_OPTIONS:
@@ -634,7 +632,7 @@ class PropertyInstruction(WebsiteGenerator):
 		block_maps = frappe._dict()
 		sorted_rows = sorted(
 			self.instruction_blocks or [],
-			key=lambda row: ((row.sort_order or row.idx or 0), row.idx or 0),
+			key=lambda row: row.idx or 0,
 		)
 		for row in sorted_rows:
 			if not row.get("name") or not self.block_has_content(row):

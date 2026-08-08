@@ -448,22 +448,22 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 				{
 					"section": "Check-In",
 					"block_type": "Step",
-					"title": "Second",
-					"body": "<p>Two</p>",
-					"sort_order": 2,
+					"title": "First",
+					"body": "<p>One</p>",
+					"step_number": 8,
 				},
 				{
 					"section": "Check-In",
 					"block_type": "Step",
-					"title": "First",
-					"body": "<p>One</p>",
-					"sort_order": 1,
+					"title": "Second",
+					"body": "<p>Two</p>",
+					"step_number": 3,
 				},
 			]
 		)
 		sections = doc.get_grouped_blocks()
 		self.assertEqual([block.title for block in sections[0].blocks], ["First", "Second"])
-		self.assertEqual([block.display_step_number for block in sections[0].blocks], [1, 2])
+		self.assertEqual([block.display_step_number for block in sections[0].blocks], [8, 3])
 
 	def test_javascript_url_rejection(self):
 		with self.assertRaises(frappe.ValidationError):
@@ -622,7 +622,9 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 		self.assertIn("Paste a Google Maps embed iframe or its src URL.", custom_embed_field["description"])
 		self.assertNotIn("google_maps_embed_html", fields_by_name)
 		self.assertNotIn("google_maps_embed_html", schema["field_order"])
-		self.assertEqual(len(schema["fields"]), 16)
+		self.assertNotIn("sort_order", fields_by_name)
+		self.assertNotIn("sort_order", schema["field_order"])
+		self.assertEqual(len(schema["fields"]), 15)
 
 	def test_snapshot_fields_exist_in_parent_schema(self):
 		schema = self.get_property_instruction_schema()
@@ -680,7 +682,7 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 			"custom_map_snapshot_error_log",
 		):
 			self.assertEqual(fields_by_name[fieldname]["in_list_view"], 0)
-		for fieldname in ("custom_map_embed_url", "step_number", "sort_order"):
+		for fieldname in ("custom_map_embed_url", "step_number"):
 			self.assertNotEqual(fields_by_name[fieldname].get("read_only"), 1)
 
 	def test_property_instruction_admin_form_actions_are_present(self):
