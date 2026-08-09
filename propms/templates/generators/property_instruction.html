@@ -514,17 +514,21 @@
     .pi-blocks > .pi-block {
       min-width: 0;
     }
-    .pi-blocks > .pi-block.pi-block-step:not(.pi-block-has-map) {
+    .pi-blocks > .pi-block:not(.pi-block-has-map) {
       flex: 1 1 420px;
     }
-    .pi-blocks > .pi-block.pi-block-step.pi-block-has-image:not(.pi-block-has-map) {
+    .pi-blocks > .pi-block.pi-block-has-image:not(.pi-block-has-map) {
       display: flex;
       flex-direction: column;
     }
-    .pi-blocks > .pi-block.pi-block-step.pi-block-has-image:not(.pi-block-has-map) > .pi-image-frame {
+    .pi-blocks > .pi-block.pi-block-text:not(.pi-block-has-image):not(.pi-block-has-map) {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+    .pi-blocks > .pi-block.pi-block-has-image:not(.pi-block-has-map) > .pi-image-frame {
       flex: 1 1 auto;
     }
-    .pi-blocks > .pi-block:not(.pi-block-step),
     .pi-blocks > .pi-block.pi-block-has-map {
       flex: 0 0 100%;
     }
