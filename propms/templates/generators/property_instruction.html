@@ -580,6 +580,24 @@
   .pi-body :last-child {
     margin-bottom: 0;
   }
+  .pi-block-text:not(.pi-block-has-image):not(.pi-block-has-map) {
+    padding: clamp(1.25rem, 1.1rem + .45vw, 1.7rem);
+  }
+  .pi-block-text:not(.pi-block-has-image):not(.pi-block-has-map) h3 {
+    font-size: clamp(1.15rem, 1.05rem + .28vw, 1.35rem);
+    line-height: 1.35;
+  }
+  .pi-block-text:not(.pi-block-has-image):not(.pi-block-has-map) .pi-body {
+    font-size: clamp(1.02rem, .96rem + .18vw, 1.15rem);
+    line-height: 1.6;
+  }
+  .pi-block-text:not(.pi-block-has-image):not(.pi-block-has-map) .pi-body :is(ol, ul) {
+    margin: .55rem 0 0;
+    padding-left: 1.5rem;
+  }
+  .pi-block-text:not(.pi-block-has-image):not(.pi-block-has-map) .pi-body li + li {
+    margin-top: .35rem;
+  }
   .pi-image-frame {
     width: 100%;
     min-width: 0;
