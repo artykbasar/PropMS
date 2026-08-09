@@ -20,6 +20,7 @@
   }
   .pi-page {
     --pi-bg: #f6f2ea;
+    --pi-bookmark-top-offset: 6rem;
     --pi-card: #ffffff;
     --pi-ink: #1f2933;
     --pi-muted: #5b6875;
@@ -42,14 +43,13 @@
     --pi-bookmark-active-width: 58px;
     position: fixed;
     left: 0;
-    top: 50%;
-    transform: translateY(-50%);
+    top: calc(var(--pi-bookmark-top-offset) + .5rem);
     z-index: 900;
     display: flex;
     flex-direction: column;
     width: var(--pi-bookmark-active-width);
-    height: calc(100dvh - 1rem);
-    max-height: calc(100dvh - 1rem);
+    height: calc(100dvh - var(--pi-bookmark-top-offset) - 1rem);
+    max-height: calc(100dvh - var(--pi-bookmark-top-offset) - 1rem);
     margin: 0;
     padding: 0;
     pointer-events: none;
@@ -825,8 +825,9 @@
     .pi-bookmark-nav {
       --pi-bookmark-width: 34px;
       --pi-bookmark-active-width: 42px;
-      height: calc(100dvh - 1rem);
-      max-height: calc(100dvh - 1rem);
+    }
+    .pi-screen-layout {
+      margin-left: 42px;
     }
     .pi-bookmark {
       padding: .15rem .15rem;
@@ -835,13 +836,13 @@
       letter-spacing: .025em;
     }
     .pi-bookmark-nav[data-guide-bookmark-density="dense"] .pi-bookmark {
-      padding-block: .05rem;
-      font-size: .47rem;
-      letter-spacing: .005em;
+      padding-block: .04rem;
+      font-size: .42rem;
+      letter-spacing: 0;
     }
     .pi-bookmark-nav[data-guide-bookmark-density="max"] .pi-bookmark {
-      padding-block: .02rem;
-      font-size: .42rem;
+      padding-block: 0;
+      font-size: .38rem;
       letter-spacing: 0;
     }
   }
@@ -2006,7 +2007,7 @@
     class="pi-bookmark-nav"
     data-guide-bookmarks
     data-guide-bookmark-count="{{ sections | length }}"
-    data-guide-bookmark-density="{% if (sections | length) >= 9 %}max{% elif (sections | length) >= 7 %}dense{% else %}normal{% endif %}"
+    data-guide-bookmark-density="{% if (sections | length) >= 9 %}max{% elif (sections | length) >= 6 %}dense{% else %}normal{% endif %}"
     aria-label="Instruction section bookmarks">
     {% for section in sections %}
     <a class="pi-bookmark" href="#{{ section.anchor }}" data-guide-bookmark="{{ section.anchor }}">

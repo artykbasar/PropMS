@@ -2178,6 +2178,7 @@
   }
 
   function syncStickyToolbarOffset() {
+    var pageRoot = document.querySelector(".pi-page");
     var shell = document.querySelector(".pi-shell");
     var toolbar = document.querySelector("[data-guide-toolbar]");
     if (!shell || !toolbar) {
@@ -2187,9 +2188,14 @@
     var computedToolbarStyle = window.getComputedStyle(toolbar);
     var stickyTop = parseFloat(computedToolbarStyle.top || "0") || 0;
     var toolbarBottomOffset = Math.max(0, Math.ceil(stickyTop + toolbarRect.height));
+    var bookmarkTopOffset = Math.max(0, Math.ceil(toolbarRect.bottom));
     shell.style.setProperty("--pi-toolbar-bottom-offset", toolbarBottomOffset + "px");
+    if (pageRoot) {
+      pageRoot.style.setProperty("--pi-bookmark-top-offset", bookmarkTopOffset + "px");
+    }
     window.__propertyInstructionStickyDiagnostics = window.__propertyInstructionStickyDiagnostics || {};
     window.__propertyInstructionStickyDiagnostics.toolbarBottomOffset = toolbarBottomOffset;
+    window.__propertyInstructionStickyDiagnostics.bookmarkTopOffset = bookmarkTopOffset;
     window.__propertyInstructionStickyDiagnostics.toolbarHeight = Math.ceil(toolbarRect.height);
     window.__propertyInstructionStickyDiagnostics.toolbarTop = stickyTop;
     scheduleActiveSectionNavigationSync();
@@ -2211,6 +2217,7 @@
       translationState.stickyToolbarResizeObserver.observe(toolbar);
     }
     window.addEventListener("resize", scheduleStickyToolbarOffsetSync, { passive: true });
+    window.addEventListener("scroll", scheduleStickyToolbarOffsetSync, { passive: true });
     scheduleStickyToolbarOffsetSync();
   }
 
