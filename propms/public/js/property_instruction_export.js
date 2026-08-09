@@ -650,7 +650,6 @@
       copyNode.textContent = "Choose Print PDF to open the printable PDF in a new tab.";
     }
     clearPdfFeedback();
-    showPdfFeedback("success", getGuideCopyText("pdf_ready", "PDF ready"));
     recordPrintGuideDiagnostic("ready-dialog-opened", {
       artifactCacheHit: !!(artifact && artifact.artifactCacheHit),
       pageCount: artifact && artifact.pageCount ? artifact.pageCount : 0,
@@ -13116,7 +13115,6 @@
       if (statusElement) {
         statusElement.textContent = getGuideCopyText("pdf_ready", "PDF ready");
       }
-      showPdfFeedback("success", getGuideCopyText("pdf_ready", "PDF ready"));
       destroyExportRoot(exportState.exportRoot);
       publishPdfArtifactModeResult(artifact);
       return artifact;
@@ -13272,9 +13270,7 @@
         automatic: true,
         filename: getPdfFilename(downloadButton)
       });
-      showAutomaticDownloadFallback(artifact, {
-        message: getGuideCopyText("download_started", "Download started") + " If it did not start automatically, use Download PDF or Open PDF below."
-      });
+      clearPdfFeedback();
     } else {
       recordPdfInteractionDiagnostic("automatic-download-fallback-shown", {
         reason: "automatic-download-unavailable"
@@ -13527,9 +13523,7 @@
         automatic: false,
         source: "feedback"
       });
-      showAutomaticDownloadFallback(feedbackDownloadArtifact, {
-        message: getGuideCopyText("download_started", "Download started") + " If it did not start, try Download PDF again or open the PDF directly."
-      });
+      clearPdfFeedback();
       return;
     }
 
@@ -13550,9 +13544,7 @@
         });
         return;
       }
-      showAutomaticDownloadFallback(feedbackOpenArtifact, {
-        message: "Your PDF was opened in a new tab."
-      });
+      clearPdfFeedback();
       return;
     }
 
