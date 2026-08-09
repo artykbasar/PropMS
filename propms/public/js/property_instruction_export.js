@@ -2226,17 +2226,39 @@
   var guideThemeMediaQuery = window.matchMedia ? window.matchMedia("(prefers-color-scheme: dark)") : null;
   var guideThemeSystemListenerBound = false;
 
-  function getStoredGuideTheme() {
+  function getStoredGuideThemePreference() {
     try {
-      var storedTheme = window.localStorage ? window.localStorage.getItem(GUIDE_THEME_STORAGE_KEY) : "";
-      return storedTheme === "dark" || storedTheme === "light" ? storedTheme : "";
+      var storedPreference = window.localStorage ? window.localStorage.getItem(GUIDE_THEME_STORAGE_KEY) : "";
+      return storedPreference === "auto" || storedPreference === "light" || storedPreference === "dark"
+        ? storedPreference
+        : "auto";
     } catch (error) {
-      return "";
+      return "auto";
+    }
+  }
+
+  function persistGuideThemePreference(preference) {
+    try {
+      if (window.localStorage) {
+        window.localStorage.setItem(GUIDE_THEME_STORAGE_KEY, preference);
+      }
+    } catch (error) {
+      // Theme still applies for this page even when storage is unavailable.
     }
   }
 
   function getSystemGuideTheme() {
     return guideThemeMediaQuery && guideThemeMediaQuery.matches ? "dark" : "light";
+  }
+
+  function resolveGuideThemePreference(preference) {
+    if (preference === "dark") {
+      return "dark";
+    }
+    if (preference === "light") {
+      return "light";
+    }
+    return getSystemGuideTheme();
   }
 
   function syncGuideDocumentThemeSurface() {
@@ -2282,65 +2304,78 @@
     });
   }
 
-  function syncGuideThemeToggle(theme) {
+  function syncGuideThemeToggle(preference, theme) {
     var toggle = document.querySelector("[data-guide-theme-toggle]");
     if (!toggle) {
       return;
     }
-    var isDark = theme === "dark";
-    var nextLabel = isDark ? "Switch to day mode" : "Switch to night mode";
-    toggle.setAttribute("aria-pressed", isDark ? "true" : "false");
-    toggle.setAttribute("aria-label", nextLabel);
-    toggle.setAttribute("title", nextLabel);
+    var normalizedPreference = preference === "light" || preference === "dark" ? preference : "auto";
+    var nextPreference = normalizedPreference === "auto"
+      ? "light"
+      : normalizedPreference === "light"
+        ? "dark"
+        : "auto";
+    var currentLabel = normalizedPreference === "auto"
+      ? "Auto (system " + theme + ")"
+      : normalizedPreference.charAt(0).toUpperCase() + normalizedPreference.slice(1);
+    var nextLabel = nextPreference === "auto"
+      ? "auto mode"
+      : nextPreference + " mode";
+    var accessibleLabel = "Theme: " + currentLabel + ". Switch to " + nextLabel;
+    toggle.setAttribute("data-guide-theme-preference", normalizedPreference);
+    toggle.removeAttribute("aria-pressed");
+    toggle.setAttribute("aria-label", accessibleLabel);
+    toggle.setAttribute("title", accessibleLabel);
     var labelNode = toggle.querySelector("[data-guide-theme-toggle-label]");
     if (labelNode) {
-      labelNode.textContent = nextLabel;
+      labelNode.textContent = accessibleLabel;
     }
   }
 
-  function applyGuideTheme(theme, options) {
+  function applyGuideThemePreference(preference, options) {
     var pageRoot = document.querySelector("[data-guide-root]");
     if (!pageRoot) {
       return;
     }
-    var resolvedTheme = theme === "dark" ? "dark" : "light";
+    var normalizedPreference = preference === "light" || preference === "dark" ? preference : "auto";
+    var resolvedTheme = resolveGuideThemePreference(normalizedPreference);
     var persist = !!(options && options.persist);
-    var source = String(options && options.source || (persist ? "manual" : "system"));
+    var source = String(options && options.source || (normalizedPreference === "auto" ? "system" : "manual"));
     pageRoot.setAttribute("data-guide-theme", resolvedTheme);
+    pageRoot.setAttribute("data-guide-theme-preference", normalizedPreference);
     pageRoot.setAttribute("data-guide-theme-source", source);
-    syncGuideThemeToggle(resolvedTheme);
+    syncGuideThemeToggle(normalizedPreference, resolvedTheme);
     syncGuideDocumentThemeSurface();
     syncPrintReadyDialogThemeVariables();
     if (persist) {
-      try {
-        if (window.localStorage) {
-          window.localStorage.setItem(GUIDE_THEME_STORAGE_KEY, resolvedTheme);
-        }
-      } catch (error) {
-        // Theme still applies for this page even when storage is unavailable.
-      }
+      persistGuideThemePreference(normalizedPreference);
     }
     window.__propertyInstructionTheme = {
       theme: resolvedTheme,
+      preference: normalizedPreference,
       source: source
     };
     scheduleStickyToolbarOffsetSync();
   }
 
   function initializeGuideTheme() {
-    var storedTheme = getStoredGuideTheme();
-    applyGuideTheme(storedTheme || getSystemGuideTheme(), {
-      source: storedTheme ? "stored" : "system"
+    var storedPreference = getStoredGuideThemePreference();
+    applyGuideThemePreference(storedPreference, {
+      source: storedPreference === "auto" ? "system" : "stored"
     });
     if (!guideThemeMediaQuery || guideThemeSystemListenerBound) {
       return;
     }
     guideThemeSystemListenerBound = true;
-    var handleSystemThemeChange = function (event) {
-      if (getStoredGuideTheme()) {
+    var handleSystemThemeChange = function () {
+      var pageRoot = document.querySelector("[data-guide-root]");
+      var currentPreference = pageRoot
+        ? String(pageRoot.getAttribute("data-guide-theme-preference") || "auto")
+        : getStoredGuideThemePreference();
+      if (currentPreference !== "auto") {
         return;
       }
-      applyGuideTheme(event.matches ? "dark" : "light", { source: "system" });
+      applyGuideThemePreference("auto", { source: "system" });
     };
     if (guideThemeMediaQuery.addEventListener) {
       guideThemeMediaQuery.addEventListener("change", handleSystemThemeChange);
@@ -2351,11 +2386,15 @@
 
   function toggleGuideTheme() {
     var pageRoot = document.querySelector("[data-guide-root]");
-    var currentTheme = pageRoot ? String(pageRoot.getAttribute("data-guide-theme") || "") : "";
-    if (currentTheme !== "dark" && currentTheme !== "light") {
-      currentTheme = getSystemGuideTheme();
-    }
-    applyGuideTheme(currentTheme === "dark" ? "light" : "dark", {
+    var currentPreference = pageRoot
+      ? String(pageRoot.getAttribute("data-guide-theme-preference") || "auto")
+      : getStoredGuideThemePreference();
+    var nextPreference = currentPreference === "auto"
+      ? "light"
+      : currentPreference === "light"
+        ? "dark"
+        : "auto";
+    applyGuideThemePreference(nextPreference, {
       persist: true,
       source: "manual"
     });
