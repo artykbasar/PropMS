@@ -462,6 +462,7 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 			]
 		)
 		sections = doc.get_grouped_blocks()
+		self.assertEqual(sections[0].navigation_icon, "key")
 		self.assertEqual([block.title for block in sections[0].blocks], ["First", "Second"])
 		self.assertEqual([block.display_step_number for block in sections[0].blocks], [8, 3])
 

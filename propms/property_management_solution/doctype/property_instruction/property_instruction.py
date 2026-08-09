@@ -61,6 +61,17 @@ SECTION_OPTIONS = [
 	"Check-Out",
 	"Emergency",
 ]
+SECTION_NAVIGATION_ICONS = {
+	"Finding the Property": "location",
+	"Check-In": "key",
+	"Parking": "car",
+	"WiFi": "wifi",
+	"During Your Stay": "home",
+	"Rubbish": "trash",
+	"House Rules": "clipboard-check",
+	"Check-Out": "log-out",
+	"Emergency": "alert",
+}
 
 WIFI_SECURITY_TYPES = {
 	"WPA": "WPA",
@@ -622,6 +633,7 @@ class PropertyInstruction(WebsiteGenerator):
 					frappe._dict(
 						section=section,
 						anchor=self.scrub(section),
+						navigation_icon=SECTION_NAVIGATION_ICONS.get(section, "info"),
 						blocks=section_blocks,
 					)
 				)
