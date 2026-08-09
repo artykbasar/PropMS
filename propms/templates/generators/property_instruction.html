@@ -517,6 +517,13 @@
     .pi-blocks > .pi-block.pi-block-step:not(.pi-block-has-map) {
       flex: 1 1 420px;
     }
+    .pi-blocks > .pi-block.pi-block-step.pi-block-has-image:not(.pi-block-has-map) {
+      display: flex;
+      flex-direction: column;
+    }
+    .pi-blocks > .pi-block.pi-block-step.pi-block-has-image:not(.pi-block-has-map) > .pi-image-frame {
+      flex: 1 1 auto;
+    }
     .pi-blocks > .pi-block:not(.pi-block-step),
     .pi-blocks > .pi-block.pi-block-has-map {
       flex: 0 0 100%;
@@ -569,13 +576,21 @@
   .pi-body :last-child {
     margin-bottom: 0;
   }
+  .pi-image-frame {
+    width: 100%;
+    min-width: 0;
+    margin-top: .8rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
   .pi-image {
     width: 100%;
     border-radius: 14px;
-    margin-top: .8rem;
     height: auto;
     max-height: min(70vh, 420px);
     object-fit: contain;
+    object-position: center center;
     background: #f8fafb;
     display: block;
   }
@@ -2407,7 +2422,7 @@
 {% macro render_screen_block(block) %}
   {% set block_map = instruction_block_maps.get(block.name) if instruction_block_maps is defined and instruction_block_maps else None %}
   <div
-    class="pi-block pi-block-{{ block.block_type | lower | replace(' ', '-') }}{% if block_map and block_map.embed_url %} pi-block-has-map{% endif %}"
+    class="pi-block pi-block-{{ block.block_type | lower | replace(' ', '-') }}{% if block.image %} pi-block-has-image{% endif %}{% if block_map and block_map.embed_url %} pi-block-has-map{% endif %}"
     data-pdf-block="{{ block.name }}"
     data-guide-block
     data-guide-block-id="{{ block.name }}"
@@ -2426,7 +2441,9 @@
     {% endif %}
 
     {% if block.image %}
-    <img class="pi-image" src="{{ block.image }}" alt="{{ block.image_alt }}" data-guide-block-image>
+    <div class="pi-image-frame">
+      <img class="pi-image" src="{{ block.image }}" alt="{{ block.image_alt }}" data-guide-block-image>
+    </div>
     {% endif %}
 
   {% if block_map and block_map.embed_url %}
