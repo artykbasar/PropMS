@@ -3389,6 +3389,24 @@
     });
   }
 
+  function guideMutationChangesSemanticSnapshot() {
+    if (!translationState.readySnapshot) {
+      return true;
+    }
+    try {
+      var currentSnapshot = captureSemanticSnapshot();
+      if (snapshotsEqual(currentSnapshot, translationState.readySnapshot)) {
+        updateTranslationDiagnostics({
+          readySnapshotInvalidationReason: "non-semantic-change-ignored"
+        });
+        return false;
+      }
+    } catch (error) {
+      return true;
+    }
+    return true;
+  }
+
   function invalidatePreparedPdfArtifacts(reason) {
     translationState.preparationPromise = null;
     translationState.preparationKey = "";
@@ -3491,6 +3509,10 @@
     }
 
     var mutationObserver = new MutationObserver(function () {
+      syncTranslationLanguageState();
+      if (!guideMutationChangesSemanticSnapshot()) {
+        return;
+      }
       var timestamp = Date.now();
       translationState.lastMutationAt = timestamp;
       if (!translationState.firstMutationAt) {
@@ -3501,7 +3523,6 @@
       translationState.readySnapshot = null;
       translationState.readyLanguage = "";
       invalidatePreparedPdfArtifacts("semantic-state-changed");
-      syncTranslationLanguageState();
       updateTranslationDiagnostics({
         firstTranslationMutationAt: translationState.firstMutationAt,
         mutationTimestamps: translationState.mutationTimestamps.slice(-60)
