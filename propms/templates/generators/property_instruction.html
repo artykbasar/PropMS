@@ -123,7 +123,7 @@
     }
   }
   .pi-shell {
-    width: min(1080px, calc(100% - 2rem));
+    width: min(1440px, calc(100% - 2rem));
     margin: 0 auto;
     --pi-toolbar-bottom-offset: 6rem;
     --pi-sticky-gap: .75rem;
@@ -480,7 +480,22 @@
   }
   .pi-blocks {
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     gap: .9rem;
+  }
+  .pi-blocks > .pi-block:not(.pi-block-step),
+  .pi-blocks > .pi-block.pi-block-has-map {
+    grid-column: 1 / -1;
+  }
+  @media (min-width: 900px) {
+    .pi-blocks {
+      grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+    }
+  }
+  @media (min-width: 769px) and (max-width: 1500px) {
+    .pi-screen-layout {
+      margin-left: var(--pi-bookmark-active-width, 58px);
+    }
   }
   .pi-block {
     border: 1px solid var(--pi-border);
@@ -2118,7 +2133,7 @@
 {% macro render_screen_block(block) %}
   {% set block_map = instruction_block_maps.get(block.name) if instruction_block_maps is defined and instruction_block_maps else None %}
   <div
-    class="pi-block pi-block-{{ block.block_type | lower | replace(' ', '-') }}"
+    class="pi-block pi-block-{{ block.block_type | lower | replace(' ', '-') }}{% if block_map and block_map.embed_url %} pi-block-has-map{% endif %}"
     data-pdf-block="{{ block.name }}"
     data-guide-block
     data-guide-block-id="{{ block.name }}"
