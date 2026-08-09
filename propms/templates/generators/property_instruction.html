@@ -48,7 +48,7 @@
     display: flex;
     flex-direction: column;
     width: var(--pi-bookmark-active-width);
-    height: min(92dvh, var(--pi-bookmark-target-height, 7.5rem));
+    height: calc(100dvh - 1rem);
     max-height: calc(100dvh - 1rem);
     margin: 0;
     padding: 0;
@@ -103,18 +103,10 @@
     white-space: nowrap;
     text-overflow: ellipsis;
   }
-  .pi-bookmark-nav[data-guide-bookmark-density="dense"] {
-    height: min(96dvh, var(--pi-bookmark-target-height, 7.5rem));
-    max-height: calc(100dvh - .5rem);
-  }
   .pi-bookmark-nav[data-guide-bookmark-density="dense"] .pi-bookmark {
     padding-block: .05rem;
     font-size: .5rem;
     letter-spacing: .01em;
-  }
-  .pi-bookmark-nav[data-guide-bookmark-density="max"] {
-    height: min(98dvh, var(--pi-bookmark-target-height, 7.5rem));
-    max-height: calc(100dvh - .25rem);
   }
   .pi-bookmark-nav[data-guide-bookmark-density="max"] .pi-bookmark {
     padding-block: .02rem;
@@ -833,7 +825,7 @@
     .pi-bookmark-nav {
       --pi-bookmark-width: 34px;
       --pi-bookmark-active-width: 42px;
-      height: min(92dvh, var(--pi-bookmark-mobile-target-height, 6.25rem));
+      height: calc(100dvh - 1rem);
       max-height: calc(100dvh - 1rem);
     }
     .pi-bookmark {
@@ -842,18 +834,10 @@
       font-size: .56rem;
       letter-spacing: .025em;
     }
-    .pi-bookmark-nav[data-guide-bookmark-density="dense"] {
-      height: min(96dvh, var(--pi-bookmark-mobile-target-height, 6.25rem));
-      max-height: calc(100dvh - .5rem);
-    }
     .pi-bookmark-nav[data-guide-bookmark-density="dense"] .pi-bookmark {
       padding-block: .05rem;
       font-size: .47rem;
       letter-spacing: .005em;
-    }
-    .pi-bookmark-nav[data-guide-bookmark-density="max"] {
-      height: min(98dvh, var(--pi-bookmark-mobile-target-height, 6.25rem));
-      max-height: calc(100dvh - .25rem);
     }
     .pi-bookmark-nav[data-guide-bookmark-density="max"] .pi-bookmark {
       padding-block: .02rem;
@@ -2023,8 +2007,7 @@
     data-guide-bookmarks
     data-guide-bookmark-count="{{ sections | length }}"
     data-guide-bookmark-density="{% if (sections | length) >= 9 %}max{% elif (sections | length) >= 7 %}dense{% else %}normal{% endif %}"
-    aria-label="Instruction section bookmarks"
-    style="--pi-bookmark-count: {{ sections | length }}; --pi-bookmark-target-height: {{ (sections | length) * 7.5 }}rem; --pi-bookmark-mobile-target-height: {{ (sections | length) * 6.25 }}rem;">
+    aria-label="Instruction section bookmarks">
     {% for section in sections %}
     <a class="pi-bookmark" href="#{{ section.anchor }}" data-guide-bookmark="{{ section.anchor }}">
       <span class="pi-bookmark-label">{{ section.section }}</span>
