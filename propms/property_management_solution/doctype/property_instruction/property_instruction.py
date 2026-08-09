@@ -1108,13 +1108,18 @@ def validate_public_pdf_image_url(url):
 		frappe.throw(_("Image URLs cannot contain embedded credentials."))
 	if not hostname:
 		frappe.throw(_("Image host is not allowed."))
-	if parsed.scheme.lower() == "http" and not is_local_development_image_host(hostname):
-		frappe.throw(_("HTTP image URLs are allowed only for local development hosts."))
 
 	path = parsed.path or ""
 	is_site_file_path = path.startswith(PUBLIC_SITE_IMAGE_PREFIXES)
+	is_current_site_file = is_site_file_path and is_current_site_file_url(parsed)
+	if (
+		parsed.scheme.lower() == "http"
+		and not is_local_development_image_host(hostname)
+		and not is_current_site_file
+	):
+		frappe.throw(_("HTTP image URLs are allowed only for local development hosts or current-site files."))
 	is_registered_public_file = is_site_file_path and has_registered_public_file_url(normalized_url)
-	if hostname not in allowed_hosts and not is_registered_public_file:
+	if hostname not in allowed_hosts and not is_registered_public_file and not is_current_site_file:
 		frappe.throw(_("Image host is not allowed."))
 	if hostname not in TRUSTED_EXTERNAL_PDF_IMAGE_HOSTS and not is_site_file_path:
 		frappe.throw(_("Only Frappe file paths are allowed for site-hosted images."))

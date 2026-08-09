@@ -2420,6 +2420,17 @@ class TestPropertyInstruction(PropertyInstructionTestMixin, FrappeTestCase):
 		self.assertEqual(parsed.hostname, "development.localhost")
 		self.assertEqual(parsed.path, "/files/test-guide.png")
 
+	def test_validate_public_pdf_image_url_allows_current_site_lan_http_file(self):
+		with patch.object(property_instruction_module, "is_current_site_file_url", return_value=True):
+			parsed = validate_public_pdf_image_url("http://192.168.1.222:8000/files/test-guide.png")
+		self.assertEqual(parsed.hostname, "192.168.1.222")
+		self.assertEqual(parsed.path, "/files/test-guide.png")
+
+	def test_validate_public_pdf_image_url_rejects_lan_http_non_file_target(self):
+		with patch.object(property_instruction_module, "is_current_site_file_url", return_value=True):
+			with self.assertRaises(frappe.ValidationError):
+				validate_public_pdf_image_url("http://192.168.1.222:8000/api/private-image.png")
+
 	def test_resolve_public_pdf_image_target_allows_local_frappe_file(self):
 		self.make_site_file("test-guide-image.png")
 		image_response = resolve_public_pdf_image_target("https://development.localhost/files/test-guide-image.png")

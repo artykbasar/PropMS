@@ -4104,7 +4104,7 @@
 
   async function getExportImageDataUri(url, cache) {
     if (!cache.has(url)) {
-      cache.set(url, (async function () {
+      var pendingImageData = (async function () {
         var response = await fetch(url, {
           credentials: "same-origin",
           cache: "no-store"
@@ -4117,9 +4117,38 @@
           throw new Error("PDF image endpoint returned a non-image response.");
         }
         return blobToDataUri(await response.blob());
-      })());
+      })();
+      cache.set(url, pendingImageData);
+      pendingImageData.catch(function () {
+        if (cache.get(url) === pendingImageData) {
+          cache.delete(url);
+        }
+      });
     }
     return cache.get(url);
+  }
+
+  async function getExportImageDataUriWithRetry(url, cache, maxAttempts) {
+    var attempts = Math.max(1, Number(maxAttempts || 1));
+    var lastError = null;
+    for (var attempt = 1; attempt <= attempts; attempt += 1) {
+      try {
+        return await getExportImageDataUri(url, cache);
+      } catch (error) {
+        lastError = error;
+        if (cache && typeof cache.delete === "function") {
+          cache.delete(url);
+        }
+        var reason = resolveMediaFailureReason(error);
+        var retryableStatus = reason.status && reason.status >= 500;
+        var retryableFailure = reason.code === "load-failed" || retryableStatus;
+        if (attempt >= attempts || !retryableFailure) {
+          break;
+        }
+        await sleep(120 * attempt);
+      }
+    }
+    throw lastError || new Error("Unable to prepare PDF image.");
   }
 
   function replaceImageWithPlaceholder(img) {
@@ -10301,25 +10330,54 @@
     var imageSources = collectModelImageSources(model);
     var uniqueSources = {};
     var uniqueEntries = [];
-    imageSources.forEach(function (descriptor) {
-      if (descriptor && descriptor.resolvedUrl && !uniqueSources[descriptor.resolvedUrl]) {
-        uniqueSources[descriptor.resolvedUrl] = true;
-        uniqueEntries.push(descriptor.resolvedUrl);
+    imageSources.forEach(function (descriptor, descriptorIndex) {
+      if (!descriptor || !descriptor.resolvedUrl) {
+        return;
       }
+      var existingEntry = uniqueSources[descriptor.resolvedUrl];
+      if (existingEntry) {
+        existingEntry.required = existingEntry.required || !!descriptor.required;
+        return;
+      }
+      var entry = {
+        resolvedUrl: descriptor.resolvedUrl,
+        required: !!descriptor.required,
+        order: descriptorIndex
+      };
+      uniqueSources[descriptor.resolvedUrl] = entry;
+      uniqueEntries.push(entry);
     });
-    var fetchResults = {};
-    await Promise.all(uniqueEntries.map(async function (resolvedUrl) {
-      try {
-        await getExportImageDataUri(resolvedUrl, exportImageDataCache);
-        fetchResults[resolvedUrl] = {
-          ok: true
-        };
-      } catch (error) {
-        fetchResults[resolvedUrl] = {
-          ok: false,
-          error: error
-        };
+    uniqueEntries.sort(function (leftEntry, rightEntry) {
+      if (leftEntry.required !== rightEntry.required) {
+        return leftEntry.required ? -1 : 1;
       }
+      return leftEntry.order - rightEntry.order;
+    });
+
+    var fetchResults = {};
+    var nextEntryIndex = 0;
+    var prewarmConcurrency = Math.min(4, Math.max(1, uniqueEntries.length));
+    async function prewarmWorker() {
+      while (nextEntryIndex < uniqueEntries.length) {
+        var entryIndex = nextEntryIndex;
+        nextEntryIndex += 1;
+        var entry = uniqueEntries[entryIndex];
+        var resolvedUrl = entry.resolvedUrl;
+        try {
+          await getExportImageDataUriWithRetry(resolvedUrl, exportImageDataCache, 2);
+          fetchResults[resolvedUrl] = {
+            ok: true
+          };
+        } catch (error) {
+          fetchResults[resolvedUrl] = {
+            ok: false,
+            error: error
+          };
+        }
+      }
+    }
+    await Promise.all(Array.from({ length: prewarmConcurrency }, function () {
+      return prewarmWorker();
     }));
 
     var optionalMediaWarnings = [];
@@ -10352,6 +10410,10 @@
 
     return {
       uniqueImageCount: uniqueEntries.length,
+      requiredImageCount: uniqueEntries.filter(function (entry) {
+        return entry.required;
+      }).length,
+      prewarmConcurrency: prewarmConcurrency,
       optionalMediaWarnings: trimWarningCollection(optionalMediaWarnings, 20)
     };
   }
