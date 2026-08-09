@@ -1068,6 +1068,200 @@
       letter-spacing: 0;
     }
   }
+  /* Keep the guide toolbar compact at every viewport size. */
+  .pi-guide-toolbar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: .45rem;
+    min-height: 3.75rem;
+    padding: .5rem;
+    border-radius: 16px;
+  }
+  .pi-toolbar-language {
+    grid-column: 1;
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    width: 100%;
+    max-width: 32rem;
+    min-width: 0;
+    gap: 0;
+    flex: initial;
+  }
+  .pi-toolbar-actions {
+    grid-column: 2;
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    justify-content: flex-end;
+    width: auto;
+    min-width: 0;
+    gap: .35rem;
+    flex: initial;
+  }
+  .pi-guide-language-select {
+    flex: 1 1 auto;
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+    min-height: 2.75rem;
+    padding-block: .55rem;
+    padding-inline: .75rem 2rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .pi-toolbar-actions .pi-btn {
+    position: relative;
+    flex: 0 0 2.75rem;
+    width: 2.75rem;
+    min-width: 2.75rem;
+    height: 2.75rem;
+    min-height: 2.75rem;
+    padding: 0;
+    gap: 0;
+    border-radius: 999px;
+  }
+  .pi-toolbar-action-label,
+  .pi-toolbar-label,
+  .pi-translation-status {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
+  }
+  .pi-translate-attribution--toolbar {
+    display: none;
+  }
+  .pi-translate-attribution--mobile {
+    display: block;
+    margin: -.6rem .65rem .75rem;
+    color: var(--pi-muted);
+    font-size: .7rem;
+    text-align: end;
+  }
+
+  /* PDF generation temporarily turns the whole compact toolbar into progress. */
+  .pi-pdf-progress {
+    position: absolute;
+    inset: 0;
+    grid-column: auto;
+    z-index: 5;
+    display: grid;
+    place-items: center;
+    min-width: 0;
+    margin: 0;
+    padding: 0 .9rem;
+    border: 0;
+    border-radius: inherit;
+    overflow: hidden;
+    background: var(--pi-toolbar-bg);
+    pointer-events: none;
+  }
+  .pi-pdf-progress[hidden] {
+    display: none !important;
+  }
+  .pi-pdf-progress-copy {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    gap: .45rem .75rem;
+    width: 100%;
+    color: var(--pi-ink);
+    font-size: .86rem;
+    text-align: center;
+    pointer-events: none;
+  }
+  .pi-pdf-progress-copy span[data-pdf-progress-label] {
+    color: var(--pi-ink);
+    font-weight: 700;
+  }
+  .pi-pdf-progress-copy span[data-pdf-progress-eta] {
+    color: var(--pi-muted);
+    font-size: .78rem;
+  }
+  .pi-pdf-progress progress {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    width: 100%;
+    height: 100%;
+    border: 0;
+    border-radius: inherit;
+    overflow: hidden;
+    background: var(--pi-toolbar-bg);
+    accent-color: var(--pi-accent-soft);
+  }
+  .pi-pdf-progress progress::-webkit-progress-bar {
+    background: var(--pi-toolbar-bg);
+    border-radius: inherit;
+  }
+  .pi-pdf-progress progress::-webkit-progress-value {
+    background: var(--pi-accent-soft);
+    border-radius: 0;
+  }
+  .pi-pdf-progress progress::-moz-progress-bar {
+    background: var(--pi-accent-soft);
+    border-radius: 0;
+  }
+
+  /* PDF feedback is a temporary corner toast and never changes toolbar height. */
+  .pi-pdf-action-feedback {
+    position: fixed;
+    top: calc(var(--pi-toast-top-offset, 4.5rem) + .5rem);
+    right: max(1rem, env(safe-area-inset-right));
+    z-index: 1400;
+    width: min(420px, calc(100vw - 2rem));
+    max-height: min(60vh, 420px);
+    overflow: auto;
+    flex: none;
+    padding: .85rem .95rem;
+    border-radius: 16px;
+    box-shadow: 0 18px 44px var(--pi-shadow-strong);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    animation: pi-toast-enter .18s ease-out;
+  }
+  html[dir="rtl"] .pi-pdf-action-feedback,
+  .pi-page[dir="rtl"] .pi-pdf-action-feedback {
+    right: auto;
+    left: max(1rem, env(safe-area-inset-left));
+  }
+  .pi-pdf-action-feedback-actions {
+    gap: .5rem;
+  }
+  .pi-pdf-action-feedback-actions .pi-btn {
+    min-height: 2.35rem;
+    padding: .55rem .85rem;
+  }
+  @keyframes pi-toast-enter {
+    from { opacity: 0; transform: translateY(-8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @media (max-width: 520px) {
+    .pi-pdf-progress-copy {
+      flex-direction: column;
+      gap: .1rem;
+      line-height: 1.2;
+    }
+    .pi-pdf-action-feedback {
+      top: calc(var(--pi-toast-top-offset, 4.5rem) + .4rem);
+      right: .75rem;
+      width: calc(100vw - 1.5rem);
+    }
+  }
+
   @media print {
     .pi-bookmark-nav {
       display: none !important;
@@ -2376,17 +2570,6 @@
       <small class="pi-translate-attribution pi-translate-attribution--toolbar">Powered by Google Translate</small>
       <div id="{{ google_translate.container_id }}" class="pi-google-translate-engine" aria-hidden="true"></div>
       {% endif %}
-      <div class="pi-pdf-action-feedback" data-guide-pdf-feedback hidden>
-        <div class="pi-pdf-action-feedback-body">
-          <p class="pi-pdf-action-feedback-message" data-guide-pdf-feedback-message></p>
-          <p class="pi-pdf-action-feedback-code" data-guide-pdf-feedback-code hidden></p>
-        </div>
-        <div class="pi-pdf-action-feedback-actions" data-guide-pdf-feedback-actions hidden>
-          <button type="button" class="pi-btn pi-btn-secondary" data-guide-pdf-feedback-retry>Retry</button>
-          <button type="button" class="pi-btn pi-btn-secondary" data-guide-pdf-feedback-download hidden>Download PDF</button>
-          <button type="button" class="pi-btn pi-btn-secondary" data-guide-pdf-feedback-open hidden>Open PDF</button>
-        </div>
-      </div>
       <p class="pi-action-status sr-only" aria-live="polite"></p>
       <a data-pdf-download-anchor hidden aria-hidden="true" tabindex="-1"></a>
       <div class="sr-only" aria-hidden="true" data-guide-copy-bank>
@@ -2414,6 +2597,17 @@
         <span data-guide-progress-copy="assembling_guide">Assembling guide</span>
       </div>
     </section>
+    <div class="pi-pdf-action-feedback" data-guide-pdf-feedback hidden>
+      <div class="pi-pdf-action-feedback-body">
+        <p class="pi-pdf-action-feedback-message" data-guide-pdf-feedback-message></p>
+        <p class="pi-pdf-action-feedback-code" data-guide-pdf-feedback-code hidden></p>
+      </div>
+      <div class="pi-pdf-action-feedback-actions" data-guide-pdf-feedback-actions hidden>
+        <button type="button" class="pi-btn pi-btn-secondary" data-guide-pdf-feedback-retry>Retry</button>
+        <button type="button" class="pi-btn pi-btn-secondary" data-guide-pdf-feedback-download hidden>Download PDF</button>
+        <button type="button" class="pi-btn pi-btn-secondary" data-guide-pdf-feedback-open hidden>Open PDF</button>
+      </div>
+    </div>
     {% if google_translate and google_translate.enabled %}
     <small class="pi-translate-attribution pi-translate-attribution--mobile">Powered by Google Translate</small>
     {% endif %}

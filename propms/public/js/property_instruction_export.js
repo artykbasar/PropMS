@@ -218,6 +218,7 @@
     readyMimeType: "",
     readySize: 0,
     readyObjectUrlRevokeTimer: 0,
+    feedbackDismissTimer: 0,
     lastTriggerButton: null,
     feedbackArtifact: null
   };
@@ -1605,7 +1606,16 @@
     restorePdfInteractionControls();
   }
 
+  function clearPdfFeedbackDismissTimer() {
+    if (!pdfExportController.feedbackDismissTimer) {
+      return;
+    }
+    window.clearTimeout(pdfExportController.feedbackDismissTimer);
+    pdfExportController.feedbackDismissTimer = 0;
+  }
+
   function clearPdfFeedback() {
+    clearPdfFeedbackDismissTimer();
     var panel = getPdfFeedbackPanel();
     var messageNode = getPdfFeedbackMessageNode();
     var codeNode = getPdfFeedbackCodeNode();
@@ -1642,6 +1652,7 @@
   }
 
   function showPdfFeedback(kind, message, options) {
+    clearPdfFeedbackDismissTimer();
     var panel = getPdfFeedbackPanel();
     var messageNode = getPdfFeedbackMessageNode();
     var codeNode = getPdfFeedbackCodeNode();
@@ -1681,6 +1692,14 @@
     }
     if (actionsNode) {
       actionsNode.hidden = !(details.showRetry || details.showDownload || details.showOpen);
+    }
+
+    var hasActions = !!(details.showRetry || details.showDownload || details.showOpen);
+    var dismissAfterMs = Number(details.dismissAfterMs || (kind === "error" || hasActions ? 12000 : 5000));
+    if (dismissAfterMs > 0) {
+      pdfExportController.feedbackDismissTimer = window.setTimeout(function () {
+        clearPdfFeedback();
+      }, dismissAfterMs);
     }
   }
 
@@ -2193,6 +2212,7 @@
     shell.style.setProperty("--pi-toolbar-bottom-offset", toolbarBottomOffset + "px");
     if (pageRoot) {
       pageRoot.style.setProperty("--pi-bookmark-top-offset", bookmarkTopOffset + "px");
+      pageRoot.style.setProperty("--pi-toast-top-offset", bookmarkTopOffset + "px");
     }
     window.__propertyInstructionStickyDiagnostics = window.__propertyInstructionStickyDiagnostics || {};
     window.__propertyInstructionStickyDiagnostics.toolbarBottomOffset = toolbarBottomOffset;
@@ -12896,7 +12916,7 @@
         if (!pdfExportController.activePromise) {
           resetPdfProgressUi();
         }
-      }, 1200);
+      }, 600);
     }
   }
 
