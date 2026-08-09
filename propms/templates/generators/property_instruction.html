@@ -2410,6 +2410,282 @@
     margin: 0;
     color: #64748b;
   }
+
+  /* Experimental webpage-style PDF flow. Kept isolated from the adaptive renderer. */
+  [data-property-instruction-export] .pi-export-page-backdrop {
+    position: absolute;
+    inset: 0;
+    background: #f5f1e6;
+    pointer-events: none;
+  }
+  [data-property-instruction-export] .pi-export-page:has(.pi-export-document[data-pdf-layout-mode="web-flow"]) .pi-export-page-body,
+  [data-property-instruction-export] .pi-export-document[data-pdf-layout-mode="web-flow"] {
+    position: relative;
+    background: transparent;
+    color: #26312c;
+  }
+  [data-property-instruction-export] .pi-export-document[data-pdf-layout-mode="web-flow"] .pi-export-header,
+  [data-property-instruction-export] .pi-export-document[data-pdf-layout-mode="web-flow"] .pi-export-map {
+    border-color: #d9ddd5;
+    background: #fffdf8;
+  }
+  [data-property-instruction-export] .pi-export-info-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 14px;
+    margin-bottom: 14px;
+    align-items: stretch;
+  }
+  [data-property-instruction-export] .pi-export-info-grid--has-map {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  [data-property-instruction-export] .pi-export-document[data-pdf-layout-mode="web-flow"] .pi-export-info-grid > .pi-export-header,
+  [data-property-instruction-export] .pi-export-document[data-pdf-layout-mode="web-flow"] .pi-export-info-grid > .pi-export-map {
+    height: 100%;
+    margin: 0;
+  }
+  [data-property-instruction-export] .pi-export-document[data-pdf-layout-mode="web-flow"] .pi-export-header {
+    padding: 14px;
+    border: 1px solid #d9ddd5;
+    border-radius: 18px;
+    margin-bottom: 14px;
+  }
+  [data-property-instruction-export] .pi-export-document[data-pdf-layout-mode="web-flow"] .pi-export-hero-top {
+    display: flex;
+    flex-direction: column-reverse;
+    align-items: stretch;
+    gap: 12px;
+  }
+  [data-property-instruction-export] .pi-export-document[data-pdf-layout-mode="web-flow"] .pi-export-hero-copy,
+  [data-property-instruction-export] .pi-export-document[data-pdf-layout-mode="web-flow"] .pi-export-hero-cover {
+    flex: none;
+    width: 100%;
+    min-width: 0;
+  }
+  [data-property-instruction-export] .pi-export-document[data-pdf-layout-mode="web-flow"] .pi-export-cover-frame {
+    max-height: 225px;
+    background: transparent;
+  }
+  [data-property-instruction-export] .pi-export-document[data-pdf-layout-mode="web-flow"] .pi-export-title {
+    font-size: 25px;
+    line-height: 1.08;
+  }
+  [data-property-instruction-export] .pi-export-document[data-pdf-layout-mode="web-flow"] .pi-export-address {
+    margin-top: 7px;
+    font-size: 12px;
+  }
+  [data-property-instruction-export] .pi-export-document[data-pdf-layout-mode="web-flow"] .pi-export-meta-list {
+    margin-top: 12px;
+    gap: 9px 12px;
+  }
+  [data-property-instruction-export] .pi-export-document[data-pdf-layout-mode="web-flow"] .pi-export-meta-item {
+    width: calc(50% - 6px);
+    font-size: 11px;
+  }
+  [data-property-instruction-export] .pi-export-document[data-pdf-layout-mode="web-flow"] .pi-export-label {
+    margin-bottom: 2px;
+    font-size: 8.5px;
+  }
+  [data-property-instruction-export] .pi-export-document[data-pdf-layout-mode="web-flow"] .pi-export-value {
+    font-size: 11.5px;
+  }
+  [data-property-instruction-export] .pi-export-document[data-pdf-layout-mode="web-flow"] .pi-export-map {
+    padding: 14px;
+    border-radius: 18px;
+  }
+  [data-property-instruction-export] .pi-export-document[data-pdf-layout-mode="web-flow"] .pi-export-map-title {
+    margin-bottom: 6px;
+    font-size: 14px;
+  }
+  [data-property-instruction-export] .pi-export-document[data-pdf-layout-mode="web-flow"] .pi-export-map-image-frame {
+    margin-top: 7px;
+  }
+  [data-property-instruction-export] .pi-export-document[data-pdf-layout-mode="web-flow"] .pi-export-kicker,
+  [data-property-instruction-export] .pi-export-document[data-pdf-layout-mode="web-flow"] .pi-export-label,
+  [data-property-instruction-export] .pi-export-document[data-pdf-layout-mode="web-flow"] .pi-export-map-attribution,
+  [data-property-instruction-export] .pi-export-document[data-pdf-layout-mode="web-flow"] .pi-export-card-caption {
+    color: #66716a;
+  }
+  [data-property-instruction-export] .pi-export-document[data-pdf-layout-mode="web-flow"] .pi-export-address,
+  [data-property-instruction-export] .pi-export-document[data-pdf-layout-mode="web-flow"] .pi-export-card-body {
+    color: #4f5b55;
+  }
+  [data-property-instruction-export] .pi-export-document[data-pdf-layout-mode="web-flow"] .pi-export-section {
+    margin-bottom: 12px;
+  }
+  [data-property-instruction-export] .pi-export-document[data-pdf-layout-mode="web-flow"] .pi-export-section-title {
+    margin-bottom: 9px;
+    padding-bottom: 6px;
+    border-color: #d9ddd5;
+    color: #26312c;
+    font-size: 20px;
+  }
+  [data-property-instruction-export] .pi-export-document[data-pdf-layout-mode="web-flow"] .pi-export-section-title--continued {
+    font-size: 16px;
+    color: #4f5b55;
+  }
+  [data-property-instruction-export] .pi-export-document[data-pdf-layout-mode="web-flow"] .pi-export-section-items {
+    display: block;
+  }
+  [data-property-instruction-export] .pi-export-document[data-pdf-layout-mode="web-flow"] .pi-export-row--web-flow {
+    margin-bottom: 10px;
+    align-items: stretch;
+  }
+  [data-property-instruction-export] .pi-export-document[data-pdf-layout-mode="web-flow"] .pi-export-row--three-up {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+    align-items: stretch;
+  }
+  [data-property-instruction-export] .pi-export-document[data-pdf-layout-mode="web-flow"] .pi-export-row--three-up .pi-export-card--web-flow {
+    padding: 10px 11px;
+  }
+  [data-property-instruction-export] .pi-export-document[data-pdf-layout-mode="web-flow"] .pi-export-row--three-up .pi-export-card-head {
+    grid-template-columns: 26px minmax(0, 1fr);
+    column-gap: 7px;
+    margin-bottom: 6px;
+  }
+  [data-property-instruction-export] .pi-export-document[data-pdf-layout-mode="web-flow"] .pi-export-row--three-up .pi-export-step-badge {
+    width: 26px;
+    height: 26px;
+    min-width: 26px;
+    font-size: 11px;
+  }
+  [data-property-instruction-export] .pi-export-document[data-pdf-layout-mode="web-flow"] .pi-export-row--three-up .pi-export-card-title {
+    font-size: 13.5px;
+    line-height: 1.25;
+  }
+  [data-property-instruction-export] .pi-export-document[data-pdf-layout-mode="web-flow"] .pi-export-row--three-up .pi-export-card-body {
+    font-size: 11.5px;
+    line-height: 1.38;
+  }
+  [data-property-instruction-export] .pi-export-document[data-pdf-layout-mode="web-flow"] .pi-export-card--web-flow {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    margin: 0;
+    padding: 12px 14px;
+    border-color: #d9ddd5;
+    border-radius: 16px;
+    background: #fffdf8;
+    color: #26312c;
+    overflow: hidden;
+  }
+  [data-property-instruction-export] .pi-export-document[data-pdf-layout-mode="web-flow"] .pi-export-card--warning {
+    border-color: #e2c17d;
+    background: #fff2d6;
+  }
+  [data-property-instruction-export] .pi-export-document[data-pdf-layout-mode="web-flow"] .pi-export-card-layout {
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+    height: auto;
+    padding-bottom: 0;
+  }
+  [data-property-instruction-export] .pi-export-document[data-pdf-layout-mode="web-flow"] .pi-export-card-text {
+    display: flex;
+    flex-direction: column;
+  }
+  [data-property-instruction-export] .pi-export-document[data-pdf-layout-mode="web-flow"] .pi-export-card-head {
+    grid-template-columns: 30px minmax(0, 1fr);
+    column-gap: 9px;
+    margin-bottom: 7px;
+    min-height: 0;
+  }
+  [data-property-instruction-export] .pi-export-document[data-pdf-layout-mode="web-flow"] .pi-export-step-badge {
+    width: 30px;
+    height: 30px;
+    min-width: 30px;
+    background: #285747;
+    color: #fffdf8;
+    font-size: 13px;
+  }
+  [data-property-instruction-export] .pi-export-document[data-pdf-layout-mode="web-flow"] .pi-export-card-title {
+    font-size: 15px;
+    line-height: 1.28;
+  }
+  [data-property-instruction-export] .pi-export-document[data-pdf-layout-mode="web-flow"] .pi-export-card-body {
+    font-size: 12.5px;
+    line-height: 1.42;
+  }
+  [data-property-instruction-export] .pi-export-document[data-pdf-layout-mode="web-flow"] .pi-export-card-body p {
+    margin-bottom: 7px;
+  }
+  [data-property-instruction-export] .pi-export-document[data-pdf-layout-mode="web-flow"] .pi-export-card-media {
+    display: flex;
+    flex: 1 1 auto;
+    width: 100%;
+    align-items: center;
+    justify-content: center;
+    min-height: 0;
+  }
+  [data-property-instruction-export] .pi-export-document[data-pdf-layout-mode="web-flow"] .pi-export-card--web-flow-text-only .pi-export-card-layout {
+    justify-content: center;
+  }
+  [data-property-instruction-export] .pi-export-document[data-pdf-layout-mode="web-flow"] .pi-export-card-image-frame,
+  [data-property-instruction-export] .pi-export-document[data-pdf-layout-mode="web-flow"] .pi-export-map-image-frame--block {
+    margin-inline: auto;
+    border-radius: 14px;
+    background: transparent;
+  }
+  [data-property-instruction-export] .pi-export-document[data-pdf-layout-mode="web-flow"] .pi-export-page-one-extras {
+    display: block;
+    margin-top: 12px;
+  }
+  [data-property-instruction-export] .pi-export-bookmark-rail {
+    position: absolute;
+    z-index: 3;
+    top: 34px;
+    bottom: 70px;
+    left: 3px;
+    width: 31px;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    pointer-events: none;
+  }
+  [data-property-instruction-export] .pi-export-bookmark-link {
+    flex: 1 1 0;
+    min-height: 0;
+    display: grid;
+    grid-template-rows: minmax(0, 1fr) 34%;
+    justify-items: center;
+    width: 28px;
+    padding: 3px 2px;
+    border: 1px solid #d9ddd5;
+    border-radius: 0 10px 10px 0;
+    background: rgba(250, 247, 239, 0.97);
+    color: #285747;
+    text-decoration: none;
+    box-sizing: border-box;
+    pointer-events: auto;
+    overflow: hidden;
+  }
+  [data-property-instruction-export] .pi-export-bookmark-link.is-active {
+    width: 31px;
+    background: #285747;
+    color: #fffdf8;
+    border-color: #285747;
+  }
+  [data-property-instruction-export] .pi-export-bookmark-label {
+    align-self: end;
+    writing-mode: vertical-rl;
+    transform: rotate(180deg);
+    white-space: nowrap;
+    font-size: 7px;
+    line-height: 1;
+    font-weight: 600;
+  }
+  [data-property-instruction-export] .pi-export-bookmark-badge {
+    align-self: start;
+    width: 13px;
+    height: 13px;
+    margin-top: 3px;
+    border: 1px solid currentColor;
+    border-radius: 999px;
+    box-sizing: border-box;
+  }
+
   [data-property-instruction-export] .pi-export-footer {
     position: absolute;
     display: flex;
