@@ -704,7 +704,7 @@
     if (!anchor) {
       return false;
     }
-    var objectUrl = createReadyPdfObjectUrl(artifact.pdfBlob);
+    var objectUrl = createReadyPdfObjectUrl(getPdfDownloadBlob(artifact.pdfBlob));
     if (!objectUrl) {
       return false;
     }
@@ -835,6 +835,13 @@
       return "WebKit";
     }
     return "Chromium";
+  }
+
+  function isIosPdfDownloadDevice() {
+    var userAgent = String((navigator && navigator.userAgent) || "");
+    var platform = String((navigator && navigator.platform) || "");
+    var maxTouchPoints = Number((navigator && navigator.maxTouchPoints) || 0);
+    return /iPad|iPhone|iPod/i.test(userAgent) || (platform === "MacIntel" && maxTouchPoints > 1);
   }
 
   function setPdfExportLifecycle(stageName) {
@@ -1765,12 +1772,19 @@
     return objectUrl;
   }
 
+  function getPdfDownloadBlob(blob) {
+    if (!blob || !isIosPdfDownloadDevice()) {
+      return blob;
+    }
+    return new Blob([blob], { type: "application/octet-stream" });
+  }
+
   function triggerAutomaticPdfDownload(blob, filename) {
     var anchor = getPdfDownloadAnchor();
     if (!anchor) {
       return false;
     }
-    var objectUrl = createReadyPdfObjectUrl(blob);
+    var objectUrl = createReadyPdfObjectUrl(getPdfDownloadBlob(blob));
     if (!objectUrl) {
       return false;
     }
