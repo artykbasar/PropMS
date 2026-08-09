@@ -508,7 +508,18 @@
   }
   @media (min-width: 900px) {
     .pi-blocks {
-      grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+      display: flex;
+      flex-wrap: wrap;
+    }
+    .pi-blocks > .pi-block {
+      min-width: 0;
+    }
+    .pi-blocks > .pi-block.pi-block-step:not(.pi-block-has-map) {
+      flex: 1 1 420px;
+    }
+    .pi-blocks > .pi-block:not(.pi-block-step),
+    .pi-blocks > .pi-block.pi-block-has-map {
+      flex: 0 0 100%;
     }
   }
   @media (min-width: 769px) and (max-width: 1500px) {
