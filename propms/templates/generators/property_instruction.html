@@ -585,13 +585,11 @@
     justify-content: center;
   }
   .pi-image {
-    width: 100%;
-    border-radius: 14px;
+    width: auto;
+    max-width: 100%;
     height: auto;
     max-height: min(70vh, 420px);
-    object-fit: contain;
-    object-position: center center;
-    background: #f8fafb;
+    border-radius: 14px;
     display: block;
   }
   .pi-caption {
@@ -963,9 +961,6 @@
   .pi-block-warning {
     border-color: var(--pi-warning-border);
     background: var(--pi-warning);
-  }
-  .pi-image {
-    background: var(--pi-surface-muted);
   }
   .pi-map-shell,
   .pi-instruction-map-shell {
