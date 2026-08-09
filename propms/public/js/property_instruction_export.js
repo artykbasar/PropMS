@@ -2221,6 +2221,13 @@
   }
 
   function getGuideActivationY() {
+    var firstSection = document.querySelector("[data-guide-section]");
+    if (firstSection) {
+      var sectionScrollMarginTop = parseFloat(window.getComputedStyle(firstSection).scrollMarginTop || "0") || 0;
+      if (sectionScrollMarginTop > 0) {
+        return sectionScrollMarginTop + 1;
+      }
+    }
     var toolbar = document.querySelector("[data-guide-toolbar]");
     if (!toolbar) {
       return 0;
@@ -2251,11 +2258,10 @@
 
   function syncActiveSectionNavigation() {
     translationState.activeSectionNavFrame = 0;
-    if (window.innerWidth <= 768) {
-      return;
-    }
     var sectionNodes = Array.prototype.slice.call(document.querySelectorAll("[data-guide-section]"));
-    var navLinks = Array.prototype.slice.call(document.querySelectorAll(".pi-nav a[href^='#']"));
+    var navLinks = Array.prototype.slice.call(document.querySelectorAll(
+      "[data-guide-bookmarks] a[href^='#']"
+    ));
     if (!sectionNodes.length || !navLinks.length) {
       return;
     }
