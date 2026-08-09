@@ -158,6 +158,7 @@
   var GUIDE_SETTLE_STABLE_PASSES = 2;
   var SOURCE_LANGUAGE = "en";
   var RTL_LANGUAGE_PREFIXES = ["ar", "fa", "he", "ku", "ps", "ur", "yi"];
+  var MY_MAPS_COOPERATIVE_SELECTOR = ".pi-map-shell--google-my-maps, .pi-instruction-map-shell--google-my-maps";
   var GOOGLE_PRESENTATION_SELECTORS = [
     "iframe.goog-te-banner-frame",
     "iframe.VIpgJd-ZVi9od-ORHb-OEVmcd",
@@ -223,6 +224,8 @@
     feedbackArtifact: null
   };
   var instructionBlockMapModels = null;
+  var myMapsGestureModifierActive = false;
+  var myMapsGestureListenersBound = false;
   var PRINT_TAB_DELAY_MS = 1000;
   var PRINT_TAB_BLOB_TTL_MS = 10 * 60 * 1000;
   var printGuideReadyDialog = null;
@@ -2199,6 +2202,210 @@
         }
       }
     });
+  }
+
+  // My Maps does not expose cooperative gesture handling, so gate pointer input at the iframe boundary.
+  function supportsMyMapsCooperativeGestures() {
+    if (!window.matchMedia) {
+      return true;
+    }
+    return window.matchMedia("(hover: hover) and (pointer: fine)").matches;
+  }
+
+  function getMyMapsGestureModifierLabel() {
+    var platform = "";
+    if (navigator.userAgentData && navigator.userAgentData.platform) {
+      platform = String(navigator.userAgentData.platform);
+    } else {
+      platform = String(navigator.platform || navigator.userAgent || "");
+    }
+    return /Mac|iPhone|iPad|iPod/i.test(platform) ? "⌘" : "Ctrl";
+  }
+
+  function getMyMapsGestureShells() {
+    return Array.prototype.slice.call(document.querySelectorAll(MY_MAPS_COOPERATIVE_SELECTOR));
+  }
+
+  function getMyMapsGestureIframe(shell) {
+    if (!shell) {
+      return null;
+    }
+    return shell.querySelector("iframe.pi-map, iframe.pi-instruction-map");
+  }
+
+  function hideMyMapsGestureHint(shell) {
+    var shield = shell && shell.querySelector("[data-my-maps-gesture-shield]");
+    if (!shield) {
+      return;
+    }
+    shield.setAttribute("data-hint-visible", "0");
+    if (shell.__piMyMapsGestureHintTimer) {
+      window.clearTimeout(shell.__piMyMapsGestureHintTimer);
+      shell.__piMyMapsGestureHintTimer = 0;
+    }
+  }
+
+  function showMyMapsGestureHint(shell) {
+    var shield = shell && shell.querySelector("[data-my-maps-gesture-shield]");
+    if (!shield || shell.classList.contains("pi-my-maps-interaction-active") || myMapsGestureModifierActive) {
+      return;
+    }
+    shield.setAttribute("data-hint-visible", "1");
+    if (shell.__piMyMapsGestureHintTimer) {
+      window.clearTimeout(shell.__piMyMapsGestureHintTimer);
+    }
+    shell.__piMyMapsGestureHintTimer = window.setTimeout(function () {
+      shield.setAttribute("data-hint-visible", "0");
+      shell.__piMyMapsGestureHintTimer = 0;
+    }, 1400);
+  }
+
+  function deactivateMyMapsPointerInteraction(shell) {
+    if (!shell) {
+      return;
+    }
+    shell.classList.remove("pi-my-maps-interaction-active");
+    var iframe = getMyMapsGestureIframe(shell);
+    if (iframe && document.activeElement === iframe && typeof iframe.blur === "function") {
+      iframe.blur();
+    }
+  }
+
+  function activateMyMapsPointerInteraction(shell) {
+    if (!shell) {
+      return;
+    }
+    hideMyMapsGestureHint(shell);
+    shell.classList.add("pi-my-maps-interaction-active");
+  }
+
+  function setMyMapsGestureModifierState(active) {
+    myMapsGestureModifierActive = !!active;
+    getMyMapsGestureShells().forEach(function (shell) {
+      if (!shell.classList.contains("pi-my-maps-cooperative-ready")) {
+        return;
+      }
+      shell.classList.toggle("pi-my-maps-modifier-active", myMapsGestureModifierActive);
+      if (myMapsGestureModifierActive) {
+        hideMyMapsGestureHint(shell);
+      }
+    });
+  }
+
+  function enhanceMyMapsGestureShell(shell) {
+    if (!shell || shell.getAttribute("data-my-maps-cooperative-ready") === "1") {
+      return false;
+    }
+    var iframe = getMyMapsGestureIframe(shell);
+    if (!iframe) {
+      return false;
+    }
+
+    var modifierLabel = getMyMapsGestureModifierLabel();
+    var shield = document.createElement("div");
+    shield.className = "pi-my-maps-gesture-shield notranslate";
+    shield.setAttribute("data-my-maps-gesture-shield", "");
+    shield.setAttribute("data-hint-visible", "0");
+    shield.setAttribute("translate", "no");
+    shield.setAttribute("role", "button");
+    shield.setAttribute("tabindex", "0");
+    shield.setAttribute(
+      "aria-label",
+      "Google My Maps. Scroll normally to move the page. Use " + modifierLabel + " plus scroll to zoom the map. Click to interact with the map."
+    );
+
+    var hint = document.createElement("span");
+    hint.className = "pi-my-maps-gesture-hint";
+    hint.textContent = "Use " + modifierLabel + " + scroll to zoom the map";
+    shield.appendChild(hint);
+
+    shield.addEventListener("wheel", function () {
+      showMyMapsGestureHint(shell);
+    }, { passive: true });
+    shield.addEventListener("click", function () {
+      activateMyMapsPointerInteraction(shell);
+      if (typeof iframe.focus === "function") {
+        iframe.focus();
+      }
+    });
+    shield.addEventListener("keydown", function (event) {
+      if (event.key !== "Enter" && event.key !== " ") {
+        return;
+      }
+      event.preventDefault();
+      activateMyMapsPointerInteraction(shell);
+      if (typeof iframe.focus === "function") {
+        iframe.focus();
+      }
+    });
+    shell.addEventListener("mouseleave", function () {
+      deactivateMyMapsPointerInteraction(shell);
+    });
+
+    shell.appendChild(shield);
+    shell.classList.add("pi-my-maps-cooperative-ready");
+    shell.classList.toggle("pi-my-maps-modifier-active", myMapsGestureModifierActive);
+    shell.setAttribute("data-my-maps-cooperative-ready", "1");
+    return true;
+  }
+
+  function resetMyMapsGestureInteraction() {
+    setMyMapsGestureModifierState(false);
+    getMyMapsGestureShells().forEach(function (shell) {
+      deactivateMyMapsPointerInteraction(shell);
+    });
+  }
+
+  function bindMyMapsGestureListeners() {
+    if (myMapsGestureListenersBound) {
+      return;
+    }
+    myMapsGestureListenersBound = true;
+
+    document.addEventListener("keydown", function (event) {
+      if (event.key === "Meta" || event.key === "Control" || event.metaKey || event.ctrlKey) {
+        setMyMapsGestureModifierState(true);
+      }
+    }, true);
+    document.addEventListener("keyup", function (event) {
+      if ((event.key === "Meta" || event.key === "Control") && !event.metaKey && !event.ctrlKey) {
+        setMyMapsGestureModifierState(false);
+      }
+    }, true);
+    window.addEventListener("blur", function () {
+      window.setTimeout(function () {
+        var activeElement = document.activeElement;
+        var activeShell = activeElement && activeElement.closest ? activeElement.closest(MY_MAPS_COOPERATIVE_SELECTOR) : null;
+        if (activeElement && activeElement.tagName === "IFRAME" && activeShell) {
+          return;
+        }
+        resetMyMapsGestureInteraction();
+      }, 0);
+    });
+    document.addEventListener("visibilitychange", function () {
+      if (document.hidden) {
+        resetMyMapsGestureInteraction();
+      }
+    });
+  }
+
+  function initializeMyMapsCooperativeGestures() {
+    if (!supportsMyMapsCooperativeGestures()) {
+      return;
+    }
+    var enhancedCount = 0;
+    getMyMapsGestureShells().forEach(function (shell) {
+      if (enhanceMyMapsGestureShell(shell)) {
+        enhancedCount += 1;
+      }
+    });
+    bindMyMapsGestureListeners();
+    window.__propertyInstructionMyMapsGestureDiagnostics = {
+      enabled: true,
+      modifierLabel: getMyMapsGestureModifierLabel(),
+      shellCount: getMyMapsGestureShells().length,
+      enhancedCount: enhancedCount
+    };
   }
 
   function scheduleStickyToolbarOffsetSync() {
@@ -13407,6 +13614,7 @@
   });
 
   hydrateInstructionBlockMaps();
+  initializeMyMapsCooperativeGestures();
   initializeGuideTheme();
   ensureStickyToolbarObservers();
   ensureSectionNavObserver();
