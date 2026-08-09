@@ -26,6 +26,7 @@
     --pi-surface: #fffdf8;
     --pi-surface-muted: #f1f3ed;
     --pi-ink: #26312c;
+    --pi-body-text: #4f5b55;
     --pi-muted: #66716a;
     --pi-accent: #285747;
     --pi-accent-fill: #285747;
@@ -34,8 +35,8 @@
     --pi-warning: #fff2d6;
     --pi-warning-border: #e2c17d;
     --pi-border: #d9ddd5;
-    --pi-step-bg: #f4faf6;
-    --pi-step-border: #cbddd1;
+    --pi-step-bg: #fffdf8;
+    --pi-step-border: #d9ddd5;
     --pi-map-bg: #e8ede8;
     --pi-bookmark-bg: rgba(250, 247, 239, 0.97);
     --pi-toolbar-bg: rgba(255, 253, 248, 0.94);
@@ -62,6 +63,7 @@
     --pi-surface: #1b2520;
     --pi-surface-muted: #202c26;
     --pi-ink: #f4f1e9;
+    --pi-body-text: #d7e0d9;
     --pi-muted: #adb8b0;
     --pi-accent: #83b59e;
     --pi-accent-fill: #356b59;
@@ -94,6 +96,7 @@
       --pi-surface: #1b2520;
       --pi-surface-muted: #202c26;
       --pi-ink: #f4f1e9;
+      --pi-body-text: #d7e0d9;
       --pi-muted: #adb8b0;
       --pi-accent: #83b59e;
       --pi-accent-fill: #356b59;
@@ -793,11 +796,21 @@
   }
   .pi-title,
   .pi-section-title,
-  .pi-block h3,
+  .pi-block h3 {
+    color: var(--pi-ink);
+  }
   .pi-body,
   .pi-body p,
   .pi-body li {
-    color: var(--pi-ink);
+    color: var(--pi-body-text);
+  }
+  .pi-page[data-guide-theme="dark"] .pi-body .ql-editor :where(p, span, li, div, strong, em) {
+    color: var(--pi-body-text) !important;
+  }
+  @media (prefers-color-scheme: dark) {
+    .pi-page:not([data-guide-theme]) .pi-body .ql-editor :where(p, span, li, div, strong, em) {
+      color: var(--pi-body-text) !important;
+    }
   }
   .pi-copy-button,
   .pi-guide-language-select {
