@@ -576,7 +576,7 @@
         ".pi-print-ready-error{margin:0;color:#b91c1c;text-align:center;}",
         ".pi-print-ready-error[hidden]{display:none;}",
         ".pi-print-ready-copy{margin:0;text-align:center;color:var(--pi-muted,#52606d);line-height:1.5;}",
-        ".pi-print-ready-actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.65rem;align-items:center;}",
+        ".pi-print-ready-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.65rem;align-items:center;width:min(100%,18rem);margin:0 auto;}",
         ".pi-print-ready-actions .pi-btn{width:100%;min-height:2.9rem;}",
         ".pi-print-ready-actions .pi-btn-primary{background:var(--pi-accent,#115e59);color:#fff;border:1px solid transparent;}",
         ".pi-print-ready-actions .pi-btn-secondary{background:transparent;color:var(--pi-accent,#115e59);border:1px solid var(--pi-border,#d7dee5);}",
