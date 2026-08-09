@@ -19,18 +19,105 @@
     scroll-behavior: smooth;
   }
   .pi-page {
-    --pi-bg: #f6f2ea;
+    --pi-bg: #f5f1e6;
+    --pi-bg-start: #faf7f0;
     --pi-bookmark-top-offset: 6rem;
-    --pi-card: #ffffff;
-    --pi-ink: #1f2933;
-    --pi-muted: #5b6875;
-    --pi-accent: #115e59;
-    --pi-accent-soft: #dff4f2;
-    --pi-warning: #fff4db;
-    --pi-border: #d7dee5;
-    background: linear-gradient(180deg, #fbfaf7 0%, var(--pi-bg) 100%);
+    --pi-card: #fffdf8;
+    --pi-surface: #fffdf8;
+    --pi-surface-muted: #f1f3ed;
+    --pi-ink: #26312c;
+    --pi-muted: #66716a;
+    --pi-accent: #285747;
+    --pi-accent-fill: #285747;
+    --pi-accent-contrast: #fffdf8;
+    --pi-accent-soft: #e2ece5;
+    --pi-warning: #fff2d6;
+    --pi-warning-border: #e2c17d;
+    --pi-border: #d9ddd5;
+    --pi-step-bg: #f4faf6;
+    --pi-step-border: #cbddd1;
+    --pi-map-bg: #e8ede8;
+    --pi-bookmark-bg: rgba(250, 247, 239, 0.97);
+    --pi-toolbar-bg: rgba(255, 253, 248, 0.94);
+    --pi-toolbar-border: rgba(217, 221, 213, 0.94);
+    --pi-success-bg: rgba(231, 243, 233, 0.96);
+    --pi-success-border: rgba(40, 87, 71, 0.22);
+    --pi-error-bg: rgba(254, 242, 242, 0.96);
+    --pi-error-border: rgba(185, 28, 28, 0.24);
+    --pi-progress-track: rgba(102, 113, 106, 0.18);
+    --pi-progress-end: #3f765f;
+    --pi-shadow: rgba(38, 49, 44, 0.07);
+    --pi-shadow-strong: rgba(38, 49, 44, 0.15);
+    color-scheme: light;
+    min-height: 100vh;
+    background: linear-gradient(180deg, var(--pi-bg-start) 0%, var(--pi-bg) 100%);
     color: var(--pi-ink);
     padding: 1.5rem 0 4rem;
+    transition: background-color .2s ease, color .2s ease;
+  }
+  .pi-page[data-guide-theme="dark"] {
+    --pi-bg: #121815;
+    --pi-bg-start: #18211d;
+    --pi-card: #1b2520;
+    --pi-surface: #1b2520;
+    --pi-surface-muted: #202c26;
+    --pi-ink: #f4f1e9;
+    --pi-muted: #adb8b0;
+    --pi-accent: #83b59e;
+    --pi-accent-fill: #356b59;
+    --pi-accent-contrast: #ffffff;
+    --pi-accent-soft: #233a31;
+    --pi-warning: #3b3322;
+    --pi-warning-border: #77633a;
+    --pi-border: #35463d;
+    --pi-step-bg: #192b23;
+    --pi-step-border: #315344;
+    --pi-map-bg: #26332d;
+    --pi-bookmark-bg: rgba(27, 37, 32, 0.97);
+    --pi-toolbar-bg: rgba(27, 37, 32, 0.94);
+    --pi-toolbar-border: rgba(53, 70, 61, 0.96);
+    --pi-success-bg: rgba(28, 54, 44, 0.96);
+    --pi-success-border: rgba(131, 181, 158, 0.28);
+    --pi-error-bg: rgba(66, 34, 34, 0.96);
+    --pi-error-border: rgba(248, 113, 113, 0.25);
+    --pi-progress-track: rgba(173, 184, 176, 0.18);
+    --pi-progress-end: #b4d6c4;
+    --pi-shadow: rgba(0, 0, 0, 0.2);
+    --pi-shadow-strong: rgba(0, 0, 0, 0.36);
+    color-scheme: dark;
+  }
+  @media (prefers-color-scheme: dark) {
+    .pi-page:not([data-guide-theme]) {
+      --pi-bg: #121815;
+      --pi-bg-start: #18211d;
+      --pi-card: #1b2520;
+      --pi-surface: #1b2520;
+      --pi-surface-muted: #202c26;
+      --pi-ink: #f4f1e9;
+      --pi-muted: #adb8b0;
+      --pi-accent: #83b59e;
+      --pi-accent-fill: #356b59;
+      --pi-accent-contrast: #ffffff;
+      --pi-accent-soft: #233a31;
+      --pi-warning: #3b3322;
+      --pi-warning-border: #77633a;
+      --pi-border: #35463d;
+      --pi-step-bg: #192b23;
+      --pi-step-border: #315344;
+      --pi-map-bg: #26332d;
+      --pi-bookmark-bg: rgba(27, 37, 32, 0.97);
+      --pi-toolbar-bg: rgba(27, 37, 32, 0.94);
+      --pi-toolbar-border: rgba(53, 70, 61, 0.96);
+      --pi-success-bg: rgba(28, 54, 44, 0.96);
+      --pi-success-border: rgba(131, 181, 158, 0.28);
+      --pi-error-bg: rgba(66, 34, 34, 0.96);
+      --pi-error-border: rgba(248, 113, 113, 0.25);
+      --pi-progress-track: rgba(173, 184, 176, 0.18);
+      --pi-progress-end: #b4d6c4;
+      --pi-shadow: rgba(0, 0, 0, 0.2);
+      --pi-shadow-strong: rgba(0, 0, 0, 0.36);
+      color-scheme: dark;
+    }
   }
   .pi-shell {
     width: min(1080px, calc(100% - 2rem));
@@ -66,11 +153,11 @@
     width: var(--pi-bookmark-width);
     min-height: 0;
     padding: .1rem .25rem;
-    border: 1px solid rgba(31, 41, 51, 0.12);
+    border: 1px solid var(--pi-border);
     border-left: 0;
     border-radius: 0 14px 14px 0;
-    background: rgba(248, 245, 239, 0.96);
-    box-shadow: 0 5px 14px rgba(15, 23, 42, 0.12);
+    background: var(--pi-bookmark-bg);
+    box-shadow: 0 5px 14px var(--pi-shadow);
     color: var(--pi-ink);
     font-size: .64rem;
     font-weight: 700;
@@ -94,9 +181,9 @@
   }
   .pi-bookmark[aria-current="location"] {
     width: var(--pi-bookmark-active-width);
-    background: var(--pi-accent);
-    color: #fff;
-    box-shadow: 0 7px 18px rgba(15, 23, 42, 0.18);
+    background: var(--pi-accent-fill);
+    color: var(--pi-accent-contrast);
+    box-shadow: 0 7px 18px var(--pi-shadow-strong);
   }
   .pi-bookmark-icon {
     flex: 0 0 auto;
@@ -699,6 +786,109 @@
   .pi-hero[data-guide-summary-section],
   .pi-sections [data-guide-section] {
     scroll-margin-top: calc(var(--pi-toolbar-bottom-offset) + 1rem);
+  }
+  .pi-hero,
+  .pi-card {
+    box-shadow: 0 18px 40px var(--pi-shadow);
+  }
+  .pi-title,
+  .pi-section-title,
+  .pi-block h3,
+  .pi-body,
+  .pi-body p,
+  .pi-body li {
+    color: var(--pi-ink);
+  }
+  .pi-copy-button,
+  .pi-guide-language-select {
+    background: var(--pi-surface);
+  }
+  .pi-copy-button.is-copied {
+    color: var(--pi-accent);
+    border-color: var(--pi-step-border);
+    background: var(--pi-accent-soft);
+  }
+  .pi-pdf-action-feedback {
+    background: var(--pi-surface);
+  }
+  .pi-pdf-action-feedback.is-error {
+    border-color: var(--pi-error-border);
+    background: var(--pi-error-bg);
+  }
+  .pi-pdf-action-feedback.is-success {
+    border-color: var(--pi-success-border);
+    background: var(--pi-success-bg);
+  }
+  .pi-btn-primary,
+  .pi-step-badge {
+    background: var(--pi-accent-fill);
+    color: var(--pi-accent-contrast);
+  }
+  .pi-btn-secondary:hover,
+  .pi-btn-secondary:focus-visible,
+  .pi-copy-button:hover,
+  .pi-copy-button:focus-visible {
+    background: var(--pi-accent-soft);
+  }
+  .pi-block {
+    background: var(--pi-surface);
+  }
+  .pi-block-step {
+    border-color: var(--pi-step-border);
+    background: var(--pi-step-bg);
+  }
+  .pi-block-warning {
+    border-color: var(--pi-warning-border);
+    background: var(--pi-warning);
+  }
+  .pi-image {
+    background: var(--pi-surface-muted);
+  }
+  .pi-map-shell,
+  .pi-instruction-map-shell {
+    background: var(--pi-map-bg);
+  }
+  .pi-guide-toolbar {
+    background: var(--pi-toolbar-bg);
+    border-color: var(--pi-toolbar-border);
+    box-shadow: 0 16px 34px var(--pi-shadow);
+  }
+  .pi-pdf-progress {
+    border-color: var(--pi-success-border);
+    background: var(--pi-success-bg);
+  }
+  .pi-pdf-progress progress,
+  .pi-pdf-progress progress::-webkit-progress-bar {
+    background: var(--pi-progress-track);
+  }
+  .pi-pdf-progress progress::-webkit-progress-value,
+  .pi-pdf-progress progress::-moz-progress-bar {
+    background: linear-gradient(90deg, var(--pi-accent-fill), var(--pi-progress-end));
+  }
+  .pi-theme-toggle {
+    width: 2.9rem;
+    min-width: 2.9rem;
+    height: 2.9rem;
+    min-height: 2.9rem;
+    padding: 0;
+    border-radius: 999px;
+  }
+  .pi-theme-icon-sun {
+    display: none;
+  }
+  .pi-page[data-guide-theme="dark"] .pi-theme-icon-sun {
+    display: block;
+  }
+  .pi-page[data-guide-theme="dark"] .pi-theme-icon-moon {
+    display: none;
+  }
+  @media (prefers-color-scheme: dark) {
+    .pi-page:not([data-guide-theme]) .pi-theme-icon-sun {
+      display: block;
+    }
+    .pi-page:not([data-guide-theme]) .pi-theme-icon-moon {
+      display: none;
+    }
   }
   @media (max-width: 768px) {
     .pi-address-row,
@@ -2095,6 +2285,25 @@
             <path d="M6 14h12v7H6z"></path>
           </svg>
           <span class="pi-toolbar-action-label">Print guide</span>
+        </button>
+        <button
+          type="button"
+          class="pi-btn pi-btn-secondary pi-theme-toggle"
+          data-guide-theme-toggle
+          aria-pressed="false"
+          aria-label="Switch to night mode"
+          title="Switch to night mode">
+          <svg class="pi-toolbar-action-icon pi-theme-icon-moon" aria-hidden="true" focusable="false" viewBox="0 0 24 24">
+            <path d="M20 15.3A8.5 8.5 0 0 1 8.7 4a8.5 8.5 0 1 0 11.3 11.3Z"></path>
+          </svg>
+          <svg class="pi-toolbar-action-icon pi-theme-icon-sun" aria-hidden="true" focusable="false" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="4"></circle>
+            <path d="M12 2v2"></path><path d="M12 20v2"></path>
+            <path d="m4.93 4.93 1.42 1.42"></path><path d="m17.66 17.66 1.41 1.41"></path>
+            <path d="M2 12h2"></path><path d="M20 12h2"></path>
+            <path d="m6.34 17.66-1.41 1.41"></path><path d="m19.07 4.93-1.41 1.42"></path>
+          </svg>
+          <span class="sr-only" data-guide-theme-toggle-label>Switch to night mode</span>
         </button>
       </div>
       <div

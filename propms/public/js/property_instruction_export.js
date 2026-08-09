@@ -578,7 +578,7 @@
         ".pi-print-ready-copy{margin:0;text-align:center;color:var(--pi-muted,#52606d);line-height:1.5;}",
         ".pi-print-ready-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.65rem;align-items:center;width:min(100%,18rem);margin:0 auto;}",
         ".pi-print-ready-actions .pi-btn{width:100%;min-height:2.9rem;}",
-        ".pi-print-ready-actions .pi-btn-primary{background:var(--pi-accent,#115e59);color:#fff;border:1px solid transparent;}",
+        ".pi-print-ready-actions .pi-btn-primary{background:var(--pi-accent-fill,var(--pi-accent,#115e59));color:var(--pi-accent-contrast,#fff);border:1px solid transparent;}",
         ".pi-print-ready-actions .pi-btn-secondary{background:transparent;color:var(--pi-accent,#115e59);border:1px solid var(--pi-border,#d7dee5);}",
         "@media (max-width: 768px){[data-guide-print-ready-dialog]{width:calc(100vw - 32px);margin:auto;}.pi-print-ready-card{padding:1rem;}.pi-print-ready-actions{grid-template-columns:1fr;}.pi-print-ready-actions .pi-btn{min-height:2.9rem;}}",
         "@media (prefers-reduced-motion:no-preference){[data-guide-print-ready-dialog][open] .pi-print-ready-card{animation:piPrintReadyFade .18s ease-out;}}",
@@ -618,6 +618,7 @@
     });
     document.body.appendChild(dialog);
     printGuideReadyDialog = dialog;
+    syncPrintReadyDialogThemeVariables();
   }
 
   function openPrintGuideReadyDialog(artifact, triggerButton, errorMessage) {
@@ -2219,6 +2220,145 @@
     window.addEventListener("resize", scheduleStickyToolbarOffsetSync, { passive: true });
     window.addEventListener("scroll", scheduleStickyToolbarOffsetSync, { passive: true });
     scheduleStickyToolbarOffsetSync();
+  }
+
+  var GUIDE_THEME_STORAGE_KEY = "propms.propertyInstruction.theme";
+  var guideThemeMediaQuery = window.matchMedia ? window.matchMedia("(prefers-color-scheme: dark)") : null;
+  var guideThemeSystemListenerBound = false;
+
+  function getStoredGuideTheme() {
+    try {
+      var storedTheme = window.localStorage ? window.localStorage.getItem(GUIDE_THEME_STORAGE_KEY) : "";
+      return storedTheme === "dark" || storedTheme === "light" ? storedTheme : "";
+    } catch (error) {
+      return "";
+    }
+  }
+
+  function getSystemGuideTheme() {
+    return guideThemeMediaQuery && guideThemeMediaQuery.matches ? "dark" : "light";
+  }
+
+  function syncGuideDocumentThemeSurface() {
+    var pageRoot = document.querySelector("[data-guide-root]");
+    if (!pageRoot) {
+      return;
+    }
+    var pageStyle = window.getComputedStyle(pageRoot);
+    var backgroundColor = String(pageStyle.getPropertyValue("--pi-bg") || "").trim();
+    var colorScheme = String(pageRoot.getAttribute("data-guide-theme") || "light") === "dark" ? "dark" : "light";
+    [document.documentElement, document.body].forEach(function (node) {
+      if (!node || !node.style) {
+        return;
+      }
+      if (backgroundColor) {
+        node.style.setProperty("background-color", backgroundColor);
+      }
+      node.style.setProperty("color-scheme", colorScheme);
+    });
+  }
+
+  function syncPrintReadyDialogThemeVariables() {
+    var pageRoot = document.querySelector("[data-guide-root]");
+    var dialog = printGuideReadyDialog || document.querySelector("[data-guide-print-ready-dialog]");
+    if (!pageRoot || !dialog) {
+      return;
+    }
+    var pageStyle = window.getComputedStyle(pageRoot);
+    [
+      "--pi-card",
+      "--pi-ink",
+      "--pi-muted",
+      "--pi-border",
+      "--pi-accent",
+      "--pi-accent-fill",
+      "--pi-accent-contrast",
+      "--pi-accent-soft"
+    ].forEach(function (propertyName) {
+      var propertyValue = String(pageStyle.getPropertyValue(propertyName) || "").trim();
+      if (propertyValue) {
+        dialog.style.setProperty(propertyName, propertyValue);
+      }
+    });
+  }
+
+  function syncGuideThemeToggle(theme) {
+    var toggle = document.querySelector("[data-guide-theme-toggle]");
+    if (!toggle) {
+      return;
+    }
+    var isDark = theme === "dark";
+    var nextLabel = isDark ? "Switch to day mode" : "Switch to night mode";
+    toggle.setAttribute("aria-pressed", isDark ? "true" : "false");
+    toggle.setAttribute("aria-label", nextLabel);
+    toggle.setAttribute("title", nextLabel);
+    var labelNode = toggle.querySelector("[data-guide-theme-toggle-label]");
+    if (labelNode) {
+      labelNode.textContent = nextLabel;
+    }
+  }
+
+  function applyGuideTheme(theme, options) {
+    var pageRoot = document.querySelector("[data-guide-root]");
+    if (!pageRoot) {
+      return;
+    }
+    var resolvedTheme = theme === "dark" ? "dark" : "light";
+    var persist = !!(options && options.persist);
+    var source = String(options && options.source || (persist ? "manual" : "system"));
+    pageRoot.setAttribute("data-guide-theme", resolvedTheme);
+    pageRoot.setAttribute("data-guide-theme-source", source);
+    syncGuideThemeToggle(resolvedTheme);
+    syncGuideDocumentThemeSurface();
+    syncPrintReadyDialogThemeVariables();
+    if (persist) {
+      try {
+        if (window.localStorage) {
+          window.localStorage.setItem(GUIDE_THEME_STORAGE_KEY, resolvedTheme);
+        }
+      } catch (error) {
+        // Theme still applies for this page even when storage is unavailable.
+      }
+    }
+    window.__propertyInstructionTheme = {
+      theme: resolvedTheme,
+      source: source
+    };
+    scheduleStickyToolbarOffsetSync();
+  }
+
+  function initializeGuideTheme() {
+    var storedTheme = getStoredGuideTheme();
+    applyGuideTheme(storedTheme || getSystemGuideTheme(), {
+      source: storedTheme ? "stored" : "system"
+    });
+    if (!guideThemeMediaQuery || guideThemeSystemListenerBound) {
+      return;
+    }
+    guideThemeSystemListenerBound = true;
+    var handleSystemThemeChange = function (event) {
+      if (getStoredGuideTheme()) {
+        return;
+      }
+      applyGuideTheme(event.matches ? "dark" : "light", { source: "system" });
+    };
+    if (guideThemeMediaQuery.addEventListener) {
+      guideThemeMediaQuery.addEventListener("change", handleSystemThemeChange);
+    } else if (guideThemeMediaQuery.addListener) {
+      guideThemeMediaQuery.addListener(handleSystemThemeChange);
+    }
+  }
+
+  function toggleGuideTheme() {
+    var pageRoot = document.querySelector("[data-guide-root]");
+    var currentTheme = pageRoot ? String(pageRoot.getAttribute("data-guide-theme") || "") : "";
+    if (currentTheme !== "dark" && currentTheme !== "light") {
+      currentTheme = getSystemGuideTheme();
+    }
+    applyGuideTheme(currentTheme === "dark" ? "light" : "dark", {
+      persist: true,
+      source: "manual"
+    });
   }
 
   function getStickyGapPx() {
@@ -12863,6 +13003,13 @@
   }
 
   async function handlePdfToolbarClick(event) {
+    const themeToggleButton = getEventActionTarget(event, "[data-guide-theme-toggle]");
+    if (themeToggleButton) {
+      event.preventDefault();
+      toggleGuideTheme();
+      return;
+    }
+
     var targetInfo = getSafeEventTargetInfo(event);
     recordPdfInteractionDiagnostic("raw-click-received", {
       tagName: targetInfo.tagName,
@@ -13125,6 +13272,7 @@
   });
 
   hydrateInstructionBlockMaps();
+  initializeGuideTheme();
   ensureStickyToolbarObservers();
   ensureSectionNavObserver();
   scheduleStickyToolbarOffsetSync();
