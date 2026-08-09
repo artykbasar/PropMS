@@ -188,7 +188,7 @@
   }
   .pi-bookmark-content {
     display: grid;
-    grid-template-rows: 42% minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) 42%;
     justify-items: center;
     width: min(100%, var(--pi-bookmark-width));
     height: 100%;
@@ -196,25 +196,61 @@
     padding: .1rem .25rem;
     box-sizing: border-box;
   }
-  .pi-bookmark-icon {
-    align-self: end;
+  .pi-bookmark-icon-badge {
+    grid-row: 2;
+    align-self: start;
     justify-self: center;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: calc(var(--pi-bookmark-icon-size) + .45rem);
+    height: calc(var(--pi-bookmark-icon-size) + .45rem);
+    margin-top: var(--pi-bookmark-icon-gap);
+    border: 1px solid currentColor;
+    border-radius: 999px;
+    box-sizing: border-box;
+    transform: rotate(-90deg);
+    transform-origin: center;
+  }
+  .pi-bookmark-icon {
+    --pi-bookmark-icon-shift-x: 0%;
+    --pi-bookmark-icon-shift-y: 0%;
+    display: block;
     flex: 0 0 auto;
     width: var(--pi-bookmark-icon-size);
     height: var(--pi-bookmark-icon-size);
     fill: none;
     stroke: currentColor;
-    stroke-width: 1.8;
+    stroke-width: 2.1;
     stroke-linecap: round;
     stroke-linejoin: round;
+    transform: translate(var(--pi-bookmark-icon-shift-x), var(--pi-bookmark-icon-shift-y));
+  }
+  .pi-bookmark-icon--info,
+  .pi-bookmark-icon--alert,
+  .pi-bookmark-icon--location {
+    --pi-bookmark-icon-shift-y: 2.0833%;
+  }
+  .pi-bookmark-icon--key {
+    --pi-bookmark-icon-shift-x: 1.0417%;
+    --pi-bookmark-icon-shift-y: 2.0833%;
+  }
+  .pi-bookmark-icon--car {
+    --pi-bookmark-icon-shift-y: -11.4583%;
+  }
+  .pi-bookmark-icon--wifi {
+    --pi-bookmark-icon-shift-y: -1.9672%;
+  }
+  .pi-bookmark-icon--log-out {
+    --pi-bookmark-icon-shift-x: 4.1667%;
   }
   .pi-bookmark-label {
+    grid-row: 1;
     display: block;
-    align-self: start;
+    align-self: end;
     justify-self: center;
     min-height: 0;
     max-height: 100%;
-    margin-top: var(--pi-bookmark-icon-gap);
     overflow: hidden;
     writing-mode: vertical-rl;
     transform: rotate(180deg);
@@ -2519,7 +2555,7 @@
 {% endmacro %}
 
 {% macro render_bookmark_icon(icon_name) %}
-<svg class="pi-bookmark-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24">
+<svg class="pi-bookmark-icon pi-bookmark-icon--{{ icon_name or 'info' }}" aria-hidden="true" focusable="false" viewBox="0 0 24 24">
   {% if icon_name == "location" %}
   <path d="M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0Z"></path>
   <circle cx="12" cy="10" r="2.5"></circle>
@@ -2545,7 +2581,7 @@
   {% elif icon_name == "alert" %}
   <path d="M12 3 2.5 20h19L12 3Z"></path><path d="M12 9v5"></path><path d="M12 17h.01"></path>
   {% else %}
-  <circle cx="12" cy="12" r="9"></circle><path d="M12 11v6"></path><path d="M12 7h.01"></path>
+  <path d="M12 10.5v6.5"></path><circle cx="12" cy="7" r="1"></circle>
   {% endif %}
 </svg>
 {% endmacro %}
@@ -2571,14 +2607,14 @@
     aria-label="Instruction section bookmarks">
     <a class="pi-bookmark" href="#stay-info" data-guide-bookmark="stay-info" data-guide-bookmark-icon="info">
       <span class="pi-bookmark-content">
-        {{ render_bookmark_icon("info") }}
+        <span class="pi-bookmark-icon-badge">{{ render_bookmark_icon("info") }}</span>
         <span class="pi-bookmark-label">Info</span>
       </span>
     </a>
     {% for section in sections %}
     <a class="pi-bookmark" href="#{{ section.anchor }}" data-guide-bookmark="{{ section.anchor }}" data-guide-bookmark-icon="{{ section.navigation_icon or 'info' }}">
       <span class="pi-bookmark-content">
-        {{ render_bookmark_icon(section.navigation_icon or "info") }}
+        <span class="pi-bookmark-icon-badge">{{ render_bookmark_icon(section.navigation_icon or "info") }}</span>
         <span class="pi-bookmark-label">{{ section.section }}</span>
       </span>
     </a>
