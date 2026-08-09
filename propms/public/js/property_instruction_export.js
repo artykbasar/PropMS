@@ -2265,7 +2265,9 @@
 
   function syncActiveSectionNavigation() {
     translationState.activeSectionNavFrame = 0;
-    var sectionNodes = Array.prototype.slice.call(document.querySelectorAll("[data-guide-section]"));
+    var sectionNodes = Array.prototype.slice.call(document.querySelectorAll(
+      "[data-guide-summary-section], [data-guide-section]"
+    ));
     var navLinks = Array.prototype.slice.call(document.querySelectorAll(
       "[data-guide-bookmarks] a[href^='#']"
     ));
@@ -8690,7 +8692,6 @@
 
     var mapCard = document.querySelector("[data-guide-map-card]");
     var mapLink = document.querySelector("[data-guide-map-link]") || document.querySelector(".pi-hero .pi-btn-primary");
-    var contentsTitleNode = document.querySelector("[data-guide-contents-title]");
     var coverNode = document.querySelector("[data-guide-cover]");
     var languageCode = getGuideLanguage();
     var emptyNode = document.querySelector("[data-guide-empty-state]");
@@ -8741,7 +8742,7 @@
       direction: getGuideDirection(languageCode),
       title: getGuideTitle(),
       kicker: getVisibleText(guideKicker),
-      contentsTitle: getVisibleText(contentsTitleNode),
+      contentsTitle: getGuideCopyText("in_this_guide", "In this guide"),
       quickAccessTitle: getGuideCopyText("quick_access", "Quick access"),
       emptyMessage: getVisibleText(emptyNode),
       showWifiQr: getGuideRootBooleanAttribute("data-guide-show-wifi-qr"),

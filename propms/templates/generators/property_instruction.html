@@ -113,6 +113,11 @@
     font-size: .46rem;
     letter-spacing: 0;
   }
+  .pi-bookmark-nav[data-guide-bookmark-density="ultra"] .pi-bookmark {
+    padding-block: 0;
+    font-size: .39rem;
+    letter-spacing: 0;
+  }
   .pi-hero,
   .pi-card {
     background: var(--pi-card);
@@ -636,55 +641,6 @@
     height: 1px !important;
     opacity: 0.01;
   }
-  .pi-guide-overview {
-    margin: 0 0 1rem;
-    padding: 1rem 1.1rem;
-    border: 1px solid var(--pi-border);
-    border-radius: 20px;
-    background: rgba(255, 255, 255, 0.86);
-    box-shadow: 0 12px 24px rgba(15, 23, 42, 0.04);
-  }
-  .pi-guide-overview h2 {
-    margin: 0 0 .85rem;
-    font-size: 1rem;
-  }
-  .pi-guide-overview ul {
-    margin: 0;
-    padding: 0;
-    list-style: none;
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: .7rem;
-  }
-  .pi-guide-overview li {
-    min-width: 0;
-  }
-  .pi-guide-overview a {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: .6rem;
-    min-height: 2.75rem;
-    padding: .8rem .95rem;
-    border: 1px solid rgba(17, 94, 89, 0.12);
-    border-radius: 16px;
-    background: #fff;
-    color: var(--pi-ink);
-    text-decoration: none;
-    font-weight: 600;
-  }
-  .pi-guide-overview a:hover,
-  .pi-guide-overview a:focus-visible {
-    border-color: rgba(17, 94, 89, 0.26);
-    background: var(--pi-accent-soft);
-    outline: none;
-  }
-  .pi-guide-overview-count {
-    flex: 0 0 auto;
-    color: var(--pi-muted);
-    font-size: .85rem;
-    font-weight: 700;
-  }
   iframe.goog-te-banner-frame,
   iframe.VIpgJd-ZVi9od-ORHb-OEVmcd,
   .goog-te-banner-frame.skiptranslate,
@@ -719,6 +675,7 @@
     height: 100%;
     border: 0;
   }
+  .pi-hero[data-guide-summary-section],
   .pi-sections [data-guide-section] {
     scroll-margin-top: calc(var(--pi-toolbar-bottom-offset) + 1rem);
   }
@@ -819,9 +776,6 @@
       font-size: .7rem;
       text-align: end;
     }
-    .pi-guide-overview ul {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
     .pi-bookmark-nav {
       --pi-bookmark-width: 34px;
       --pi-bookmark-active-width: 42px;
@@ -843,6 +797,11 @@
     .pi-bookmark-nav[data-guide-bookmark-density="max"] .pi-bookmark {
       padding-block: 0;
       font-size: .38rem;
+      letter-spacing: 0;
+    }
+    .pi-bookmark-nav[data-guide-bookmark-density="ultra"] .pi-bookmark {
+      padding-block: 0;
+      font-size: .32rem;
       letter-spacing: 0;
     }
   }
@@ -2003,12 +1962,16 @@
   data-guide-wifi-security-type="{{ wifi_security_type or 'WPA' }}"
   data-guide-wifi-hidden-network="{{ 1 if wifi_hidden_network else 0 }}">
   {% if has_sections %}
+  {% set bookmark_count = (sections | length) + 1 %}
   <nav
     class="pi-bookmark-nav"
     data-guide-bookmarks
-    data-guide-bookmark-count="{{ sections | length }}"
-    data-guide-bookmark-density="{% if (sections | length) >= 9 %}max{% elif (sections | length) >= 6 %}dense{% else %}normal{% endif %}"
+    data-guide-bookmark-count="{{ bookmark_count }}"
+    data-guide-bookmark-density="{% if bookmark_count >= 10 %}ultra{% elif bookmark_count >= 9 %}max{% elif bookmark_count >= 6 %}dense{% else %}normal{% endif %}"
     aria-label="Instruction section bookmarks">
+    <a class="pi-bookmark" href="#stay-info" data-guide-bookmark="stay-info">
+      <span class="pi-bookmark-label">Info</span>
+    </a>
     {% for section in sections %}
     <a class="pi-bookmark" href="#{{ section.anchor }}" data-guide-bookmark="{{ section.anchor }}">
       <span class="pi-bookmark-label">{{ section.section }}</span>
@@ -2135,7 +2098,7 @@
     <small class="pi-translate-attribution pi-translate-attribution--mobile">Powered by Google Translate</small>
     {% endif %}
     <div class="pi-screen-layout" data-guide-screen>
-      <article class="pi-hero">
+      <article id="stay-info" class="pi-hero" data-guide-summary-section>
         {% if cover_image %}
         <img class="pi-cover" src="{{ cover_image }}" alt="{{ title }} cover image" data-guide-cover>
         {% endif %}
@@ -2192,22 +2155,6 @@
           {% endif %}
         </div>
       </article>
-
-      {% if has_sections %}
-      <nav class="pi-guide-overview" aria-label="In this guide" data-guide-overview>
-        <h2 data-guide-contents-title>In this guide</h2>
-        <ul>
-          {% for section in sections %}
-          <li>
-            <a href="#{{ section.anchor }}" data-guide-overview-link="{{ section.anchor }}">
-              <span>{{ section.section }}</span>
-              <span class="pi-guide-overview-count">{{ section.blocks | length }}</span>
-            </a>
-          </li>
-          {% endfor %}
-        </ul>
-      </nav>
-      {% endif %}
 
       {% if screen_map_embed_url %}
       <section
