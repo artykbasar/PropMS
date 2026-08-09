@@ -239,6 +239,25 @@
   .pi-screen-layout {
     display: block;
   }
+  .pi-info-layout {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 440px), 1fr));
+    gap: 1.25rem;
+    align-items: stretch;
+    margin-bottom: 1.25rem;
+  }
+  .pi-info-layout .pi-hero,
+  .pi-info-layout .pi-map-card {
+    min-width: 0;
+    margin-bottom: 0;
+  }
+  .pi-info-layout .pi-map-card {
+    display: flex;
+    flex-direction: column;
+  }
+  .pi-info-layout .pi-map-shell {
+    flex: 1 1 320px;
+  }
   .pi-hero {
     overflow: hidden;
     margin-bottom: 1.25rem;
@@ -2399,6 +2418,7 @@
     <small class="pi-translate-attribution pi-translate-attribution--mobile">Powered by Google Translate</small>
     {% endif %}
     <div class="pi-screen-layout" data-guide-screen>
+      <div class="pi-info-layout" data-guide-info-layout>
       <article id="stay-info" class="pi-hero" data-guide-summary-section>
         {% if cover_image %}
         <img class="pi-cover" src="{{ cover_image }}" alt="{{ title }} cover image" data-guide-cover>
@@ -2488,6 +2508,7 @@
         {% endif %}
       </section>
       {% endif %}
+      </div>
 
       {% if has_sections %}
       <div class="pi-grid">
