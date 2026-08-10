@@ -62,10 +62,8 @@
   ];
   var PUBLIC_PDF_IMAGE_ENDPOINT = "/api/method/propms.property_management_solution.doctype.property_instruction.property_instruction.public_pdf_image";
   var PUBLIC_MAP_SNAPSHOT_IMAGE_ENDPOINT = "/api/method/propms.map_snapshot.pdf_assets.public_map_snapshot_image";
-  var PDF_ADAPTIVE_LAYOUT_VERSION = "2026-07-27-adaptive-a4-v1";
-  var PDF_WEB_FLOW_LAYOUT_VERSION = "2026-08-09-web-flow-a4-v1";
-  var PDF_LAYOUT_MODE = getRequestedPdfLayoutMode();
-  var PDF_RENDERER_ID = PDF_LAYOUT_MODE === "web-flow" ? "web-flow-vector" : "adaptive-vector";
+  var PDF_LAYOUT_VERSION = "2026-08-10-web-flow-a4-v2";
+  var PDF_RENDERER_ID = "web-flow-vector";
   var PDF_EXPORT_WIDTH = 794;
   var PDF_EXPORT_PAGE_HEIGHT = 1122;
   var PDF_EXPORT_OFFSCREEN_LEFT = -20000;
@@ -80,74 +78,9 @@
   var PDF_EXPORT_TIMEOUT_MS = 240000;
   var PDF_EXPORT_IMAGE_RATIO_TOLERANCE = 0.02;
   var PDF_EXPORT_IMAGE_CLIP_TOLERANCE = 1.5;
-  var PDF_ADAPTIVE_MEDIA_RATIO_WARNING = 0.005;
-  var PDF_ADAPTIVE_MEDIA_RATIO_BLOCKER = 0.01;
-  var PDF_ADAPTIVE_CARD_GAP = 12;
-  var PDF_ADAPTIVE_HALF_WIDTH = Math.floor((PDF_EXPORT_CONTENT_WIDTH - PDF_ADAPTIVE_CARD_GAP) / 2);
-  var PDF_ADAPTIVE_WIDE_WIDTH = PDF_EXPORT_CONTENT_WIDTH;
-  var PDF_ADAPTIVE_PORTRAIT_RATIO_THRESHOLD = 1.15;
-  var PDF_ADAPTIVE_LANDSCAPE_RATIO_THRESHOLD = 1.15;
-  var PDF_ADAPTIVE_COMPACT_TEXT_LIMIT = 180;
-  var PDF_ADAPTIVE_MEDIUM_TEXT_LIMIT = 360;
-  var PDF_ADAPTIVE_COMPACT_HEIGHT_LIMIT = 320;
-  var PDF_ADAPTIVE_MEDIUM_HEIGHT_LIMIT = 430;
-  var PDF_ADAPTIVE_COMPACT_TEXT_HEIGHT_LIMIT = 150;
-  var PDF_ADAPTIVE_MEDIUM_TEXT_HEIGHT_LIMIT = 240;
-  var PDF_ADAPTIVE_HALF_CARD_HEADER_HEIGHT_LIMIT = 168;
-  var PDF_ADAPTIVE_COMPACT_HEIGHT_HARD_LIMIT = 388;
-  var PDF_ADAPTIVE_MEDIUM_HEIGHT_HARD_LIMIT = 504;
-  var PDF_ADAPTIVE_COMPACT_TEXT_HEIGHT_HARD_LIMIT = 222;
-  var PDF_ADAPTIVE_MEDIUM_TEXT_HEIGHT_HARD_LIMIT = 320;
-  var PDF_ADAPTIVE_HALF_CARD_HEADER_HARD_LIMIT = 244;
-  var PDF_ADAPTIVE_SPARSE_PAGE_THRESHOLD = 0.65;
-  var PDF_ADAPTIVE_REBALANCE_PASSES = 3;
-  var ADAPTIVE_TYPOGRAPHY_SCALES = [1, 0.96, 0.92, 0.88];
-  var PDF_ADAPTIVE_BASE_BADGE_SIZE = 38;
-  var PDF_ADAPTIVE_BASE_TITLE_FONT_SIZE = 17;
-  var PDF_ADAPTIVE_BASE_BODY_FONT_SIZE = 14;
-  var PDF_ADAPTIVE_BASE_CAPTION_FONT_SIZE = 13;
-  var PDF_ADAPTIVE_BASE_LINK_FONT_SIZE = 14;
-  var PDF_ADAPTIVE_BASE_TITLE_LINE_HEIGHT = 1.28;
-  var PDF_ADAPTIVE_BASE_BODY_LINE_HEIGHT = 1.45;
-  var PDF_ADAPTIVE_BASE_CAPTION_LINE_HEIGHT = 1.4;
-  var PDF_ADAPTIVE_BASE_LINK_LINE_HEIGHT = 1.35;
-  var PDF_ADAPTIVE_MIN_TITLE_FONT_SIZE = 14.75;
-  var PDF_ADAPTIVE_MIN_BODY_FONT_SIZE = 12.32;
-  var PDF_ADAPTIVE_MIN_CAPTION_FONT_SIZE = 11.44;
-  var PDF_ADAPTIVE_MIN_LINK_FONT_SIZE = 12.32;
-  var PDF_ADAPTIVE_MIN_LINE_HEIGHT = 1.24;
-  var PDF_ADAPTIVE_MAX_MEDIA_REGION_GROWTH = 28;
-  var PDF_ADAPTIVE_MAX_LAYOUT_GAP_GROWTH = 12;
-  var PDF_ADAPTIVE_MAX_PARAGRAPH_GAP_GROWTH = 8;
-  var PDF_ADAPTIVE_MAX_FLEXIBLE_SPACER = 40;
-  var PDF_ADAPTIVE_FREE_SPACE_WARNING_PX = 36;
-  var PDF_ADAPTIVE_FREE_SPACE_RATIO_WARNING = 0.08;
-  var PDF_ADAPTIVE_MEDIA_ALIGNMENT_WARNING_PX = 10;
-  var PDF_ADAPTIVE_FOOTER_ALIGNMENT_WARNING_PX = 4;
-  var PDF_ADAPTIVE_TITLE_ALIGNMENT_WARNING_PX = 2;
-  var PDF_ADAPTIVE_PROJECTED_TITLE_MEDIA_GAP_WARNING_PX = 28;
-  var PDF_ADAPTIVE_PROJECTED_TITLE_MEDIA_GAP_BLOCKER_PX = 52;
-  var PDF_ADAPTIVE_PROJECTED_UNUSED_SPACE_WARNING_RATIO = 0.16;
-  var PDF_ADAPTIVE_PROJECTED_EQUALIZATION_WARNING_RATIO = 0.22;
-  var PDF_ADAPTIVE_PROJECTED_MEDIA_USEFULNESS_MIN_RATIO = 0.2;
-  var PDF_ADAPTIVE_PROJECTED_MEDIA_MISMATCH_WARNING_RATIO = 0.24;
-  var PDF_ADAPTIVE_PROJECTED_TRAILING_SPACE_WARNING_PX = 34;
-  var PDF_ADAPTIVE_BADGE_CENTER_WARNING_PX = 1;
-  var PDF_ADAPTIVE_CARD_CONTAINMENT_TOLERANCE_PX = 1;
-  var PDF_ADAPTIVE_MEDIA_LETTERBOX_WARNING_RATIO = 0.35;
-  var PDF_ADAPTIVE_MEDIA_LETTERBOX_BLOCKER_RATIO = 0.5;
-  var PDF_ADAPTIVE_MEDIA_FRAME_RATIO_WARNING = 1.8;
-  var PDF_ADAPTIVE_MEDIA_FRAME_RATIO_BLOCKER = 2.3;
-  var PDF_ADAPTIVE_MEDIA_BALANCE_WARNING_RATIO = 2;
-  var PDF_ADAPTIVE_MEDIA_BALANCE_GAP_WARNING_PX = 24;
-  var PDF_ADAPTIVE_MEDIA_BALANCE_GAP_BLOCKER_PX = 44;
-  var PDF_ADAPTIVE_HEADER_GROWTH_WARNING_RATIO = 0.22;
-  var PDF_ADAPTIVE_HEADER_GROWTH_BLOCKER_RATIO = 0.34;
-  var PDF_ADAPTIVE_RENDER_PROJECTION_DELTA_WARNING_PX = 12;
-  var PDF_ADAPTIVE_MIN_PORTRAIT_MEDIA_HEIGHT = 132;
-  var PDF_ADAPTIVE_MIN_LANDSCAPE_MEDIA_HEIGHT = 92;
-  var PDF_ADAPTIVE_MIN_SQUARE_MEDIA_HEIGHT = 104;
-  var PDF_ADAPTIVE_RENDER_PROJECTION_DELTA_BLOCKER_PX = 24;
+  var PDF_MEDIA_RATIO_BLOCKER = 0.01;
+  var PDF_PORTRAIT_RATIO_THRESHOLD = 1.15;
+  var PDF_SPARSE_PAGE_THRESHOLD = 0.65;
   var PDF_EXPORT_FONT_LOADS = [
     '400 16px "PropMS PDF Inter"',
     '500 16px "PropMS PDF Inter"',
@@ -250,33 +183,10 @@
   var vectorPdfImageAssetState = {
     preparedAssets: null
   };
-  function getRequestedPdfLayoutMode() {
-    try {
-      var params = new URLSearchParams(window.location.search || "");
-      var requested = String(params.get("propms_pdf_layout") || "").trim().toLowerCase();
-      return requested === "web-flow" || requested === "web" ? "web-flow" : "adaptive";
-    } catch (error) {
-      return "adaptive";
-    }
-  }
-
-  function isWebFlowPdfLayoutEnabled() {
-    return PDF_LAYOUT_MODE === "web-flow";
-  }
-
   function isPdfArtifactModeEnabled() {
     try {
       var params = new URLSearchParams(window.location.search || "");
       return String(params.get("propms_pdf_artifact_mode") || "").toLowerCase() === "1";
-    } catch (error) {
-      return false;
-    }
-  }
-
-  function isParkingMutationDiagnosticBypassEnabled() {
-    try {
-      var params = new URLSearchParams(window.location.search || "");
-      return String(params.get("propms_pdf_debug_disable_parking_action_relocation") || "").toLowerCase() === "1";
     } catch (error) {
       return false;
     }
@@ -294,9 +204,7 @@
   }
 
   function getCurrentPdfLayoutVersion() {
-    return isWebFlowPdfLayoutEnabled()
-      ? PDF_WEB_FLOW_LAYOUT_VERSION
-      : PDF_ADAPTIVE_LAYOUT_VERSION;
+    return PDF_LAYOUT_VERSION;
   }
 
   function clearPdfArtifactModeResult(reason) {
@@ -896,13 +804,7 @@
       currentStage: "idle",
       events: [],
       stageDurations: {},
-      counters: {
-        parkingActionRelocations: 0,
-        parkingActionRelocationByCard: {},
-        adaptiveCandidateMeasurements: 0,
-        adaptiveVariantApplications: 0
-      },
-      parkingMutations: [],
+      counters: {},
       warnings: []
     };
     return window.__propertyInstructionPdfGenerationDiagnostics;
@@ -941,15 +843,6 @@
       }, extraDetails || {}));
       diagnostics.warnings = trimTraceCollection(diagnostics.warnings, 80);
     }
-  }
-
-  function recordParkingMutationDiagnostic(details) {
-    var diagnostics = getPdfGenerationDiagnostics();
-    diagnostics.parkingMutations.push(Object.assign({
-      at: Date.now(),
-      elapsedMs: Math.max(0, Date.now() - diagnostics.startedAt)
-    }, details || {}));
-    diagnostics.parkingMutations = trimTraceCollection(diagnostics.parkingMutations, 120);
   }
 
   function recordPdfPerformance(performanceState, key, startedAt, value) {
@@ -2958,10 +2851,6 @@
     return "none";
   }
 
-  function shouldUseQrForCustomMap(representation, isCustomGoogleMap) {
-    return !!isCustomGoogleMap && normalizePdfMapRepresentation(representation) !== "snapshot";
-  }
-
   function getSemanticNodeId(element) {
     if (!element) {
       return "";
@@ -4472,21 +4361,6 @@
     };
   }
 
-  function fitMediaWithinBounds(naturalWidth, naturalHeight, maxWidth, maxHeight, allowUpscale) {
-    var width = Math.max(1, Number(maxWidth || 0));
-    var height = Math.max(1, Number(maxHeight || 0));
-    var ratio = Math.min(width / naturalWidth, height / naturalHeight);
-    if (!allowUpscale) {
-      ratio = Math.min(ratio, 1);
-    }
-    ratio = Math.max(ratio, 0);
-    return {
-      width: Number((naturalWidth * ratio).toFixed(2)),
-      height: Number((naturalHeight * ratio).toFixed(2)),
-      scale: Number(ratio.toFixed(6))
-    };
-  }
-
   function getExportMediaType(img) {
     var role = String(img && img.getAttribute ? img.getAttribute("data-export-image-role") || "image" : "image");
     if (role === "map") {
@@ -4499,370 +4373,6 @@
       return "photo";
     }
     return "image";
-  }
-
-  function getAdaptiveMediaFitPolicy(img, cardNode) {
-    var mediaType = getExportMediaType(img);
-    if (mediaType === "qr") {
-      return "square-contain";
-    }
-    if (mediaType === "map") {
-      return "contain";
-    }
-    if (mediaType === "photo") {
-      return "contain";
-    }
-    return "contain";
-  }
-
-  function getFrameRectWithFallback(frameNode, fallbackWidth, fallbackHeight, preferFallback) {
-    var frameRect = frameNode.getBoundingClientRect();
-    var frameStyles = window.getComputedStyle(frameNode);
-    var horizontalPadding = (parseFloat(frameStyles.paddingLeft || "0") || 0) + (parseFloat(frameStyles.paddingRight || "0") || 0);
-    var verticalPadding = (parseFloat(frameStyles.paddingTop || "0") || 0) + (parseFloat(frameStyles.paddingBottom || "0") || 0);
-    var horizontalBorder = (parseFloat(frameStyles.borderLeftWidth || "0") || 0) + (parseFloat(frameStyles.borderRightWidth || "0") || 0);
-    var verticalBorder = (parseFloat(frameStyles.borderTopWidth || "0") || 0) + (parseFloat(frameStyles.borderBottomWidth || "0") || 0);
-    var innerWidth = Math.max(1, frameRect.width - horizontalPadding - horizontalBorder);
-    var innerHeight = Math.max(1, frameRect.height - verticalPadding - verticalBorder);
-    if (preferFallback) {
-      if (fallbackWidth) {
-        innerWidth = Math.max(1, Number(fallbackWidth || 0) - horizontalPadding - horizontalBorder);
-      }
-      if (fallbackHeight) {
-        innerHeight = Math.max(1, Number(fallbackHeight || 0) - verticalPadding - verticalBorder);
-      }
-    }
-    if (!frameRect.width && frameNode.clientWidth) {
-      innerWidth = Math.max(1, frameNode.clientWidth - horizontalPadding);
-    }
-    if (!frameRect.height && frameNode.clientHeight) {
-      innerHeight = Math.max(1, frameNode.clientHeight - verticalPadding);
-    }
-    return {
-      width: Math.max(1, innerWidth || Number(fallbackWidth || 0) || 1),
-      height: Math.max(1, innerHeight || Number(fallbackHeight || 0) || 1),
-      outerWidth: Math.max(1, (preferFallback ? Number(fallbackWidth || 0) : 0) || frameRect.width || Number(fallbackWidth || 0) || 1),
-      outerHeight: Math.max(1, (preferFallback ? Number(fallbackHeight || 0) : 0) || frameRect.height || Number(fallbackHeight || 0) || 1)
-    };
-  }
-
-  function applyAdaptiveMediaDimensions(frameNode, img, options) {
-    if (!frameNode || !img || !img.naturalWidth || !img.naturalHeight) {
-      return null;
-    }
-    var resolvedGeometry = options && options.resolvedGeometry ? options.resolvedGeometry : null;
-    var fitPolicy = String((options && options.fitPolicy) || "contain");
-    var frameRect = resolvedGeometry
-      ? {
-          width: Number(resolvedGeometry.frameWidth || 1),
-          height: Number(resolvedGeometry.frameHeight || 1),
-          outerWidth: Number(resolvedGeometry.frameWidth || 1),
-          outerHeight: Number(resolvedGeometry.frameHeight || 1)
-        }
-      : getFrameRectWithFallback(
-          frameNode,
-          options && options.fallbackWidth,
-          options && options.fallbackHeight,
-          !!(options && options.preferFallbackFrameRect)
-        );
-    var fitted = resolvedGeometry
-      ? {
-          width: Number(resolvedGeometry.imageWidth || 1),
-          height: Number(resolvedGeometry.imageHeight || 1),
-          scale: Number(resolvedGeometry.scale || 0)
-        }
-      : fitMediaWithinBounds(
-          img.naturalWidth,
-          img.naturalHeight,
-          frameRect.width,
-          frameRect.height,
-          !!(options && options.allowUpscale)
-        );
-    frameNode.style.display = "flex";
-    frameNode.style.alignItems = "center";
-    frameNode.style.justifyContent = "center";
-    frameNode.style.overflow = "hidden";
-    img.removeAttribute("width");
-    img.removeAttribute("height");
-    img.style.width = fitted.width + "px";
-    img.style.height = fitted.height + "px";
-    img.style.maxWidth = "100%";
-    img.style.maxHeight = "100%";
-    img.style.objectFit = fitPolicy === "cover" ? "cover" : "contain";
-    img.style.objectPosition = "center";
-    img.style.flex = "0 0 auto";
-    img.setAttribute("data-export-media-fit-policy", fitPolicy);
-    return {
-      fitPolicy: fitPolicy,
-      fittedWidth: fitted.width,
-      fittedHeight: fitted.height,
-      frameWidth: frameRect.width,
-      frameHeight: frameRect.height,
-      outerFrameWidth: frameRect.outerWidth,
-      outerFrameHeight: frameRect.outerHeight,
-      scale: fitted.scale,
-      resolvedGeometry: resolvedGeometry || null
-    };
-  }
-
-  function getAdaptiveFrameAspectRatioValue(ratio) {
-    var resolvedRatio = Number(ratio || 0);
-    if (!resolvedRatio || !isFinite(resolvedRatio)) {
-      return "";
-    }
-    return Number(resolvedRatio.toFixed(4)) + " / 1";
-  }
-
-  function resolveAdaptiveMediaFramePolicyDefinition(options) {
-    var mediaType = String(options && options.mediaType || "image");
-    var layout = String(options && options.layout || "");
-    var naturalRatio = Number(options && options.naturalRatio || 0) || 1;
-    var availableWidth = Math.max(1, Number(options && options.availableWidth || 0) || 1);
-    var availableHeight = Math.max(1, Number(options && options.availableHeight || 0) || 1);
-    var fitPolicy = String((options && options.fitPolicy) || "contain");
-    var policy = {
-      mediaType: mediaType,
-      layout: layout,
-      fitPolicy: fitPolicy,
-      framePolicy: "full-width",
-      frameWidth: availableWidth,
-      aspectRatio: "",
-      transparentFrame: false,
-      visualReason: "",
-      expectedLetterboxRatio: 0
-    };
-
-    if (mediaType !== "photo" || fitPolicy !== "contain") {
-      return policy;
-    }
-
-    if (
-      (
-        layout === "half-portrait-stacked" ||
-        layout === "half-portrait-stacked-compact" ||
-        (layout === "wide-stacked" && naturalRatio < 1)
-      ) &&
-      naturalRatio > 0 &&
-      naturalRatio < 1 &&
-      (availableWidth / availableHeight) > (naturalRatio * 1.6)
-    ) {
-      var portraitWidthAtHeight = Math.max(1, availableHeight * naturalRatio);
-      var portraitShrinkWidth = Math.max(1, Math.min(availableWidth, portraitWidthAtHeight));
-      var portraitLetterboxRatio = Math.max(0, (availableWidth - portraitShrinkWidth) / availableWidth);
-      policy.framePolicy = "shrink-wrap-natural";
-      policy.frameWidth = portraitShrinkWidth;
-      policy.aspectRatio = getAdaptiveFrameAspectRatioValue(naturalRatio);
-      policy.transparentFrame = true;
-      policy.visualReason = "contain-letterbox-reduction";
-      policy.expectedLetterboxRatio = Number(portraitLetterboxRatio.toFixed(4));
-      return policy;
-    }
-
-    if (layout === "half-compact" && naturalRatio >= PDF_ADAPTIVE_LANDSCAPE_RATIO_THRESHOLD) {
-      var naturalWidthAtHeight = Math.max(1, availableHeight * naturalRatio);
-      var shrinkWidth = Math.max(1, Math.min(availableWidth, naturalWidthAtHeight));
-      var letterboxRatio = Math.max(0, (availableWidth - shrinkWidth) / availableWidth);
-      policy.framePolicy = "shrink-wrap-natural";
-      policy.frameWidth = shrinkWidth;
-      policy.aspectRatio = getAdaptiveFrameAspectRatioValue(naturalRatio);
-      policy.transparentFrame = true;
-      policy.visualReason = "contain-letterbox-reduction";
-      policy.expectedLetterboxRatio = Number(letterboxRatio.toFixed(4));
-    }
-
-    return policy;
-  }
-
-  function resolveAdaptiveMediaFramePolicy(cardNode, img, options) {
-    return resolveAdaptiveMediaFramePolicyDefinition({
-      mediaType: getExportMediaType(img),
-      layout: String(cardNode && cardNode.getAttribute("data-pdf-selected-variant") || ""),
-      naturalRatio: img && img.naturalWidth && img.naturalHeight
-        ? (img.naturalWidth / img.naturalHeight)
-        : 1,
-      availableWidth: Number(options && options.availableWidth || 0) || 1,
-      availableHeight: Number(options && options.availableHeight || 0) || 1,
-      fitPolicy: String((options && options.fitPolicy) || "contain")
-    });
-  }
-
-  function resolveAdaptiveFinalMediaGeometry(options) {
-    var naturalWidth = Math.max(1, Number(options && options.naturalWidth || 0) || 1);
-    var naturalHeight = Math.max(1, Number(options && options.naturalHeight || 0) || 1);
-    var availableWidth = Math.max(1, Number(options && options.availableWidth || 0) || 1);
-    var availableHeight = Math.max(1, Number(options && options.availableHeight || 0) || 1);
-    var fitPolicy = String((options && options.fitPolicy) || "contain");
-    var mediaType = String(options && options.mediaType || "image");
-    var framePolicy = options && options.framePolicy
-      ? Object.assign({}, options.framePolicy)
-      : resolveAdaptiveMediaFramePolicyDefinition({
-          mediaType: mediaType,
-          layout: String(options && options.layout || ""),
-          naturalRatio: naturalWidth / naturalHeight,
-          availableWidth: availableWidth,
-          availableHeight: availableHeight,
-          fitPolicy: fitPolicy
-        });
-    var frameWidth = framePolicy.framePolicy === "shrink-wrap-natural"
-      ? Math.max(1, Math.min(availableWidth, Number(framePolicy.frameWidth || availableWidth) || availableWidth))
-      : availableWidth;
-    var frameHeight = availableHeight;
-    var fitted = fitMediaWithinBounds(
-      naturalWidth,
-      naturalHeight,
-      frameWidth,
-      frameHeight,
-      !!(options && options.allowUpscale)
-    );
-    var horizontalLetterboxPercent = frameWidth
-      ? Math.max(0, (frameWidth - fitted.width) / frameWidth)
-      : 0;
-    var verticalLetterboxPercent = frameHeight
-      ? Math.max(0, (frameHeight - fitted.height) / frameHeight)
-      : 0;
-    var frameRatio = frameHeight ? (frameWidth / frameHeight) : (naturalWidth / naturalHeight);
-    var naturalRatio = naturalWidth / naturalHeight;
-    var frameSourceAspectMismatch = naturalRatio && frameRatio
-      ? Math.max(frameRatio / naturalRatio, naturalRatio / frameRatio)
-      : 1;
-    var issues = [];
-    var severity = "ok";
-    if (mediaType === "photo" && fitPolicy === "contain") {
-      if (
-        horizontalLetterboxPercent > PDF_ADAPTIVE_MEDIA_LETTERBOX_BLOCKER_RATIO ||
-        verticalLetterboxPercent > PDF_ADAPTIVE_MEDIA_LETTERBOX_BLOCKER_RATIO
-      ) {
-        severity = "blocker";
-        issues.push("excessive-contain-letterbox");
-      } else if (
-        horizontalLetterboxPercent > PDF_ADAPTIVE_MEDIA_LETTERBOX_WARNING_RATIO ||
-        verticalLetterboxPercent > PDF_ADAPTIVE_MEDIA_LETTERBOX_WARNING_RATIO
-      ) {
-        severity = "warning";
-        issues.push("contain-letterbox-warning");
-      }
-    }
-    return {
-      mediaType: mediaType,
-      fitPolicy: fitPolicy,
-      framePolicy: framePolicy.framePolicy,
-      visualReason: framePolicy.visualReason || "",
-      transparentFrame: !!framePolicy.transparentFrame,
-      availableWidth: Number(availableWidth.toFixed(2)),
-      availableHeight: Number(availableHeight.toFixed(2)),
-      frameWidth: Number(frameWidth.toFixed(2)),
-      frameHeight: Number(frameHeight.toFixed(2)),
-      imageWidth: Number(fitted.width.toFixed(2)),
-      imageHeight: Number(fitted.height.toFixed(2)),
-      scale: Number(fitted.scale.toFixed(6)),
-      horizontalLetterboxPercent: Number(horizontalLetterboxPercent.toFixed(4)),
-      verticalLetterboxPercent: Number(verticalLetterboxPercent.toFixed(4)),
-      frameSourceAspectMismatch: Number(frameSourceAspectMismatch.toFixed(4)),
-      valid: severity !== "blocker",
-      severity: severity,
-      issues: issues,
-      aspectRatio: framePolicy.aspectRatio || "",
-      expectedLetterboxRatio: Number(framePolicy.expectedLetterboxRatio || 0)
-    };
-  }
-
-  function getAdaptiveMediaSiblingReservedHeight(mediaNode, frameNode) {
-    if (!mediaNode || !frameNode) {
-      return 0;
-    }
-    var mediaStyles = window.getComputedStyle(mediaNode);
-    var rowGap = parseFloat(mediaStyles.rowGap || mediaStyles.gap || "0") || 0;
-    var visibleSiblingCount = 0;
-    var reservedHeight = Array.prototype.slice.call(mediaNode.children || []).reduce(function (total, childNode) {
-      if (!childNode || childNode === frameNode) {
-        return total;
-      }
-      var childStyles = window.getComputedStyle(childNode);
-      if (childStyles.display === "none" || childStyles.visibility === "hidden") {
-        return total;
-      }
-      var childRect = childNode.getBoundingClientRect();
-      if (childRect.height <= 0) {
-        return total;
-      }
-      visibleSiblingCount += 1;
-      return total + childRect.height;
-    }, 0);
-    if (!visibleSiblingCount) {
-      return 0;
-    }
-    return Math.max(0, reservedHeight + (rowGap * visibleSiblingCount));
-  }
-
-  function getAdaptiveAvailableFrameHeight(mediaNode, frameNode, fallbackHeight) {
-    if (!mediaNode || !frameNode) {
-      return Math.max(0, Number(fallbackHeight || 0));
-    }
-    var mediaInnerBounds = getNodeInnerBounds(mediaNode);
-    var baseHeight = mediaInnerBounds && mediaInnerBounds.height
-      ? mediaInnerBounds.height
-      : (mediaNode.getBoundingClientRect().height || Number(fallbackHeight || 0));
-    var reservedHeight = getAdaptiveMediaSiblingReservedHeight(mediaNode, frameNode);
-    var resolvedHeight = Math.max(0, baseHeight - reservedHeight);
-    if (resolvedHeight > 0) {
-      return resolvedHeight;
-    }
-    return Math.max(0, Number(fallbackHeight || 0) - reservedHeight);
-  }
-
-  function applyAdaptiveMediaFramePolicy(frameNode, mediaNode, cardNode, img, options) {
-    if (!frameNode || !img) {
-      return resolveAdaptiveMediaFramePolicy(cardNode, img, options);
-    }
-    var resolvedGeometry = options && options.resolvedGeometry ? options.resolvedGeometry : null;
-    var policy = resolvedGeometry
-      ? {
-          framePolicy: resolvedGeometry.framePolicy,
-          fitPolicy: resolvedGeometry.fitPolicy,
-          aspectRatio: resolvedGeometry.aspectRatio,
-          frameWidth: resolvedGeometry.frameWidth,
-          transparentFrame: resolvedGeometry.transparentFrame
-        }
-      : resolveAdaptiveMediaFramePolicy(cardNode, img, options);
-    frameNode.setAttribute("data-pdf-media-frame-policy", policy.framePolicy);
-    frameNode.setAttribute("data-pdf-media-fit-policy", policy.fitPolicy);
-    if (mediaNode) {
-      mediaNode.setAttribute("data-pdf-media-frame-policy", policy.framePolicy);
-      mediaNode.style.alignItems = policy.framePolicy === "shrink-wrap-natural" ? "center" : "";
-    }
-    frameNode.style.marginInline = "";
-    frameNode.style.alignSelf = "";
-    frameNode.style.background = "";
-    frameNode.style.aspectRatio = "";
-    if (resolvedGeometry) {
-      frameNode.style.width = Math.max(1, Number(resolvedGeometry.frameWidth || 0)) + "px";
-      frameNode.style.height = Math.max(1, Number(resolvedGeometry.frameHeight || 0)) + "px";
-      frameNode.style.maxWidth = Math.max(1, Number(resolvedGeometry.frameWidth || 0)) + "px";
-      frameNode.style.maxHeight = Math.max(1, Number(resolvedGeometry.frameHeight || 0)) + "px";
-      frameNode.style.minHeight = Math.max(1, Number(resolvedGeometry.frameHeight || 0)) + "px";
-      frameNode.style.marginInline = "auto";
-      frameNode.style.alignSelf = "center";
-      if (resolvedGeometry.transparentFrame) {
-        frameNode.style.background = "transparent";
-      }
-      return Object.assign({}, policy, resolvedGeometry);
-    }
-    if (policy.aspectRatio) {
-      frameNode.style.aspectRatio = policy.aspectRatio;
-    }
-    if (policy.framePolicy === "shrink-wrap-natural") {
-      frameNode.style.width = Math.max(1, Number(policy.frameWidth || 0)) + "px";
-      frameNode.style.maxWidth = "100%";
-      frameNode.style.marginInline = "auto";
-      frameNode.style.alignSelf = "center";
-      if (policy.transparentFrame) {
-        frameNode.style.background = "transparent";
-      }
-    } else {
-      frameNode.style.width = "100%";
-      frameNode.style.maxWidth = "100%";
-    }
-    return policy;
   }
 
   function getPdfImageMaxHeight(img) {
@@ -4910,711 +4420,6 @@
     };
   }
 
-  function getAdaptiveImageOrientation(naturalWidth, naturalHeight) {
-    if (!naturalWidth || !naturalHeight) {
-      return "square";
-    }
-    var ratio = naturalWidth / naturalHeight;
-    if (ratio >= PDF_ADAPTIVE_LANDSCAPE_RATIO_THRESHOLD) {
-      return "landscape";
-    }
-    if ((naturalHeight / naturalWidth) >= PDF_ADAPTIVE_PORTRAIT_RATIO_THRESHOLD) {
-      return "portrait";
-    }
-    return "square";
-  }
-
-  function getAdaptiveCardTextLength(cardNode) {
-    var titleNode = cardNode ? cardNode.querySelector(".pi-export-card-title") : null;
-    var bodyNode = cardNode ? cardNode.querySelector(".pi-export-card-body") : null;
-    var linkNode = cardNode ? cardNode.querySelector(".pi-export-card-link") : null;
-    var captionNode = cardNode ? cardNode.querySelector(".pi-export-card-caption") : null;
-    return normalizeText([
-      titleNode ? (titleNode.innerText || titleNode.textContent || "") : "",
-      bodyNode ? (bodyNode.innerText || bodyNode.textContent || "") : "",
-      linkNode ? (linkNode.innerText || linkNode.textContent || "") : "",
-      captionNode ? (captionNode.innerText || captionNode.textContent || "") : ""
-    ].join(" ")).length;
-  }
-
-  function getAdaptiveCardImageNode(cardNode) {
-    if (!cardNode) {
-      return null;
-    }
-    return cardNode.querySelector("img[data-export-image-role='card']") ||
-      cardNode.querySelector("img[data-export-image-role='map']") ||
-      null;
-  }
-
-  function isAdaptiveParkingCard(cardNode) {
-    if (!cardNode) {
-      return false;
-    }
-    var sectionNode = cardNode.closest(".pi-export-section");
-    var anchor = sectionNode ? String(sectionNode.getAttribute("data-pdf-section-anchor") || "").trim() : "";
-    return anchor === "parking" && !!cardNode.querySelector("img[data-export-image-role='map']");
-  }
-
-  function createAdaptiveMeasurementHost(exportRoot) {
-    var host = exportRoot.ownerDocument.createElement("div");
-    host.className = "pi-export-measure-host";
-    host.setAttribute("aria-hidden", "true");
-    host.style.position = "absolute";
-    host.style.left = "0";
-    host.style.top = "0";
-    host.style.width = PDF_EXPORT_CONTENT_WIDTH + "px";
-    host.style.visibility = "hidden";
-    host.style.pointerEvents = "none";
-    host.style.zIndex = "-1";
-    exportRoot.appendChild(host);
-    return host;
-  }
-
-  function getAdaptiveVariantClassNames(variant) {
-    var classes = [
-      "pi-export-card--adaptive",
-      "pi-export-card--adaptive-" + String(variant.kind || "medium"),
-      variant.isWide ? "pi-export-card--adaptive-full" : "pi-export-card--adaptive-half",
-      "pi-export-card--adaptive-" + String(variant.orientation || "square"),
-      "pi-export-card--adaptive-layout-" + String(variant.layout || "half-compact")
-    ];
-    return classes;
-  }
-
-  function getAdaptiveTypographyMetrics(scale) {
-    var resolvedScale = Number(scale || 1);
-    var metrics = {
-      typographyScale: resolvedScale,
-      titleFontSize: Number((PDF_ADAPTIVE_BASE_TITLE_FONT_SIZE * resolvedScale).toFixed(2)),
-      bodyFontSize: Number((PDF_ADAPTIVE_BASE_BODY_FONT_SIZE * resolvedScale).toFixed(2)),
-      captionFontSize: Number((PDF_ADAPTIVE_BASE_CAPTION_FONT_SIZE * resolvedScale).toFixed(2)),
-      linkFontSize: Number((PDF_ADAPTIVE_BASE_LINK_FONT_SIZE * resolvedScale).toFixed(2)),
-      titleLineHeight: Number(Math.max(PDF_ADAPTIVE_MIN_LINE_HEIGHT, PDF_ADAPTIVE_BASE_TITLE_LINE_HEIGHT - ((1 - resolvedScale) * 0.08)).toFixed(3)),
-      bodyLineHeight: Number(Math.max(PDF_ADAPTIVE_MIN_LINE_HEIGHT, PDF_ADAPTIVE_BASE_BODY_LINE_HEIGHT - ((1 - resolvedScale) * 0.06)).toFixed(3)),
-      captionLineHeight: Number(Math.max(PDF_ADAPTIVE_MIN_LINE_HEIGHT, PDF_ADAPTIVE_BASE_CAPTION_LINE_HEIGHT - ((1 - resolvedScale) * 0.05)).toFixed(3)),
-      linkLineHeight: Number(Math.max(PDF_ADAPTIVE_MIN_LINE_HEIGHT, PDF_ADAPTIVE_BASE_LINK_LINE_HEIGHT - ((1 - resolvedScale) * 0.05)).toFixed(3)),
-      badgeSize: Number((PDF_ADAPTIVE_BASE_BADGE_SIZE * Math.min(1, Math.max(0.94, resolvedScale))).toFixed(2))
-    };
-    metrics.isReadable =
-      metrics.titleFontSize >= PDF_ADAPTIVE_MIN_TITLE_FONT_SIZE &&
-      metrics.bodyFontSize >= PDF_ADAPTIVE_MIN_BODY_FONT_SIZE &&
-      metrics.captionFontSize >= PDF_ADAPTIVE_MIN_CAPTION_FONT_SIZE &&
-      metrics.linkFontSize >= PDF_ADAPTIVE_MIN_LINK_FONT_SIZE &&
-      metrics.titleLineHeight >= PDF_ADAPTIVE_MIN_LINE_HEIGHT &&
-      metrics.bodyLineHeight >= PDF_ADAPTIVE_MIN_LINE_HEIGHT &&
-      metrics.captionLineHeight >= PDF_ADAPTIVE_MIN_LINE_HEIGHT &&
-      metrics.linkLineHeight >= PDF_ADAPTIVE_MIN_LINE_HEIGHT;
-    return metrics;
-  }
-
-  function applyAdaptiveTypographyScale(cardNode, scale) {
-    if (!cardNode || !cardNode.style) {
-      return getAdaptiveTypographyMetrics(scale);
-    }
-    var typographyMetrics = getAdaptiveTypographyMetrics(scale);
-    cardNode.style.setProperty("--pi-export-adaptive-type-scale", String(typographyMetrics.typographyScale));
-    cardNode.style.setProperty("--pi-export-adaptive-title-size", typographyMetrics.titleFontSize + "px");
-    cardNode.style.setProperty("--pi-export-adaptive-body-size", typographyMetrics.bodyFontSize + "px");
-    cardNode.style.setProperty("--pi-export-adaptive-caption-size", typographyMetrics.captionFontSize + "px");
-    cardNode.style.setProperty("--pi-export-adaptive-link-size", typographyMetrics.linkFontSize + "px");
-    cardNode.style.setProperty("--pi-export-adaptive-title-line-height", String(typographyMetrics.titleLineHeight));
-    cardNode.style.setProperty("--pi-export-adaptive-body-line-height", String(typographyMetrics.bodyLineHeight));
-    cardNode.style.setProperty("--pi-export-adaptive-caption-line-height", String(typographyMetrics.captionLineHeight));
-    cardNode.style.setProperty("--pi-export-adaptive-link-line-height", String(typographyMetrics.linkLineHeight));
-    cardNode.style.setProperty("--pi-export-adaptive-badge-size", typographyMetrics.badgeSize + "px");
-    cardNode.setAttribute("data-pdf-typography-scale", String(typographyMetrics.typographyScale));
-    return typographyMetrics;
-  }
-
-  function measureAdaptiveNodeBottom(containerNode) {
-    if (!containerNode || !containerNode.getBoundingClientRect) {
-      return 0;
-    }
-    var containerRect = containerNode.getBoundingClientRect();
-    var maxBottom = containerRect.top;
-    Array.prototype.slice.call(containerNode.querySelectorAll("*")).forEach(function (childNode) {
-      if (!childNode || !childNode.getBoundingClientRect) {
-        return;
-      }
-      var styles = window.getComputedStyle(childNode);
-      if (styles.display === "none" || styles.visibility === "hidden" || styles.position === "absolute") {
-        return;
-      }
-      var rect = childNode.getBoundingClientRect();
-      if (rect.width <= 0 || rect.height <= 0) {
-        return;
-      }
-      maxBottom = Math.max(maxBottom, rect.bottom);
-    });
-    return Math.max(0, maxBottom - containerRect.top);
-  }
-
-  function getAdaptiveTextBlockParagraphCount(node) {
-    if (!node || !node.querySelectorAll) {
-      return 0;
-    }
-    return node.querySelectorAll("p, li").length;
-  }
-
-  function buildAdaptiveCardContentProfile(cardNode, orientation, metrics, textLength) {
-    if (!cardNode) {
-      return {
-        hasHeader: false,
-        hasBodyText: false,
-        hasListContent: false,
-        hasWarningContent: false,
-        hasMedia: false,
-        hasCaption: false,
-        hasLink: false,
-        hasQrContent: false,
-        hasMeaningfulFooterContent: false,
-        hasMapContent: false,
-        mostlyMediaContent: false,
-        headerAndMediaOnly: false,
-        mediaOrientation: orientation || "square",
-        mediaAspectRatio: 1
-      };
-    }
-    var headerNode = cardNode.querySelector("[data-card-region='header']");
-    var bodyNode = cardNode.querySelector(".pi-export-card-body");
-    var footerNode = cardNode.querySelector("[data-card-region='footer']");
-    var captionNode = cardNode.querySelector(".pi-export-card-caption");
-    var linkNode = cardNode.querySelector(".pi-export-card-link");
-    var mediaNode = cardNode.querySelector("[data-card-region='media']");
-    var imageNode = getAdaptiveCardImageNode(cardNode);
-    var listCount = bodyNode ? bodyNode.querySelectorAll("ul, ol, li").length : 0;
-    var warningContent = cardNode.classList.contains("pi-export-card--warning");
-    var qrCount = cardNode.querySelectorAll(".pi-export-qr-frame, .pi-export-card-qr-panel, .pi-export-qr-grid").length;
-    var bodyText = normalizeText(bodyNode ? (bodyNode.innerText || bodyNode.textContent || "") : "");
-    var footerText = normalizeText(footerNode ? (footerNode.innerText || footerNode.textContent || "") : "");
-    var footerParagraphCount = getAdaptiveTextBlockParagraphCount(footerNode);
-    var hasBodyText = !!bodyText;
-    var hasCaption = !!captionNode && !!normalizeText(captionNode.textContent || "");
-    var hasLink = !!linkNode && !!normalizeText(linkNode.textContent || "");
-    var hasQrContent = qrCount > 0;
-    var hasMapContent = !!cardNode.querySelector("img[data-export-image-role='map']");
-    var hasMedia = !!mediaNode && !!imageNode;
-    var hasMeaningfulFooterContent = !!footerText || hasCaption || hasLink || hasQrContent || footerParagraphCount > 0;
-    var headerAndMediaOnly = !!headerNode && hasMedia && !hasBodyText && !hasMeaningfulFooterContent;
-    var mediaAspectRatio = imageNode && imageNode.naturalWidth && imageNode.naturalHeight
-      ? (imageNode.naturalWidth / imageNode.naturalHeight)
-      : 1;
-    var mostlyMediaContent = hasMedia && !hasMapContent && (
-      headerAndMediaOnly ||
-      (
-        !hasMeaningfulFooterContent &&
-        !warningContent &&
-        textLength <= PDF_ADAPTIVE_COMPACT_TEXT_LIMIT &&
-        bodyText.length <= 60 &&
-        listCount === 0
-      )
-    );
-    return {
-      hasHeader: !!headerNode,
-      hasBodyText: hasBodyText,
-      hasListContent: listCount > 0,
-      hasWarningContent: warningContent,
-      hasMedia: hasMedia,
-      hasCaption: hasCaption,
-      hasLink: hasLink,
-      hasQrContent: hasQrContent,
-      hasMeaningfulFooterContent: hasMeaningfulFooterContent,
-      hasMapContent: hasMapContent,
-      mostlyMediaContent: mostlyMediaContent,
-      headerAndMediaOnly: headerAndMediaOnly,
-      mediaOrientation: orientation || "square",
-      mediaAspectRatio: Number(mediaAspectRatio.toFixed(4)),
-      bodyParagraphCount: getAdaptiveTextBlockParagraphCount(bodyNode),
-      footerParagraphCount: footerParagraphCount,
-      textLength: Number(textLength || 0)
-    };
-  }
-
-  function isAdaptiveStackedLayout(layout) {
-    var layoutName = String(layout || "");
-    return (
-      layoutName === "half-compact" ||
-      layoutName === "half-landscape-stacked" ||
-      layoutName === "half-portrait-stacked" ||
-      layoutName === "half-portrait-stacked-compact" ||
-      layoutName === "wide-stacked"
-    );
-  }
-
-  function isAdaptiveSideMediaLayout(layout) {
-    var layoutName = String(layout || "");
-    return (
-      layoutName === "half-portrait-side" ||
-      layoutName === "half-portrait-side-narrow" ||
-      layoutName === "half-portrait-side-wide" ||
-      layoutName === "wide-horizontal"
-    );
-  }
-
-  function getAdaptivePortraitSideLayouts() {
-    return [
-      "half-portrait-side-narrow",
-      "half-portrait-side",
-      "half-portrait-side-wide"
-    ];
-  }
-
-  function getAdaptiveCandidateSoftPenalty(candidate) {
-    if (!candidate || !candidate.halfEligibility || !Array.isArray(candidate.halfEligibility.softFailures)) {
-      return 0;
-    }
-    return candidate.halfEligibility.softFailures.reduce(function (total, failure) {
-      return total + Number(failure.penalty || 0);
-    }, 0);
-  }
-
-  function getAdaptiveCandidateVariantPenalty(candidate, cardPlan) {
-    if (!candidate) {
-      return 0;
-    }
-    var contentProfile = cardPlan && cardPlan.contentProfile
-      ? cardPlan.contentProfile
-      : (candidate.contentProfile || {});
-    var layout = String(candidate.layout || "");
-    if (layout === "half-portrait-side-narrow" || layout === "half-portrait-side-wide") {
-      return contentProfile.headerAndMediaOnly || contentProfile.mostlyMediaContent ? 10 : 18;
-    }
-    if (layout === "half-portrait-stacked") {
-      return contentProfile.headerAndMediaOnly || contentProfile.mostlyMediaContent ? 18 : 30;
-    }
-    if (layout === "half-portrait-stacked-compact") {
-      return 34;
-    }
-    return 0;
-  }
-
-  function getAdaptiveCandidateHardFailureReason(candidate) {
-    if (!candidate || !candidate.halfEligibility || !Array.isArray(candidate.halfEligibility.hardFailures)) {
-      return "";
-    }
-    return (candidate.halfEligibility.hardFailures[0] && candidate.halfEligibility.hardFailures[0].code) || "";
-  }
-
-  function getAdaptiveCandidateMinimumMediaHeight(candidate, contentProfile) {
-    var profile = contentProfile || candidate && candidate.contentProfile || {};
-    if (!profile.hasMedia || profile.hasMapContent || profile.hasQrContent) {
-      return 0;
-    }
-    var orientation = String(candidate && candidate.orientation || profile.mediaOrientation || "square");
-    if (orientation === "portrait") {
-      return PDF_ADAPTIVE_MIN_PORTRAIT_MEDIA_HEIGHT;
-    }
-    if (orientation === "landscape") {
-      return PDF_ADAPTIVE_MIN_LANDSCAPE_MEDIA_HEIGHT;
-    }
-    return PDF_ADAPTIVE_MIN_SQUARE_MEDIA_HEIGHT;
-  }
-
-  function buildAdaptiveHalfCandidateEligibility(candidate, cardPlan) {
-    var plan = cardPlan || {};
-    var contentProfile = plan.contentProfile || candidate && candidate.contentProfile || {};
-    var hardFailures = [];
-    var softFailures = [];
-    var textLength = Number(plan.textLength || candidate && candidate.textLength || 0);
-    var isCompact = candidate && candidate.kind === "compact";
-    var measuredHeight = Number(candidate && candidate.measuredHeight || 0);
-    var textHeight = Number(candidate && candidate.textHeight || 0);
-    var headerHeight = Number(candidate && candidate.headerHeight || 0);
-    var mediaHeight = Number(candidate && (candidate.mediaRegionHeight || candidate.mediaHeight) || 0);
-    var mediaMinimum = getAdaptiveCandidateMinimumMediaHeight(candidate, contentProfile);
-
-    function addHard(code, actual, limit) {
-      hardFailures.push({
-        code: code,
-        severity: "hard",
-        actual: Number(actual || 0),
-        limit: Number(limit || 0)
-      });
-    }
-
-    function addSoft(code, actual, limit, penalty) {
-      softFailures.push({
-        code: code,
-        severity: "soft",
-        actual: Number(actual || 0),
-        limit: Number(limit || 0),
-        penalty: Number(penalty || 0)
-      });
-    }
-
-    if (!candidate || candidate.isWide) {
-      addHard("not-half-candidate", 1, 0);
-    }
-    if ((candidate && candidate.qualityWarnings || []).indexOf("below-minimum-typography") !== -1) {
-      addHard("below-minimum-typography", 1, 0);
-    }
-    if ((candidate && candidate.qualityWarnings || []).indexOf("card-containment-overflow") !== -1) {
-      addHard("card-containment-overflow", Number(candidate.containmentOverflow || 0), PDF_ADAPTIVE_CARD_CONTAINMENT_TOLERANCE_PX);
-    }
-    if ((candidate && candidate.qualityWarnings || []).indexOf("media-placement-blocker") !== -1) {
-      addHard(
-        "media-placement-blocker",
-        Number(candidate && candidate.mediaVisualPlacement && candidate.mediaVisualPlacement.visibleLetterboxPercent || 0),
-        PDF_ADAPTIVE_MEDIA_VISUAL_BLOCKER_LETTERBOX_PERCENT
-      );
-    }
-    if (mediaMinimum && mediaHeight < mediaMinimum) {
-      addHard("media-below-useful-minimum", mediaHeight, mediaMinimum);
-    }
-    if (isCompact) {
-      if (textLength > PDF_ADAPTIVE_COMPACT_TEXT_LIMIT) {
-        addSoft("compact-text-length", textLength, PDF_ADAPTIVE_COMPACT_TEXT_LIMIT, 44 + ((textLength - PDF_ADAPTIVE_COMPACT_TEXT_LIMIT) * 0.08));
-      }
-      if (headerHeight > PDF_ADAPTIVE_HALF_CARD_HEADER_HARD_LIMIT) {
-        addHard("header-height-hard-limit", headerHeight, PDF_ADAPTIVE_HALF_CARD_HEADER_HARD_LIMIT);
-      } else if (headerHeight > PDF_ADAPTIVE_HALF_CARD_HEADER_HEIGHT_LIMIT) {
-        addSoft("header-height-warning", headerHeight, PDF_ADAPTIVE_HALF_CARD_HEADER_HEIGHT_LIMIT, 28 + ((headerHeight - PDF_ADAPTIVE_HALF_CARD_HEADER_HEIGHT_LIMIT) * 1.1));
-      }
-      if (measuredHeight > PDF_ADAPTIVE_COMPACT_HEIGHT_HARD_LIMIT) {
-        addHard("compact-height-hard-limit", measuredHeight, PDF_ADAPTIVE_COMPACT_HEIGHT_HARD_LIMIT);
-      } else if (measuredHeight > PDF_ADAPTIVE_COMPACT_HEIGHT_LIMIT) {
-        addSoft("compact-height-warning", measuredHeight, PDF_ADAPTIVE_COMPACT_HEIGHT_LIMIT, 34 + ((measuredHeight - PDF_ADAPTIVE_COMPACT_HEIGHT_LIMIT) * 0.9));
-      }
-      if (textHeight > PDF_ADAPTIVE_COMPACT_TEXT_HEIGHT_HARD_LIMIT) {
-        addHard("compact-text-height-hard-limit", textHeight, PDF_ADAPTIVE_COMPACT_TEXT_HEIGHT_HARD_LIMIT);
-      } else if (textHeight > PDF_ADAPTIVE_COMPACT_TEXT_HEIGHT_LIMIT) {
-        addSoft("compact-text-height-warning", textHeight, PDF_ADAPTIVE_COMPACT_TEXT_HEIGHT_LIMIT, 24 + ((textHeight - PDF_ADAPTIVE_COMPACT_TEXT_HEIGHT_LIMIT) * 0.75));
-      }
-    } else {
-      if (textLength > PDF_ADAPTIVE_MEDIUM_TEXT_LIMIT) {
-        addSoft("medium-text-length", textLength, PDF_ADAPTIVE_MEDIUM_TEXT_LIMIT, 36 + ((textLength - PDF_ADAPTIVE_MEDIUM_TEXT_LIMIT) * 0.06));
-      }
-      if (headerHeight > PDF_ADAPTIVE_HALF_CARD_HEADER_HARD_LIMIT) {
-        addHard("header-height-hard-limit", headerHeight, PDF_ADAPTIVE_HALF_CARD_HEADER_HARD_LIMIT);
-      } else if (headerHeight > PDF_ADAPTIVE_HALF_CARD_HEADER_HEIGHT_LIMIT) {
-        addSoft("header-height-warning", headerHeight, PDF_ADAPTIVE_HALF_CARD_HEADER_HEIGHT_LIMIT, 24 + ((headerHeight - PDF_ADAPTIVE_HALF_CARD_HEADER_HEIGHT_LIMIT) * 0.85));
-      }
-      if (measuredHeight > PDF_ADAPTIVE_MEDIUM_HEIGHT_HARD_LIMIT) {
-        addHard("medium-height-hard-limit", measuredHeight, PDF_ADAPTIVE_MEDIUM_HEIGHT_HARD_LIMIT);
-      } else if (measuredHeight > PDF_ADAPTIVE_MEDIUM_HEIGHT_LIMIT) {
-        addSoft("medium-height-warning", measuredHeight, PDF_ADAPTIVE_MEDIUM_HEIGHT_LIMIT, 28 + ((measuredHeight - PDF_ADAPTIVE_MEDIUM_HEIGHT_LIMIT) * 0.72));
-      }
-      if (textHeight > PDF_ADAPTIVE_MEDIUM_TEXT_HEIGHT_HARD_LIMIT) {
-        addHard("medium-text-height-hard-limit", textHeight, PDF_ADAPTIVE_MEDIUM_TEXT_HEIGHT_HARD_LIMIT);
-      } else if (textHeight > PDF_ADAPTIVE_MEDIUM_TEXT_HEIGHT_LIMIT) {
-        addSoft("medium-text-height-warning", textHeight, PDF_ADAPTIVE_MEDIUM_TEXT_HEIGHT_LIMIT, 20 + ((textHeight - PDF_ADAPTIVE_MEDIUM_TEXT_HEIGHT_LIMIT) * 0.55));
-      }
-    }
-
-    return {
-      valid: hardFailures.length === 0,
-      hardFailures: hardFailures,
-      softFailures: softFailures,
-      softPenalty: Number(softFailures.reduce(function (total, failure) {
-        return total + Number(failure.penalty || 0);
-      }, 0).toFixed(2))
-    };
-  }
-
-  function getAdaptiveParkingLayoutVariant(cardNode, direction) {
-    if (!cardNode) {
-      return "parking-map-right-balanced";
-    }
-    var normalizedDirection = String(direction || "ltr").toLowerCase();
-    var roadList = cardNode.querySelector(".pi-export-card-body ul, .pi-export-card-body ol");
-    var hasQrPanel = !!cardNode.querySelector(".pi-export-card-qr-panel .pi-export-qr-frame");
-    var hasLink = !!cardNode.querySelector(".pi-export-card-link");
-    if (hasQrPanel && (hasLink || roadList)) {
-      if (normalizedDirection === "rtl") {
-        return "parking-map-right-actions-stack";
-      }
-      if (roadList) {
-        var actionItems = Array.prototype.slice.call(roadList.querySelectorAll(":scope > li")).map(function (itemNode) {
-          return normalizeText(itemNode.textContent || "");
-        }).filter(Boolean);
-        var actionLongestItem = actionItems.reduce(function (maxLength, itemText) {
-          return Math.max(maxLength, itemText.length);
-        }, 0);
-        if (!actionItems.length || (actionItems.length <= 8 && actionLongestItem <= 42)) {
-          return "parking-map-right-actions-stack";
-        }
-      } else {
-        return "parking-map-right-actions-stack";
-      }
-    }
-    if (!roadList) {
-      return "parking-map-right-balanced";
-    }
-    var items = Array.prototype.slice.call(roadList.querySelectorAll(":scope > li")).map(function (itemNode) {
-      return normalizeText(itemNode.textContent || "");
-    }).filter(Boolean);
-    var longestItem = items.reduce(function (maxLength, itemText) {
-      return Math.max(maxLength, itemText.length);
-    }, 0);
-    if (normalizedDirection !== "rtl" && items.length >= 6 && longestItem <= 20) {
-      return "parking-map-right-list-columns";
-    }
-    return "parking-map-right-balanced";
-  }
-
-  function getAdaptiveParkingCompositeVariant(parkingTextCard, parkingMapNode, direction, scopeNode) {
-    var scope = scopeNode || parkingTextCard || parkingMapNode;
-    if (!scope) {
-      return "parking-map-right-balanced";
-    }
-    var normalizedDirection = String(direction || "ltr").toLowerCase();
-    var roadList = (parkingTextCard && parkingTextCard.querySelector(".pi-export-card-body ul, .pi-export-card-body ol")) ||
-      scope.querySelector(".pi-export-card-body ul, .pi-export-card-body ol");
-    var hasQrPanel = !!(
-      (parkingTextCard && parkingTextCard.querySelector(".pi-export-card-qr-panel .pi-export-qr-frame")) ||
-      (parkingMapNode && parkingMapNode.querySelector(".pi-export-card-qr-panel .pi-export-qr-frame")) ||
-      scope.querySelector(".pi-export-card-qr-panel .pi-export-qr-frame")
-    );
-    var hasLink = !!(
-      (parkingTextCard && parkingTextCard.querySelector(".pi-export-card-link")) ||
-      (parkingMapNode && parkingMapNode.querySelector(".pi-export-card-link")) ||
-      scope.querySelector(".pi-export-card-link")
-    );
-    if (hasQrPanel && hasLink && parkingMapNode) {
-      if (normalizedDirection === "rtl") {
-        return "parking-map-right-actions-stack";
-      }
-      if (!roadList) {
-        return "parking-map-right-actions-stack";
-      }
-      var mapActionItems = Array.prototype.slice.call(roadList.querySelectorAll(":scope > li")).map(function (itemNode) {
-        return normalizeText(itemNode.textContent || "");
-      }).filter(Boolean);
-      var mapActionLongestItem = mapActionItems.reduce(function (maxLength, itemText) {
-        return Math.max(maxLength, itemText.length);
-      }, 0);
-      if (!mapActionItems.length || (mapActionItems.length <= 12 && mapActionLongestItem <= 64)) {
-        return "parking-map-right-actions-stack";
-      }
-    }
-    if (hasQrPanel && (hasLink || roadList)) {
-      if (normalizedDirection === "rtl") {
-        return "parking-map-right-actions-stack";
-      }
-      if (!roadList) {
-        return "parking-map-right-actions-stack";
-      }
-      var actionItems = Array.prototype.slice.call(roadList.querySelectorAll(":scope > li")).map(function (itemNode) {
-        return normalizeText(itemNode.textContent || "");
-      }).filter(Boolean);
-      var actionLongestItem = actionItems.reduce(function (maxLength, itemText) {
-        return Math.max(maxLength, itemText.length);
-      }, 0);
-      if (!actionItems.length || (actionItems.length <= 10 && actionLongestItem <= 56)) {
-        return "parking-map-right-actions-stack";
-      }
-    }
-    return getAdaptiveParkingLayoutVariant(parkingTextCard || scope, normalizedDirection);
-  }
-
-  function createExportRectDiagnostic(rect) {
-    if (!rect) {
-      return null;
-    }
-    return {
-      left: Number(rect.left.toFixed(2)),
-      top: Number(rect.top.toFixed(2)),
-      right: Number(rect.right.toFixed(2)),
-      bottom: Number(rect.bottom.toFixed(2)),
-      width: Number(rect.width.toFixed(2)),
-      height: Number(rect.height.toFixed(2)),
-      centerX: Number((rect.left + (rect.width / 2)).toFixed(2)),
-      centerY: Number((rect.top + (rect.height / 2)).toFixed(2))
-    };
-  }
-
-  function parsePdfJsonAttribute(value, fallbackValue) {
-    if (!value) {
-      return fallbackValue;
-    }
-    try {
-      return JSON.parse(String(value));
-    } catch (error) {
-      return fallbackValue;
-    }
-  }
-
-  function buildAdaptiveDescendantLabel(node) {
-    if (!node || !node.tagName) {
-      return "";
-    }
-    var label = node.tagName.toLowerCase();
-    var region = String(node.getAttribute("data-card-region") || "").trim();
-    if (region) {
-      label += "[data-card-region='" + region + "']";
-    }
-    if (node.classList && node.classList.length) {
-      label += "." + Array.prototype.slice.call(node.classList).join(".");
-    }
-    return label;
-  }
-
-  function hasAdaptiveDirectVisibleText(node) {
-    if (!node || !node.childNodes) {
-      return false;
-    }
-    return Array.prototype.slice.call(node.childNodes).some(function (childNode) {
-      return childNode && childNode.nodeType === 3 && normalizeText(childNode.textContent || "");
-    });
-  }
-
-  function isAdaptiveContainmentRelevantNode(node, descendantStyles) {
-    if (!node || !descendantStyles || !node.tagName) {
-      return false;
-    }
-    var tagName = node.tagName.toLowerCase();
-    if (/^(img|svg|canvas|iframe|a|p|li|h1|h2|h3|h4|h5|h6|span)$/.test(tagName)) {
-      return true;
-    }
-    if (node.classList) {
-      if (
-        node.classList.contains("pi-export-card-title") ||
-        node.classList.contains("pi-export-card-caption") ||
-        node.classList.contains("pi-export-card-link") ||
-        node.classList.contains("pi-export-card-media") ||
-        node.classList.contains("pi-export-card-image-frame") ||
-        node.classList.contains("pi-export-map-image-frame--block") ||
-        node.classList.contains("pi-export-qr-frame")
-      ) {
-        return true;
-      }
-    }
-    if (hasAdaptiveDirectVisibleText(node)) {
-      return true;
-    }
-    var hasBorder =
-      (parseFloat(descendantStyles.borderTopWidth || "0") || 0) > 0 ||
-      (parseFloat(descendantStyles.borderRightWidth || "0") || 0) > 0 ||
-      (parseFloat(descendantStyles.borderBottomWidth || "0") || 0) > 0 ||
-      (parseFloat(descendantStyles.borderLeftWidth || "0") || 0) > 0;
-    if (hasBorder) {
-      return true;
-    }
-    return descendantStyles.backgroundColor && descendantStyles.backgroundColor !== "rgba(0, 0, 0, 0)" && descendantStyles.backgroundColor !== "transparent";
-  }
-
-  function collectAdaptiveCardContainment(cardNode) {
-    if (!cardNode || !cardNode.getBoundingClientRect) {
-      return {
-        cardBounds: null,
-        innerBounds: null,
-        descendantBounds: [],
-        overflowTop: 0,
-        overflowRight: 0,
-        overflowBottom: 0,
-        overflowLeft: 0,
-        maxOverflow: 0,
-        valid: true
-      };
-    }
-    var cardRect = cardNode.getBoundingClientRect();
-    var cardStyles = window.getComputedStyle(cardNode);
-    var borderLeft = parseFloat(cardStyles.borderLeftWidth || "0") || 0;
-    var borderRight = parseFloat(cardStyles.borderRightWidth || "0") || 0;
-    var borderTop = parseFloat(cardStyles.borderTopWidth || "0") || 0;
-    var borderBottom = parseFloat(cardStyles.borderBottomWidth || "0") || 0;
-    var innerBounds = {
-      left: cardRect.left + borderLeft,
-      top: cardRect.top + borderTop,
-      right: cardRect.right - borderRight,
-      bottom: cardRect.bottom - borderBottom
-    };
-    var maxTop = 0;
-    var maxRight = 0;
-    var maxBottom = 0;
-    var maxLeft = 0;
-    var overflowingDescendants = [];
-
-    Array.prototype.slice.call(cardNode.querySelectorAll("*")).forEach(function (descendantNode) {
-      if (!descendantNode || !descendantNode.getBoundingClientRect) {
-        return;
-      }
-      // Step badges intentionally overlap the card edge and are drawn separately by jsPDF.
-      if (descendantNode.closest(".pi-export-step-badge")) {
-        return;
-      }
-      var descendantStyles = window.getComputedStyle(descendantNode);
-      if (descendantStyles.display === "none" || descendantStyles.visibility === "hidden") {
-        return;
-      }
-      if (!isAdaptiveContainmentRelevantNode(descendantNode, descendantStyles)) {
-        return;
-      }
-      var descendantRect = descendantNode.getBoundingClientRect();
-      if (descendantRect.width <= 0 || descendantRect.height <= 0) {
-        return;
-      }
-      var overflowTop = Math.max(0, innerBounds.top - descendantRect.top);
-      var overflowRight = Math.max(0, descendantRect.right - innerBounds.right);
-      var overflowBottom = Math.max(0, descendantRect.bottom - innerBounds.bottom);
-      var overflowLeft = Math.max(0, innerBounds.left - descendantRect.left);
-      maxTop = Math.max(maxTop, overflowTop);
-      maxRight = Math.max(maxRight, overflowRight);
-      maxBottom = Math.max(maxBottom, overflowBottom);
-      maxLeft = Math.max(maxLeft, overflowLeft);
-      if (
-        overflowTop > PDF_ADAPTIVE_CARD_CONTAINMENT_TOLERANCE_PX ||
-        overflowRight > PDF_ADAPTIVE_CARD_CONTAINMENT_TOLERANCE_PX ||
-        overflowBottom > PDF_ADAPTIVE_CARD_CONTAINMENT_TOLERANCE_PX ||
-        overflowLeft > PDF_ADAPTIVE_CARD_CONTAINMENT_TOLERANCE_PX
-      ) {
-        overflowingDescendants.push({
-          descendant: buildAdaptiveDescendantLabel(descendantNode),
-          descendantBounds: createExportRectDiagnostic(descendantRect),
-          overflowDirection: [
-            overflowTop > PDF_ADAPTIVE_CARD_CONTAINMENT_TOLERANCE_PX ? "top" : "",
-            overflowRight > PDF_ADAPTIVE_CARD_CONTAINMENT_TOLERANCE_PX ? "right" : "",
-            overflowBottom > PDF_ADAPTIVE_CARD_CONTAINMENT_TOLERANCE_PX ? "bottom" : "",
-            overflowLeft > PDF_ADAPTIVE_CARD_CONTAINMENT_TOLERANCE_PX ? "left" : ""
-          ].filter(Boolean),
-          overflowTop: Number(overflowTop.toFixed(2)),
-          overflowRight: Number(overflowRight.toFixed(2)),
-          overflowBottom: Number(overflowBottom.toFixed(2)),
-          overflowLeft: Number(overflowLeft.toFixed(2)),
-          computedStyles: {
-            overflow: descendantStyles.overflow,
-            overflowX: descendantStyles.overflowX,
-            overflowY: descendantStyles.overflowY,
-            minWidth: descendantStyles.minWidth,
-            minHeight: descendantStyles.minHeight,
-            width: descendantStyles.width,
-            height: descendantStyles.height,
-            maxWidth: descendantStyles.maxWidth,
-            maxHeight: descendantStyles.maxHeight,
-            objectFit: descendantStyles.objectFit,
-            objectPosition: descendantStyles.objectPosition,
-            transform: descendantStyles.transform,
-            position: descendantStyles.position,
-            marginTop: descendantStyles.marginTop,
-            marginRight: descendantStyles.marginRight,
-            marginBottom: descendantStyles.marginBottom,
-            marginLeft: descendantStyles.marginLeft
-          }
-        });
-      }
-    });
-
-    var maxOverflow = Math.max(maxTop, maxRight, maxBottom, maxLeft);
-    return {
-      cardBounds: createExportRectDiagnostic(cardRect),
-      innerBounds: createExportRectDiagnostic({
-        left: innerBounds.left,
-        top: innerBounds.top,
-        right: innerBounds.right,
-        bottom: innerBounds.bottom,
-        width: Math.max(0, innerBounds.right - innerBounds.left),
-        height: Math.max(0, innerBounds.bottom - innerBounds.top)
-      }),
-      descendantBounds: overflowingDescendants,
-      overflowTop: Number(maxTop.toFixed(2)),
-      overflowRight: Number(maxRight.toFixed(2)),
-      overflowBottom: Number(maxBottom.toFixed(2)),
-      overflowLeft: Number(maxLeft.toFixed(2)),
-      maxOverflow: Number(maxOverflow.toFixed(2)),
-      valid: maxOverflow <= PDF_ADAPTIVE_CARD_CONTAINMENT_TOLERANCE_PX
-    };
-  }
-
   function getNodeInnerBounds(node) {
     if (!node || !node.getBoundingClientRect) {
       return null;
@@ -5654,10 +4459,8 @@
       overflowY === "hidden" ||
       overflowY === "clip" ||
       semanticRole === "overview-map-panel" ||
-      semanticRole === "parking-map-panel" ||
       node.classList.contains("pi-export-map") ||
-      node.classList.contains("pi-export-card") ||
-      node.classList.contains("pi-export-parking-map");
+      node.classList.contains("pi-export-card");
   }
 
   function getNearestExportContainmentInnerBounds(node, stopNode) {
@@ -5674,2985 +4477,11 @@
     return null;
   }
 
-  function createAdaptiveBoundsDiagnostic(bounds) {
-    if (!bounds) {
-      return null;
-    }
-    return {
-      left: Number(bounds.left.toFixed(2)),
-      top: Number(bounds.top.toFixed(2)),
-      right: Number(bounds.right.toFixed(2)),
-      bottom: Number(bounds.bottom.toFixed(2)),
-      width: Number(bounds.width.toFixed(2)),
-      height: Number(bounds.height.toFixed(2)),
-      centerX: Number(bounds.centerX.toFixed(2)),
-      centerY: Number(bounds.centerY.toFixed(2))
-    };
-  }
-
-  function getAdaptiveLastMeaningfulDescendantRect(node) {
-    if (!node) {
-      return null;
-    }
-    var descendants = Array.prototype.slice.call(node.querySelectorAll("*")).filter(function (descendantNode) {
-      if (!descendantNode || !descendantNode.getBoundingClientRect) {
-        return false;
-      }
-      var styles = window.getComputedStyle(descendantNode);
-      if (styles.display === "none" || styles.visibility === "hidden" || styles.position === "absolute") {
-        return false;
-      }
-      var rect = descendantNode.getBoundingClientRect();
-      if (rect.width <= 0 || rect.height <= 0) {
-        return false;
-      }
-      return normalizeText(descendantNode.textContent || "").length > 0 ||
-        descendantNode.tagName === "IMG" ||
-        descendantNode.tagName === "A";
-    });
-    if (!descendants.length) {
-      var nodeText = normalizeText(node.textContent || "");
-      var ownRect = node.getBoundingClientRect();
-      if (
-        (nodeText.length > 0 || node.tagName === "IMG" || node.tagName === "A") &&
-        ownRect.width > 0 &&
-        ownRect.height > 0
-      ) {
-        return ownRect;
-      }
-      return null;
-    }
-    return descendants.reduce(function (lastRect, descendantNode) {
-      var rect = descendantNode.getBoundingClientRect();
-      if (!lastRect || rect.bottom > lastRect.bottom) {
-        return rect;
-      }
-      return lastRect;
-    }, null);
-  }
-
-  function getAdaptiveMeaningfulContentReferenceRect(cardNode) {
-    if (!cardNode) {
-      return null;
-    }
-    var footerRect = getAdaptiveLastMeaningfulDescendantRect(cardNode.querySelector("[data-card-region='footer']"));
-    if (footerRect) {
-      return footerRect;
-    }
-    var bodyRect = getAdaptiveLastMeaningfulDescendantRect(cardNode.querySelector("[data-card-region='body']"));
-    if (bodyRect) {
-      return bodyRect;
-    }
-    var headerNode = cardNode.querySelector(".pi-export-card-head");
-    if (!headerNode) {
-      return null;
-    }
-    var headerCandidates = [
-      ".pi-export-card-title",
-      ".pi-export-step-badge",
-      ".pi-export-card-caption",
-      ".pi-export-card-link"
-    ].map(function (selector) {
-      return headerNode.querySelector(selector);
-    }).filter(function (node) {
-      return !!node && !!node.getBoundingClientRect;
-    }).map(function (node) {
-      return node.getBoundingClientRect();
-    }).filter(function (rect) {
-      return rect.width > 0 && rect.height > 0;
-    });
-    if (headerCandidates.length) {
-      return headerCandidates.reduce(function (lastRect, rect) {
-        if (!lastRect || rect.bottom > lastRect.bottom) {
-          return rect;
-        }
-        return lastRect;
-      }, null);
-    }
-    return headerNode.getBoundingClientRect();
-  }
-
-  function getAdaptiveMediaReferenceRect(cardNode) {
-    if (!cardNode) {
-      return null;
-    }
-    var mediaNode = cardNode.querySelector("[data-card-region='media']");
-    var frameNode = mediaNode ? mediaNode.querySelector("[data-export-image-frame]") : null;
-    return frameNode ? frameNode.getBoundingClientRect() : (mediaNode ? mediaNode.getBoundingClientRect() : null);
-  }
-
-  function getAdaptiveContentMediaRelationship(layout) {
-    if (isAdaptiveStackedLayout(layout)) {
-      return "stacked";
-    }
-    if (isAdaptiveSideMediaLayout(layout)) {
-      return "side";
-    }
-    return "none";
-  }
-
-  function classifyAdaptiveMediaVisualPlacement(details) {
-    var warnings = [];
-    var blockers = [];
-    var horizontalLetterboxPercent = Number(details && details.horizontalLetterboxPercent || 0);
-    var verticalLetterboxPercent = Number(details && details.verticalLetterboxPercent || 0);
-    var frameMismatch = Number(details && details.frameSourceAspectMismatch || 0);
-    var topBlank = Number(details && details.topBlankBelowHeader || 0);
-    var bottomBlank = Number(details && details.bottomBlankBelowMedia || 0);
-    var frameToCardCenterDeltaY = Number(details && details.frameToCardInnerCentreDeltaY || 0);
-    var frameToRegionCenterDeltaY = Number(details && details.frameToMediaRegionCentreDeltaY || 0);
-    var hasProjection = !!(details && details.hasProjection);
-    var titleToMediaGapDelta = Math.abs(Number(details && details.titleToMediaGapDelta || 0));
-    var headerHeightDelta = Math.abs(Number(details && details.headerHeightDelta || 0));
-    var relationship = String(details && details.contentMediaRelationship || "none");
-    var alignmentMode = String(details && details.mediaVerticalAlignmentMode || "natural");
-    var hasMapContent = !!(details && details.hasMapContent);
-    var hasQrContent = !!(details && details.hasQrContent);
-
-    function isCenteredMode() {
-      return alignmentMode === "content-group-centred" || alignmentMode === "balanced-between-header-and-card-bottom";
-    }
-
-    function isHeaderAnchoredMode() {
-      return alignmentMode === "header-aligned" || alignmentMode === "natural";
-    }
-
-    if (
-      horizontalLetterboxPercent > PDF_ADAPTIVE_MEDIA_LETTERBOX_BLOCKER_RATIO ||
-      verticalLetterboxPercent > PDF_ADAPTIVE_MEDIA_LETTERBOX_BLOCKER_RATIO
-    ) {
-      blockers.push("excessive-contain-letterbox");
-    } else if (
-      horizontalLetterboxPercent > PDF_ADAPTIVE_MEDIA_LETTERBOX_WARNING_RATIO ||
-      verticalLetterboxPercent > PDF_ADAPTIVE_MEDIA_LETTERBOX_WARNING_RATIO
-    ) {
-      warnings.push("excessive-contain-letterbox");
-    }
-
-    if (frameMismatch > PDF_ADAPTIVE_MEDIA_FRAME_RATIO_BLOCKER) {
-      blockers.push("frame-source-aspect-mismatch");
-    } else if (frameMismatch > PDF_ADAPTIVE_MEDIA_FRAME_RATIO_WARNING) {
-      warnings.push("frame-source-aspect-mismatch");
-    }
-
-    if (relationship === "stacked") {
-      // Stacked cards are naturally top- or bottom-weighted when translated copy
-      // changes the header height. Keep this as a diagnostic warning rather than
-      // rejecting an otherwise valid vector PDF.
-      if (
-        bottomBlank > PDF_ADAPTIVE_MEDIA_BALANCE_GAP_WARNING_PX &&
-        bottomBlank > (topBlank * PDF_ADAPTIVE_MEDIA_BALANCE_WARNING_RATIO) &&
-        frameToCardCenterDeltaY > 18
-      ) {
-        warnings.push("media-top-heavy");
-      }
-
-      if (
-        topBlank > PDF_ADAPTIVE_MEDIA_BALANCE_GAP_WARNING_PX &&
-        topBlank > (bottomBlank * PDF_ADAPTIVE_MEDIA_BALANCE_WARNING_RATIO) &&
-        frameToCardCenterDeltaY > 18
-      ) {
-        warnings.push("media-bottom-heavy");
-      }
-    } else if (relationship === "side") {
-      var insetGap = Math.abs(bottomBlank - topBlank);
-      if (hasMapContent || hasQrContent) {
-        // Composite map/QR cards intentionally reserve asymmetric text/footer space
-        // beside the media frame, so the plain photo-card side-balance heuristic is
-        // not a reliable blocker for them.
-      } else if (isCenteredMode()) {
-        if (insetGap > PDF_ADAPTIVE_MEDIA_BALANCE_GAP_BLOCKER_PX && frameToRegionCenterDeltaY > 18) {
-          blockers.push(bottomBlank > topBlank ? "media-top-heavy" : "media-bottom-heavy");
-        } else if (insetGap > PDF_ADAPTIVE_MEDIA_BALANCE_GAP_WARNING_PX && frameToRegionCenterDeltaY > 10) {
-          warnings.push(bottomBlank > topBlank ? "media-top-heavy" : "media-bottom-heavy");
-        }
-      } else if (isHeaderAnchoredMode()) {
-        if (
-          bottomBlank > (PDF_ADAPTIVE_MEDIA_BALANCE_GAP_BLOCKER_PX * 2) &&
-          bottomBlank > (topBlank + PDF_ADAPTIVE_MEDIA_BALANCE_GAP_BLOCKER_PX) &&
-          frameToRegionCenterDeltaY > 36
-        ) {
-          blockers.push("media-top-heavy");
-        } else if (
-          bottomBlank > (PDF_ADAPTIVE_MEDIA_BALANCE_GAP_WARNING_PX * 2) &&
-          bottomBlank > (topBlank + PDF_ADAPTIVE_MEDIA_BALANCE_GAP_WARNING_PX) &&
-          frameToRegionCenterDeltaY > 24
-        ) {
-          warnings.push("media-top-heavy");
-        }
-
-        if (
-          topBlank > (PDF_ADAPTIVE_MEDIA_BALANCE_GAP_BLOCKER_PX * 2) &&
-          topBlank > (bottomBlank + PDF_ADAPTIVE_MEDIA_BALANCE_GAP_BLOCKER_PX) &&
-          frameToRegionCenterDeltaY > 36
-        ) {
-          blockers.push("media-bottom-heavy");
-        } else if (
-          topBlank > (PDF_ADAPTIVE_MEDIA_BALANCE_GAP_WARNING_PX * 2) &&
-          topBlank > (bottomBlank + PDF_ADAPTIVE_MEDIA_BALANCE_GAP_WARNING_PX) &&
-          frameToRegionCenterDeltaY > 24
-        ) {
-          warnings.push("media-bottom-heavy");
-        }
-      }
-    }
-
-    if (hasProjection) {
-      if (
-        titleToMediaGapDelta > PDF_ADAPTIVE_RENDER_PROJECTION_DELTA_BLOCKER_PX ||
-        headerHeightDelta > PDF_ADAPTIVE_RENDER_PROJECTION_DELTA_BLOCKER_PX
-      ) {
-        blockers.push("projection-render-mismatch");
-      } else if (
-        titleToMediaGapDelta > PDF_ADAPTIVE_RENDER_PROJECTION_DELTA_WARNING_PX ||
-        headerHeightDelta > PDF_ADAPTIVE_RENDER_PROJECTION_DELTA_WARNING_PX
-      ) {
-        warnings.push("projection-render-mismatch");
-      }
-    }
-
-    if (blockers.length) {
-      return {
-        severity: "blocker",
-        issues: blockers,
-        visualIssue: blockers[0]
-      };
-    }
-    if (warnings.length) {
-      return {
-        severity: "visual-warning",
-        issues: warnings,
-        visualIssue: warnings[0]
-      };
-    }
-    return {
-      severity: "ok",
-      issues: [],
-      visualIssue: "clean"
-    };
-  }
-
-  function collectAdaptiveMediaVisualPlacement(cardNode) {
-    if (!cardNode) {
-      return null;
-    }
-    var imageNode = cardNode.querySelector("img[data-export-image-role='card']");
-    var mediaRegionNode = cardNode.querySelector("[data-card-region='media']");
-    var frameNode = mediaRegionNode ? mediaRegionNode.querySelector("[data-export-image-frame]") : null;
-    if (!imageNode || !mediaRegionNode || !frameNode || !imageNode.naturalWidth || !imageNode.naturalHeight) {
-      return null;
-    }
-    var headerNode = cardNode.querySelector("[data-card-region='header']");
-    var containment = collectAdaptiveCardContainment(cardNode);
-    var cardInnerBounds = containment && containment.innerBounds
-      ? {
-          left: containment.innerBounds.left,
-          top: containment.innerBounds.top,
-          right: containment.innerBounds.right,
-          bottom: containment.innerBounds.bottom,
-          width: Math.max(0, containment.innerBounds.right - containment.innerBounds.left),
-          height: Math.max(0, containment.innerBounds.bottom - containment.innerBounds.top),
-          centerX: containment.innerBounds.left + ((containment.innerBounds.right - containment.innerBounds.left) / 2),
-          centerY: containment.innerBounds.top + ((containment.innerBounds.bottom - containment.innerBounds.top) / 2)
-        }
-      : null;
-    var mediaRegionRect = mediaRegionNode.getBoundingClientRect();
-    var mediaFrameRect = frameNode.getBoundingClientRect();
-    var imageRect = imageNode.getBoundingClientRect();
-    var mediaRegionInnerBounds = getNodeInnerBounds(mediaRegionNode);
-    var mediaFrameInner = getNodeInnerBounds(frameNode);
-    var headerRect = headerNode ? headerNode.getBoundingClientRect() : null;
-    var meaningfulContentRect = getAdaptiveMeaningfulContentReferenceRect(cardNode);
-    var mediaReferenceRect = getAdaptiveMediaReferenceRect(cardNode) || mediaFrameRect;
-    var selectedLayout = String(cardNode.getAttribute("data-pdf-selected-variant") || "");
-    var contentMediaRelationship = getAdaptiveContentMediaRelationship(selectedLayout);
-    var hasMapContent = !!cardNode.querySelector("img[data-export-image-role='map']");
-    var hasQrContent = !!cardNode.querySelector(".pi-export-card-qr-panel, .pi-export-qr-panel");
-    var naturalRatio = imageNode.naturalWidth / imageNode.naturalHeight;
-    var frameRatio = mediaFrameInner && mediaFrameInner.height
-      ? (mediaFrameInner.width / mediaFrameInner.height)
-      : (mediaFrameRect.width && mediaFrameRect.height ? (mediaFrameRect.width / mediaFrameRect.height) : naturalRatio);
-    var imageRatio = imageRect.height ? (imageRect.width / imageRect.height) : naturalRatio;
-    var leftLetterbox = mediaFrameInner ? Math.max(0, imageRect.left - mediaFrameInner.left) : 0;
-    var rightLetterbox = mediaFrameInner ? Math.max(0, mediaFrameInner.right - imageRect.right) : 0;
-    var topLetterbox = mediaFrameInner ? Math.max(0, imageRect.top - mediaFrameInner.top) : 0;
-    var bottomLetterbox = mediaFrameInner ? Math.max(0, mediaFrameInner.bottom - imageRect.bottom) : 0;
-    var horizontalLetterboxPercent = mediaFrameInner && mediaFrameInner.width
-      ? Math.max(0, (leftLetterbox + rightLetterbox) / mediaFrameInner.width)
-      : 0;
-    var verticalLetterboxPercent = mediaFrameInner && mediaFrameInner.height
-      ? Math.max(0, (topLetterbox + bottomLetterbox) / mediaFrameInner.height)
-      : 0;
-    var frameSourceAspectMismatch = naturalRatio && frameRatio
-      ? Math.max(frameRatio / naturalRatio, naturalRatio / frameRatio)
-      : 1;
-    var contentReferenceBottom = meaningfulContentRect
-      ? meaningfulContentRect.bottom
-      : (headerRect ? headerRect.bottom : (cardInnerBounds ? cardInnerBounds.top : mediaFrameRect.top));
-    var sideBalanceBounds = mediaRegionInnerBounds || cardInnerBounds;
-    var topBlankBelowHeader = contentMediaRelationship === "stacked"
-      ? Math.max(0, mediaReferenceRect.top - contentReferenceBottom)
-      : Math.max(0, mediaFrameRect.top - (sideBalanceBounds ? sideBalanceBounds.top : mediaFrameRect.top));
-    var bottomBlankBelowMedia = contentMediaRelationship === "stacked"
-      ? Math.max(0, (cardInnerBounds ? cardInnerBounds.bottom : mediaFrameRect.bottom) - mediaFrameRect.bottom)
-      : Math.max(0, (sideBalanceBounds ? sideBalanceBounds.bottom : mediaFrameRect.bottom) - mediaFrameRect.bottom);
-    var frameCenterX = mediaFrameRect.left + (mediaFrameRect.width / 2);
-    var frameCenterY = mediaFrameRect.top + (mediaFrameRect.height / 2);
-    var imageCenterX = imageRect.left + (imageRect.width / 2);
-    var imageCenterY = imageRect.top + (imageRect.height / 2);
-    var mediaRegionCenterX = mediaRegionRect.left + (mediaRegionRect.width / 2);
-    var mediaRegionCenterY = mediaRegionRect.top + (mediaRegionRect.height / 2);
-    var cardCenterX = cardInnerBounds ? cardInnerBounds.centerX : frameCenterX;
-    var cardCenterY = cardInnerBounds ? cardInnerBounds.centerY : frameCenterY;
-    var mediaRegionInnerCenterX = sideBalanceBounds ? sideBalanceBounds.centerX : mediaRegionCenterX;
-    var mediaRegionInnerCenterY = sideBalanceBounds ? sideBalanceBounds.centerY : mediaRegionCenterY;
-    var rowProjection = {};
-    try {
-      rowProjection = JSON.parse(cardNode.getAttribute("data-pdf-card-row-projection") || "{}");
-    } catch (error) {
-      rowProjection = {};
-    }
-    var hasProjection = !!Object.keys(rowProjection).length;
-    var compareHeaderHeight = hasProjection && Math.abs(
-      Number(rowProjection.appliedHeaderHeight || 0) -
-      Number(rowProjection.naturalHeaderHeight || 0)
-    ) > 0.5;
-    var measuredTitleToMediaGap = contentMediaRelationship === "stacked"
-      ? Math.max(0, mediaReferenceRect.top - contentReferenceBottom)
-      : 0;
-    var projectedTitleToMediaGap = contentMediaRelationship === "stacked"
-      ? Number(rowProjection.projectedTitleToMediaGap || 0)
-      : 0;
-    var measuredHeaderHeight = headerRect ? headerRect.height : 0;
-    var projectedHeaderHeight = Number(rowProjection.appliedHeaderHeight || 0);
-    var projectedMediaHeight = Number(rowProjection.projectedMediaHeight || 0);
-    var measuredMediaHeight = Number(mediaFrameRect.height || 0);
-    var gapAxis = contentMediaRelationship === "stacked" ? "vertical" : "none";
-    var classification = classifyAdaptiveMediaVisualPlacement({
-      horizontalLetterboxPercent: horizontalLetterboxPercent,
-      verticalLetterboxPercent: verticalLetterboxPercent,
-      frameSourceAspectMismatch: frameSourceAspectMismatch,
-      topBlankBelowHeader: topBlankBelowHeader,
-      bottomBlankBelowMedia: bottomBlankBelowMedia,
-      frameToCardInnerCentreDeltaY: Math.abs(frameCenterY - cardCenterY),
-      frameToMediaRegionCentreDeltaY: Math.abs(frameCenterY - mediaRegionInnerCenterY),
-      hasProjection: hasProjection,
-      titleToMediaGapDelta: gapAxis === "vertical" ? Math.abs(measuredTitleToMediaGap - projectedTitleToMediaGap) : 0,
-      headerHeightDelta: compareHeaderHeight ? Math.abs(measuredHeaderHeight - projectedHeaderHeight) : 0,
-      contentMediaRelationship: contentMediaRelationship,
-      mediaVerticalAlignmentMode: String(cardNode.getAttribute("data-pdf-media-vertical-alignment") || "natural"),
-      hasMapContent: hasMapContent,
-      hasQrContent: hasQrContent
-    });
-    return {
-      fitPolicy: String(imageNode.getAttribute("data-export-media-fit-policy") || "contain"),
-      framePolicy: String(frameNode.getAttribute("data-pdf-media-frame-policy") || ""),
-      mediaVerticalAlignmentMode: String(cardNode.getAttribute("data-pdf-media-vertical-alignment") || "natural"),
-      contentMediaRelationship: contentMediaRelationship,
-      projectedContentMediaGapAxis: gapAxis,
-      measuredContentMediaGapAxis: gapAxis,
-      sourceAspectRatio: Number(naturalRatio.toFixed(4)),
-      frameAspectRatio: Number(frameRatio.toFixed(4)),
-      imageAspectRatio: Number(imageRatio.toFixed(4)),
-      frameSourceAspectMismatch: Number(frameSourceAspectMismatch.toFixed(4)),
-      cardBounds: createExportRectDiagnostic(cardNode.getBoundingClientRect()),
-      cardInnerBounds: createAdaptiveBoundsDiagnostic(cardInnerBounds),
-      headerBounds: headerRect ? createExportRectDiagnostic(headerRect) : null,
-      meaningfulContentBounds: meaningfulContentRect ? createExportRectDiagnostic(meaningfulContentRect) : null,
-      mediaRegionBounds: createExportRectDiagnostic(mediaRegionRect),
-      mediaRegionInnerBounds: createAdaptiveBoundsDiagnostic(mediaRegionInnerBounds),
-      mediaFrameBounds: createExportRectDiagnostic(mediaFrameRect),
-      mediaFrameInnerBounds: createAdaptiveBoundsDiagnostic(mediaFrameInner),
-      imageBounds: createExportRectDiagnostic(imageRect),
-      imageToFrameCentreDeltaX: Number(Math.abs(imageCenterX - frameCenterX).toFixed(2)),
-      imageToFrameCentreDeltaY: Number(Math.abs(imageCenterY - frameCenterY).toFixed(2)),
-      frameToCardInnerCentreDeltaX: Number(Math.abs(frameCenterX - cardCenterX).toFixed(2)),
-      frameToCardInnerCentreDeltaY: Number(Math.abs(frameCenterY - cardCenterY).toFixed(2)),
-      frameToMediaRegionCentreDeltaX: Number(Math.abs(frameCenterX - mediaRegionInnerCenterX).toFixed(2)),
-      frameToMediaRegionCentreDeltaY: Number(Math.abs(frameCenterY - mediaRegionInnerCenterY).toFixed(2)),
-      mediaRegionToCardInnerCentreDeltaX: Number(Math.abs(mediaRegionCenterX - cardCenterX).toFixed(2)),
-      mediaRegionToCardInnerCentreDeltaY: Number(Math.abs(mediaRegionCenterY - cardCenterY).toFixed(2)),
-      imageToCardInnerCentreDeltaX: Number(Math.abs(imageCenterX - cardCenterX).toFixed(2)),
-      imageToCardInnerCentreDeltaY: Number(Math.abs(imageCenterY - cardCenterY).toFixed(2)),
-      topBlankBelowHeader: Number(topBlankBelowHeader.toFixed(2)),
-      bottomBlankBelowMedia: Number(bottomBlankBelowMedia.toFixed(2)),
-      projectedTitleToMediaGap: Number(projectedTitleToMediaGap.toFixed(2)),
-      measuredTitleToMediaGap: Number(measuredTitleToMediaGap.toFixed(2)),
-      titleToMediaGapDelta: Number((measuredTitleToMediaGap - projectedTitleToMediaGap).toFixed(2)),
-      projectedHeaderHeight: Number(projectedHeaderHeight.toFixed(2)),
-      measuredHeaderHeight: Number(measuredHeaderHeight.toFixed(2)),
-      headerHeightDelta: Number((measuredHeaderHeight - projectedHeaderHeight).toFixed(2)),
-      projectedMediaHeight: Number(projectedMediaHeight.toFixed(2)),
-      measuredMediaHeight: Number(measuredMediaHeight.toFixed(2)),
-      mediaHeightDelta: Number((measuredMediaHeight - projectedMediaHeight).toFixed(2)),
-      leftLetterboxPx: Number(leftLetterbox.toFixed(2)),
-      rightLetterboxPx: Number(rightLetterbox.toFixed(2)),
-      topLetterboxPx: Number(topLetterbox.toFixed(2)),
-      bottomLetterboxPx: Number(bottomLetterbox.toFixed(2)),
-      horizontalLetterboxPercent: Number(horizontalLetterboxPercent.toFixed(4)),
-      verticalLetterboxPercent: Number(verticalLetterboxPercent.toFixed(4)),
-      visibleLetterboxPercent: Number(Math.max(horizontalLetterboxPercent, verticalLetterboxPercent).toFixed(4)),
-      severity: classification.severity,
-      issues: classification.issues,
-      visualIssue: classification.visualIssue
-    };
-  }
-
-  function estimateAdaptiveTitleLines(titleNode, typographyMetrics) {
-    if (!titleNode || !typographyMetrics || !typographyMetrics.titleFontSize || !typographyMetrics.titleLineHeight) {
-      return 0;
-    }
-    var rect = titleNode.getBoundingClientRect();
-    if (!rect.height) {
-      return 0;
-    }
-    var lineHeightPixels = typographyMetrics.titleFontSize * typographyMetrics.titleLineHeight;
-    return Math.max(1, Math.round(rect.height / Math.max(1, lineHeightPixels)));
-  }
-
-  function applyAdaptiveMeasurementVariant(cardNode, variant) {
-    var generationDiagnostics = getPdfGenerationDiagnostics();
-    generationDiagnostics.counters.adaptiveVariantApplications += 1;
-    cardNode.classList.remove(
-      "pi-export-card--adaptive-compact",
-      "pi-export-card--adaptive-medium",
-      "pi-export-card--adaptive-wide",
-      "pi-export-card--adaptive-half",
-      "pi-export-card--adaptive-full",
-      "pi-export-card--adaptive-portrait",
-      "pi-export-card--adaptive-landscape",
-      "pi-export-card--adaptive-square",
-      "pi-export-card--adaptive-layout-half-compact",
-      "pi-export-card--adaptive-layout-half-landscape-stacked",
-      "pi-export-card--adaptive-layout-half-portrait-side",
-      "pi-export-card--adaptive-layout-half-portrait-side-narrow",
-      "pi-export-card--adaptive-layout-half-portrait-side-wide",
-      "pi-export-card--adaptive-layout-half-portrait-stacked",
-      "pi-export-card--adaptive-layout-half-portrait-stacked-compact",
-      "pi-export-card--adaptive-layout-wide-horizontal",
-      "pi-export-card--adaptive-layout-wide-stacked",
-      "pi-export-card--adaptive-layout-parking-map-right",
-      "pi-export-card--adaptive-layout-parking-map-right-compact"
-    );
-    getAdaptiveVariantClassNames(variant).forEach(function (className) {
-      cardNode.classList.add(className);
-    });
-    cardNode.classList.remove("pi-export-card--adaptive-parking-list-columns");
-    if (
-      String(variant.layout || "").indexOf("parking-map-right") === 0 &&
-      getAdaptiveParkingLayoutVariant(
-        cardNode,
-        cardNode.closest(".pi-export-document") ? cardNode.closest(".pi-export-document").getAttribute("dir") : "ltr"
-      ) === "parking-map-right-list-columns"
-    ) {
-      cardNode.classList.add("pi-export-card--adaptive-parking-list-columns");
-      cardNode.setAttribute("data-pdf-parking-variant", "parking-map-right-list-columns");
-    } else if (String(variant.layout || "").indexOf("parking-map-right") === 0) {
-      cardNode.setAttribute("data-pdf-parking-variant", "parking-map-right-balanced");
-      if (!isParkingMutationDiagnosticBypassEnabled()) {
-        moveAdaptiveParkingCardActionsToMedia(cardNode, variant);
-      }
-    } else {
-      cardNode.removeAttribute("data-pdf-parking-variant");
-    }
-    cardNode.setAttribute("data-pdf-selected-variant", String(variant.layout || variant.kind || "medium"));
-    cardNode.style.width = (variant.isWide ? PDF_ADAPTIVE_WIDE_WIDTH : PDF_ADAPTIVE_HALF_WIDTH) + "px";
-    applyAdaptiveTypographyScale(cardNode, variant.typographyScale || 1);
-  }
-
-  function measureAdaptiveCardVariant(cardNode, variant, measurementHost, measurementCache) {
-    var cacheKey = [
-      String(cardNode.getAttribute("data-pdf-block-id") || cardNode.getAttribute("data-export-source-id") || ""),
-      variant.kind,
-      variant.orientation,
-      variant.isWide ? "wide" : "half",
-      variant.layout,
-      String(variant.typographyScale || 1)
-    ].join("::");
-    if (measurementCache[cacheKey]) {
-      return measurementCache[cacheKey];
-    }
-    var clone = cardNode.cloneNode(true);
-    getPdfGenerationDiagnostics().counters.adaptiveCandidateMeasurements += 1;
-    clone.setAttribute("data-pdf-measurement-clone", "1");
-    applyAdaptiveMeasurementVariant(clone, variant);
-    measurementHost.appendChild(clone);
-    var cloneMediaRegionNode = clone.querySelector("[data-card-region='media']");
-    var cloneImageFrame = clone.querySelector(".pi-export-card-media [data-export-image-frame]");
-    var cloneImageNode = cloneImageFrame ? cloneImageFrame.querySelector("img") : null;
-    var resolvedMediaGeometry = null;
-    if (cloneMediaRegionNode && cloneImageFrame && cloneImageNode && cloneImageNode.naturalWidth && cloneImageNode.naturalHeight) {
-    var cloneMediaRegionRect = cloneMediaRegionNode.getBoundingClientRect();
-    var cloneFrameRect = cloneImageFrame.getBoundingClientRect();
-    var cloneAvailableFrameHeight = getAdaptiveAvailableFrameHeight(
-      cloneMediaRegionNode,
-      cloneImageFrame,
-      cloneFrameRect.height || cloneMediaRegionRect.height || 1
-    );
-    resolvedMediaGeometry = resolveAdaptiveFinalMediaGeometry({
-      layout: variant.layout,
-      mediaType: getExportMediaType(cloneImageNode),
-      fitPolicy: getAdaptiveMediaFitPolicy(cloneImageNode, clone),
-      naturalWidth: cloneImageNode.naturalWidth,
-      naturalHeight: cloneImageNode.naturalHeight,
-      availableWidth: cloneMediaRegionRect.width || cloneFrameRect.width || clone.clientWidth || 1,
-      availableHeight: cloneAvailableFrameHeight
-    });
-      applyAdaptiveMediaFramePolicy(cloneImageFrame, cloneMediaRegionNode, clone, cloneImageNode, {
-        availableWidth: resolvedMediaGeometry.availableWidth,
-        availableHeight: resolvedMediaGeometry.availableHeight,
-        fitPolicy: resolvedMediaGeometry.fitPolicy,
-        resolvedGeometry: resolvedMediaGeometry
-      });
-      applyAdaptiveMediaDimensions(cloneImageFrame, cloneImageNode, {
-        fitPolicy: resolvedMediaGeometry.fitPolicy,
-        resolvedGeometry: resolvedMediaGeometry
-      });
-    }
-    var cloneRect = clone.getBoundingClientRect();
-    var typographyMetrics = getAdaptiveTypographyMetrics(variant.typographyScale || 1);
-    var textNode = clone.querySelector(".pi-export-card-text");
-    var textRect = textNode ? textNode.getBoundingClientRect() : null;
-    var bodyRegionNode = clone.querySelector("[data-card-region='body']");
-    var bodyRegionRect = bodyRegionNode ? bodyRegionNode.getBoundingClientRect() : null;
-    var footerRegionNode = clone.querySelector("[data-card-region='footer']");
-    var footerRegionRect = footerRegionNode ? footerRegionNode.getBoundingClientRect() : null;
-    var mediaRegionNode = clone.querySelector("[data-card-region='media']");
-    var mediaRegionRect = mediaRegionNode ? mediaRegionNode.getBoundingClientRect() : null;
-    var imageFrame = clone.querySelector(".pi-export-card-media [data-export-image-frame]");
-    var imageRect = imageFrame ? imageFrame.getBoundingClientRect() : null;
-    var headNode = clone.querySelector(".pi-export-card-head");
-    var headRect = headNode ? headNode.getBoundingClientRect() : null;
-    var titleNode = clone.querySelector(".pi-export-card-title");
-    var titleRect = titleNode ? titleNode.getBoundingClientRect() : null;
-    var meaningfulContentRect = getAdaptiveMeaningfulContentReferenceRect(clone);
-    var mediaReferenceRect = getAdaptiveMediaReferenceRect(clone) || imageRect || mediaRegionRect;
-    var contentBottom = measureAdaptiveNodeBottom(clone);
-    var containmentDiagnostics = collectAdaptiveCardContainment(clone);
-    var mediaVisualPlacement = collectAdaptiveMediaVisualPlacement(clone);
-    var height = Math.ceil(cloneRect.height || clone.offsetHeight || clone.scrollHeight || 0);
-    var metrics = {
-      height: height,
-      textHeight: Math.ceil(textRect ? textRect.height : 0),
-      bodyHeight: Math.ceil(bodyRegionRect ? bodyRegionRect.height : 0),
-      footerHeight: Math.ceil(footerRegionRect ? footerRegionRect.height : 0),
-      mediaWidth: Math.ceil(imageRect ? imageRect.width : 0),
-      mediaHeight: Math.ceil(imageRect ? imageRect.height : 0),
-      mediaRegionHeight: Math.ceil(mediaRegionRect ? mediaRegionRect.height : 0),
-      mediaRegionWidth: Math.ceil(mediaRegionRect ? mediaRegionRect.width : 0),
-      mediaNaturalWidth: Math.ceil(cloneImageNode ? cloneImageNode.naturalWidth : 0),
-      mediaNaturalHeight: Math.ceil(cloneImageNode ? cloneImageNode.naturalHeight : 0),
-      headerHeight: Math.ceil(headRect ? headRect.height : 0),
-      titleHeight: Math.ceil(titleRect ? titleRect.height : 0),
-      contentReferenceBottom: meaningfulContentRect ? Number(meaningfulContentRect.bottom.toFixed(2)) : 0,
-      mediaReferenceTop: mediaReferenceRect ? Number(mediaReferenceRect.top.toFixed(2)) : 0,
-      contentToMediaGap: meaningfulContentRect && mediaReferenceRect
-        ? Number(Math.max(0, mediaReferenceRect.top - meaningfulContentRect.bottom).toFixed(2))
-        : 0,
-      contentBottom: Number(contentBottom.toFixed(2)),
-      naturalContentHeight: Math.ceil(contentBottom || height),
-      overflowPixels: Math.max(0, Math.ceil((contentBottom || height) - height)),
-      typographyScale: typographyMetrics.typographyScale,
-      titleFontSize: typographyMetrics.titleFontSize,
-      bodyFontSize: typographyMetrics.bodyFontSize,
-      captionFontSize: typographyMetrics.captionFontSize,
-      linkFontSize: typographyMetrics.linkFontSize,
-      lineHeight: typographyMetrics.bodyLineHeight,
-      badgeSize: typographyMetrics.badgeSize,
-      titleLines: estimateAdaptiveTitleLines(titleNode, typographyMetrics),
-      paragraphCount: getAdaptiveTextBlockParagraphCount(bodyRegionNode),
-      hasMedia: !!mediaRegionNode && !!imageRect,
-      hasFooter: !!footerRegionNode && Math.ceil(footerRegionRect ? footerRegionRect.height : 0) > 0,
-      containmentOverflow: Number(containmentDiagnostics.maxOverflow || 0),
-      containmentDiagnostics: containmentDiagnostics,
-      mediaUsefulnessRatio: height && imageRect ? Number((Math.max(0, imageRect.height) / height).toFixed(4)) : 0,
-      mediaVisualPlacement: mediaVisualPlacement,
-      resolvedMediaGeometry: resolvedMediaGeometry,
-      qualityWarnings: [],
-      layout: variant.layout,
-      kind: variant.kind,
-      orientation: variant.orientation,
-      isWide: !!variant.isWide
-    };
-    if (!typographyMetrics.isReadable) {
-      metrics.qualityWarnings.push("below-minimum-typography");
-    }
-    if (!containmentDiagnostics.valid) {
-      metrics.qualityWarnings.push("card-containment-overflow");
-    }
-    if (mediaVisualPlacement && mediaVisualPlacement.severity === "blocker") {
-      metrics.qualityWarnings.push("media-placement-blocker");
-    }
-    measurementHost.removeChild(clone);
-    measurementCache[cacheKey] = metrics;
-    return metrics;
-  }
-
-  function createAdaptiveCardCandidates(cardNode, measurementHost, measurementCache) {
-    var imageNode = getAdaptiveCardImageNode(cardNode);
-    var imageOrientation = imageNode
-      ? getAdaptiveImageOrientation(imageNode.naturalWidth || 0, imageNode.naturalHeight || 0)
-      : "square";
-    var textLength = getAdaptiveCardTextLength(cardNode);
-    var isWarning = cardNode.classList.contains("pi-export-card--warning");
-    var hasMap = !!cardNode.querySelector("img[data-export-image-role='map']");
-    var isParkingMapCard = isAdaptiveParkingCard(cardNode);
-    var candidates = [];
-    var candidateDiagnostics = [];
-    var contentProfile = buildAdaptiveCardContentProfile(cardNode, imageOrientation, null, textLength);
-
-    function pushCandidate(kind, layout, isWide) {
-      ADAPTIVE_TYPOGRAPHY_SCALES.forEach(function (scale) {
-        var variant = {
-          kind: kind,
-          layout: layout,
-          orientation: imageOrientation,
-          isWide: !!isWide,
-          typographyScale: scale
-        };
-        var metrics = measureAdaptiveCardVariant(cardNode, variant, measurementHost, measurementCache);
-        if (
-          !metrics ||
-          (metrics.qualityWarnings || []).indexOf("below-minimum-typography") !== -1 ||
-          (metrics.qualityWarnings || []).indexOf("card-containment-overflow") !== -1 ||
-          (metrics.qualityWarnings || []).indexOf("media-placement-blocker") !== -1
-        ) {
-          if (metrics) {
-            candidateDiagnostics.push({
-              layout: layout,
-              widthStrategy: isWide ? "wide" : "half",
-              typographyScale: scale,
-              measuredHeight: Number(metrics.height || 0),
-              naturalContentHeight: Number(metrics.naturalContentHeight || metrics.height || 0),
-              headerHeight: Number(metrics.headerHeight || 0),
-              textHeight: Number(metrics.textHeight || 0),
-              bodyHeight: Number(metrics.bodyHeight || 0),
-              footerHeight: Number(metrics.footerHeight || 0),
-              projectedMediaDimensions: {
-                width: Number(metrics.mediaWidth || 0),
-                height: Number(metrics.mediaHeight || 0)
-              },
-              mediaUsefulness: Number(metrics.mediaUsefulnessRatio || 0),
-              containmentResult: !!metrics.containmentDiagnostics && !!metrics.containmentDiagnostics.valid,
-              failedPredicates: (metrics.qualityWarnings || []).map(function (warningCode) {
-                return {
-                  code: warningCode,
-                  severity: "hard"
-                };
-              }),
-              state: "rejected"
-            });
-          }
-          return;
-        }
-        var candidate = Object.assign({}, variant, {
-          measuredHeight: metrics.height,
-          textHeight: metrics.textHeight,
-          bodyHeight: metrics.bodyHeight,
-          footerHeight: metrics.footerHeight,
-          mediaWidth: metrics.mediaWidth,
-          mediaHeight: metrics.mediaHeight,
-          mediaRegionHeight: metrics.mediaRegionHeight,
-          mediaRegionWidth: metrics.mediaRegionWidth,
-          mediaNaturalWidth: metrics.mediaNaturalWidth,
-          mediaNaturalHeight: metrics.mediaNaturalHeight,
-          naturalContentHeight: metrics.naturalContentHeight,
-          contentBottom: metrics.contentBottom,
-          contentReferenceBottom: metrics.contentReferenceBottom,
-          mediaReferenceTop: metrics.mediaReferenceTop,
-          contentToMediaGap: metrics.contentToMediaGap,
-          overflowPixels: metrics.overflowPixels,
-          titleHeight: metrics.titleHeight,
-          headerHeight: metrics.headerHeight,
-          titleLines: metrics.titleLines,
-          titleFontSize: metrics.titleFontSize,
-          bodyFontSize: metrics.bodyFontSize,
-          captionFontSize: metrics.captionFontSize,
-          linkFontSize: metrics.linkFontSize,
-          lineHeight: metrics.lineHeight,
-          badgeSize: metrics.badgeSize,
-          qualityWarnings: metrics.qualityWarnings || [],
-          paragraphCount: metrics.paragraphCount,
-          hasMedia: metrics.hasMedia,
-          hasFooter: metrics.hasFooter,
-          contentProfile: contentProfile,
-          mediaUsefulnessRatio: Number(metrics.mediaUsefulnessRatio || 0),
-          resolvedMediaGeometry: metrics.resolvedMediaGeometry
-        });
-        candidates.push(candidate);
-      });
-    }
-
-    if (isParkingMapCard) {
-      pushCandidate("wide", "parking-map-right", true);
-      pushCandidate("wide", "parking-map-right-compact", true);
-    } else if (!isWarning && !hasMap) {
-      if (imageOrientation === "portrait") {
-        getAdaptivePortraitSideLayouts().forEach(function (layoutName) {
-          pushCandidate("medium", layoutName, false);
-        });
-        pushCandidate("medium", "half-portrait-stacked", false);
-        if (contentProfile.headerAndMediaOnly || contentProfile.mostlyMediaContent) {
-          pushCandidate("compact", "half-portrait-stacked-compact", false);
-        }
-        if (textLength <= PDF_ADAPTIVE_COMPACT_TEXT_LIMIT) {
-          pushCandidate("compact", "half-compact", false);
-        }
-      } else {
-        if (textLength <= PDF_ADAPTIVE_COMPACT_TEXT_LIMIT) {
-          pushCandidate("compact", "half-compact", false);
-        }
-        pushCandidate("medium", "half-landscape-stacked", false);
-      }
-    }
-
-    if (!isParkingMapCard) {
-      pushCandidate("wide", "wide-horizontal", true);
-    }
-    if (!isParkingMapCard && (imageOrientation === "landscape" || textLength > PDF_ADAPTIVE_MEDIUM_TEXT_LIMIT || isWarning || hasMap)) {
-      pushCandidate("wide", "wide-stacked", true);
-    }
-
-    var portraitSideCandidate = candidates.find(function (candidate) {
-      return getAdaptivePortraitSideLayouts().indexOf(candidate.layout) !== -1;
-    }) || null;
-
-    candidates.forEach(function (candidate) {
-      candidate.halfEligibility = buildAdaptiveHalfCandidateEligibility(candidate, {
-        textLength: textLength,
-        contentProfile: contentProfile
-      });
-      candidateDiagnostics.push({
-        layout: String(candidate.layout || candidate.kind || "medium"),
-        widthStrategy: candidate.isWide ? "wide" : "half",
-        typographyScale: Number(candidate.typographyScale || 1),
-        measuredHeight: Number(candidate.measuredHeight || 0),
-        naturalContentHeight: Number(candidate.naturalContentHeight || candidate.measuredHeight || 0),
-        headerHeight: Number(candidate.headerHeight || 0),
-        textHeight: Number(candidate.textHeight || 0),
-        bodyHeight: Number(candidate.bodyHeight || 0),
-        footerHeight: Number(candidate.footerHeight || 0),
-        projectedMediaDimensions: {
-          width: Number(candidate.mediaWidth || 0),
-          height: Number(candidate.mediaHeight || 0)
-        },
-        mediaUsefulness: Number(candidate.mediaUsefulnessRatio || 0),
-        containmentResult: Number(candidate.containmentOverflow || 0) <= PDF_ADAPTIVE_CARD_CONTAINMENT_TOLERANCE_PX,
-        failedPredicates: candidate.halfEligibility.valid
-          ? candidate.halfEligibility.softFailures.slice()
-          : candidate.halfEligibility.hardFailures.concat(candidate.halfEligibility.softFailures),
-        state: candidate.halfEligibility.valid ? "available" : "rejected"
-      });
-    });
-
-    var halfCandidates = candidates.filter(function (candidate) {
-      if (candidate.isWide) {
-        return false;
-      }
-      if (!candidate.halfEligibility || !candidate.halfEligibility.valid) {
-        return false;
-      }
-      if (candidate.kind === "compact") {
-        if (
-          imageOrientation === "portrait" &&
-          portraitSideCandidate &&
-          candidate.layout === "half-compact" &&
-          candidate.measuredHeight >= portraitSideCandidate.measuredHeight - 24
-        ) {
-          return false;
-        }
-        return true;
-      }
-      return true;
-    });
-    var wideCandidates = candidates.filter(function (candidate) {
-      return candidate.isWide;
-    });
-    var preferredHalfCandidate = halfCandidates.slice().sort(function (left, right) {
-      return left.measuredHeight - right.measuredHeight;
-    })[0] || null;
-    var preferredSingleCandidate = wideCandidates.slice().sort(function (left, right) {
-      return left.measuredHeight - right.measuredHeight;
-    })[0] || null;
-
-    cardNode.setAttribute("data-pdf-card-orientation", imageOrientation);
-    cardNode.setAttribute("data-pdf-card-text-length", String(textLength));
-    return {
-      cardNode: cardNode,
-      blockId: String(cardNode.getAttribute("data-pdf-block-id") || ""),
-      orientation: imageOrientation,
-      textLength: textLength,
-      isWarning: isWarning,
-      hasMap: hasMap,
-      isParkingMapCard: isParkingMapCard,
-      contentProfile: contentProfile,
-      candidates: candidates,
-      candidateDiagnostics: candidateDiagnostics,
-      halfCandidates: halfCandidates,
-      wideCandidates: wideCandidates,
-      preferredHalfCandidate: preferredHalfCandidate,
-      preferredSingleCandidate: preferredSingleCandidate
-    };
-  }
-
-  function scoreAdaptiveSingleCandidate(cardPlan, candidate, remainingCardCount) {
-    if (!cardPlan || !candidate) {
-      return Number.POSITIVE_INFINITY;
-    }
-    var penalty = 0;
-    if (cardPlan.textLength <= PDF_ADAPTIVE_COMPACT_TEXT_LIMIT && candidate.kind === "wide") {
-      penalty += 55;
-    }
-    if (candidate.layout === "wide-stacked" && cardPlan.orientation !== "landscape") {
-      penalty += 28;
-    }
-    if (remainingCardCount === 1 && candidate.measuredHeight < 240) {
-      penalty += 34;
-    }
-    if (candidate.layout === "parking-map-right") {
-      penalty += 16;
-    }
-    penalty += getAdaptiveCandidateSoftPenalty(candidate);
-    penalty += getAdaptiveCandidateVariantPenalty(candidate, cardPlan);
-    if (
-      remainingCardCount > 1 &&
-      !cardPlan.isParkingMapCard &&
-      candidate.isWide &&
-      cardPlan.halfCandidates &&
-      cardPlan.halfCandidates.length
-    ) {
-      penalty += 72;
-      if (cardPlan.contentProfile && (cardPlan.contentProfile.headerAndMediaOnly || cardPlan.contentProfile.mostlyMediaContent)) {
-        penalty += 48;
-      }
-    }
-    penalty += Math.round((1 - Number(candidate.typographyScale || 1)) * 240);
-    return candidate.measuredHeight + penalty;
-  }
-
-  function getAdaptiveRowBalancePenalty(firstCandidate, secondCandidate, rowHeight) {
-    if (!firstCandidate || !secondCandidate || !rowHeight) {
-      return {
-        score: 0,
-        internalFreeSpaceDifferencePenalty: 0,
-        internalFreeSpaceRatioPenalty: 0,
-        mediaAlignmentPenalty: 0,
-        footerAlignmentPenalty: 0,
-        titleAlignmentPenalty: 0,
-        excessiveSpacerPenalty: 0
-      };
-    }
-    var firstFreeSpace = Math.max(0, Number(rowHeight) - Number(firstCandidate.naturalContentHeight || firstCandidate.measuredHeight || 0));
-    var secondFreeSpace = Math.max(0, Number(rowHeight) - Number(secondCandidate.naturalContentHeight || secondCandidate.measuredHeight || 0));
-    var freeSpaceDifference = Math.abs(firstFreeSpace - secondFreeSpace);
-    var freeSpaceRatio = rowHeight ? (freeSpaceDifference / rowHeight) : 0;
-    var mediaAlignmentPenalty = Math.max(
-      0,
-      Math.abs(Number(firstCandidate.mediaRegionHeight || firstCandidate.mediaHeight || 0) - Number(secondCandidate.mediaRegionHeight || secondCandidate.mediaHeight || 0)) - PDF_ADAPTIVE_MEDIA_ALIGNMENT_WARNING_PX
-    ) * 0.6;
-    var footerAlignmentPenalty = Math.max(
-      0,
-      Math.abs(Number(firstCandidate.footerHeight || 0) - Number(secondCandidate.footerHeight || 0)) - PDF_ADAPTIVE_FOOTER_ALIGNMENT_WARNING_PX
-    ) * 0.5;
-    var titleAlignmentPenalty = Math.abs(Number(firstCandidate.headerHeight || 0) - Number(secondCandidate.headerHeight || 0)) * 0.35;
-    var internalFreeSpaceDifferencePenalty = freeSpaceDifference > PDF_ADAPTIVE_FREE_SPACE_WARNING_PX
-      ? 40 + ((freeSpaceDifference - PDF_ADAPTIVE_FREE_SPACE_WARNING_PX) * 0.8)
-      : freeSpaceDifference * 0.22;
-    var internalFreeSpaceRatioPenalty = freeSpaceRatio > PDF_ADAPTIVE_FREE_SPACE_RATIO_WARNING
-      ? 36 + ((freeSpaceRatio - PDF_ADAPTIVE_FREE_SPACE_RATIO_WARNING) * 340)
-      : freeSpaceRatio * 90;
-    var excessiveSpacerPenalty = Math.max(0, Math.max(firstFreeSpace, secondFreeSpace) - PDF_ADAPTIVE_MAX_FLEXIBLE_SPACER) * 0.5;
-    return {
-      score: internalFreeSpaceDifferencePenalty + internalFreeSpaceRatioPenalty + mediaAlignmentPenalty + footerAlignmentPenalty + titleAlignmentPenalty + excessiveSpacerPenalty,
-      internalFreeSpaceDifferencePenalty: internalFreeSpaceDifferencePenalty,
-      internalFreeSpaceRatioPenalty: internalFreeSpaceRatioPenalty,
-      mediaAlignmentPenalty: mediaAlignmentPenalty,
-      footerAlignmentPenalty: footerAlignmentPenalty,
-      titleAlignmentPenalty: titleAlignmentPenalty,
-      excessiveSpacerPenalty: excessiveSpacerPenalty
-    };
-  }
-
-  function getAdaptiveProjectedTitleMediaGap(candidate, distribution, contentProfile) {
-    var profile = contentProfile || candidate && candidate.contentProfile || {};
-    var assigned = distribution && distribution.assignedFreeSpace ? distribution.assignedFreeSpace : {};
-    var stackedLayout = isAdaptiveStackedLayout(candidate && candidate.layout);
-    var baseGap = Number(candidate && candidate.contentToMediaGap || 12);
-    if (!candidate || !profile.hasMedia) {
-      return 0;
-    }
-    if (stackedLayout) {
-      return baseGap +
-        Number(assigned.bodyMediaGap || 0) +
-        Number(assigned.flexibleSpacer || 0);
-    }
-    if (isAdaptiveSideMediaLayout(candidate.layout)) {
-      return baseGap + Math.min(10, Number(assigned.flexibleSpacer || 0));
-    }
-    return baseGap + Number(assigned.bodyMediaGap || 0);
-  }
-
-  function getAdaptiveProjectedHeaderStrategyOptions(firstCandidate, secondCandidate, firstPlan, secondPlan) {
-    var options = ["natural"];
-    if (!firstCandidate || !secondCandidate || !firstPlan || !secondPlan) {
-      return options;
-    }
-    if (
-      Number(firstCandidate.headerHeight || 0) > 0 &&
-      Number(secondCandidate.headerHeight || 0) > 0 &&
-      !firstPlan.contentProfile.hasMapContent &&
-      !secondPlan.contentProfile.hasMapContent
-    ) {
-      options.push("shared");
-    }
-    return options;
-  }
-
-  function projectAdaptiveCardRowGeometry(cardPlan, candidate, rowHeight, options) {
-    if (!cardPlan || !candidate) {
-      return null;
-    }
-    var projectionOptions = options || {};
-    var contentProfile = cardPlan.contentProfile || candidate.contentProfile || {};
-    var naturalHeight = Number(candidate.naturalContentHeight || candidate.measuredHeight || 0);
-    var measuredHeight = Number(candidate.measuredHeight || naturalHeight || 0);
-    var naturalHeaderHeight = Number(candidate.headerHeight || 0);
-    var sharedHeaderHeight = Number(projectionOptions.sharedHeaderHeight || naturalHeaderHeight || 0);
-    var useSharedHeader = projectionOptions.headerStrategy === "shared" && sharedHeaderHeight > naturalHeaderHeight;
-    var appliedHeaderHeight = useSharedHeader ? sharedHeaderHeight : naturalHeaderHeight;
-    var headerGrowth = Math.max(0, appliedHeaderHeight - naturalHeaderHeight);
-    var effectiveMeasuredHeight = measuredHeight;
-    if (headerGrowth > 0) {
-      if (isAdaptiveStackedLayout(candidate.layout)) {
-        effectiveMeasuredHeight += headerGrowth;
-      } else if (isAdaptiveSideMediaLayout(candidate.layout)) {
-        var textColumnHeight = Number(candidate.headerHeight || 0) + Number(candidate.bodyHeight || 0) + Number(candidate.footerHeight || 0);
-        var mediaColumnHeight = Number(candidate.mediaRegionHeight || candidate.mediaHeight || 0);
-        var grownTextColumnHeight = textColumnHeight + headerGrowth;
-        var previousTallestColumn = Math.max(textColumnHeight, mediaColumnHeight);
-        var nextTallestColumn = Math.max(grownTextColumnHeight, mediaColumnHeight);
-        effectiveMeasuredHeight += Math.max(0, nextTallestColumn - previousTallestColumn);
-      }
-    }
-    var sharedHeight = Number(rowHeight || effectiveMeasuredHeight || measuredHeight || 0);
-    var distribution = getAdaptiveFreeSpaceDistribution(Object.assign({}, candidate, {
-      naturalContentHeight: effectiveMeasuredHeight
-    }), sharedHeight, contentProfile);
-    var assigned = distribution.assignedFreeSpace || {};
-    var equalizationGrowth = Math.max(0, sharedHeight - measuredHeight);
-    var internalUnusedSpace = Math.max(0, Number(distribution.internalFreeSpace || 0));
-    var mediaHeight = Math.max(0, Number(candidate.mediaRegionHeight || candidate.mediaHeight || 0) + Number(assigned.mediaGrowth || 0));
-    var projectedMediaGeometry = candidate.hasMedia
-      ? resolveAdaptiveFinalMediaGeometry({
-          layout: candidate.layout,
-          mediaType: (candidate.resolvedMediaGeometry && candidate.resolvedMediaGeometry.mediaType) || "photo",
-          fitPolicy: (candidate.resolvedMediaGeometry && candidate.resolvedMediaGeometry.fitPolicy) || "contain",
-          naturalWidth: Number(candidate.mediaNaturalWidth || candidate.mediaWidth || 1),
-          naturalHeight: Number(candidate.mediaNaturalHeight || candidate.mediaHeight || 1),
-          availableWidth: Number(candidate.mediaRegionWidth || candidate.mediaWidth || 1),
-          availableHeight: mediaHeight,
-          framePolicy: candidate.resolvedMediaGeometry
-            ? {
-                framePolicy: candidate.resolvedMediaGeometry.framePolicy,
-                frameWidth: candidate.resolvedMediaGeometry.frameWidth,
-                aspectRatio: candidate.resolvedMediaGeometry.aspectRatio,
-                transparentFrame: candidate.resolvedMediaGeometry.transparentFrame,
-                visualReason: candidate.resolvedMediaGeometry.visualReason,
-                expectedLetterboxRatio: candidate.resolvedMediaGeometry.expectedLetterboxRatio
-              }
-            : null
-        })
-      : null;
-    var mediaUsefulnessRatio = sharedHeight && projectedMediaGeometry
-      ? (Number(projectedMediaGeometry.imageHeight || 0) / sharedHeight)
-      : (sharedHeight ? (mediaHeight / sharedHeight) : 0);
-    var titleToMediaGap = getAdaptiveProjectedTitleMediaGap(candidate, distribution, contentProfile);
-    return {
-      naturalHeight: naturalHeight,
-      measuredHeight: measuredHeight,
-      requiredRowHeight: Number(effectiveMeasuredHeight.toFixed(2)),
-      sharedRowHeight: sharedHeight,
-      naturalHeaderHeight: Number(naturalHeaderHeight.toFixed(2)),
-      appliedHeaderHeight: Number(appliedHeaderHeight.toFixed(2)),
-      headerGrowth: Number(headerGrowth.toFixed(2)),
-      headerGrowthRatio: naturalHeaderHeight ? Number((headerGrowth / naturalHeaderHeight).toFixed(4)) : 0,
-      equalizationGrowth: Number(equalizationGrowth.toFixed(2)),
-      equalizationGrowthRatio: sharedHeight ? Number((equalizationGrowth / sharedHeight).toFixed(4)) : 0,
-      projectedTextColumnHeight: Number((
-        appliedHeaderHeight +
-        Number(candidate.bodyHeight || 0) +
-        Number(candidate.footerHeight || 0) +
-        Number(assigned.flexibleSpacer || 0) +
-        Number(assigned.bodyMediaGap || 0)
-      ).toFixed(2)),
-      projectedMediaHeight: Number((projectedMediaGeometry ? projectedMediaGeometry.frameHeight : mediaHeight).toFixed(2)),
-      projectedMediaGeometry: projectedMediaGeometry,
-      projectedTitleToMediaGap: Number(titleToMediaGap.toFixed(2)),
-      internalUnusedSpace: Number(internalUnusedSpace.toFixed(2)),
-      internalUnusedSpaceRatio: sharedHeight ? Number((internalUnusedSpace / sharedHeight).toFixed(4)) : 0,
-      mediaUsefulnessRatio: Number(mediaUsefulnessRatio.toFixed(4)),
-      trailingResidualSpace: Number(distribution.trailingResidualSpace || 0),
-      distribution: distribution,
-      contentProfile: contentProfile
-    };
-  }
-
-  function getAdaptiveProjectedPairPenalty(firstProjection, secondProjection, firstCandidate, secondCandidate, headerStrategy) {
-    if (!firstProjection || !secondProjection) {
-      return {
-        score: 0
-      };
-    }
-    var titleToMediaSeparationPenalty = 0;
-    [firstProjection, secondProjection].forEach(function (projection) {
-      if (projection.projectedTitleToMediaGap > PDF_ADAPTIVE_PROJECTED_TITLE_MEDIA_GAP_BLOCKER_PX) {
-        titleToMediaSeparationPenalty += 320 + ((projection.projectedTitleToMediaGap - PDF_ADAPTIVE_PROJECTED_TITLE_MEDIA_GAP_BLOCKER_PX) * 4);
-      } else if (projection.projectedTitleToMediaGap > PDF_ADAPTIVE_PROJECTED_TITLE_MEDIA_GAP_WARNING_PX) {
-        titleToMediaSeparationPenalty += 90 + ((projection.projectedTitleToMediaGap - PDF_ADAPTIVE_PROJECTED_TITLE_MEDIA_GAP_WARNING_PX) * 2.2);
-      }
-    });
-    var unusedSpacePenalty = 0;
-    [firstProjection, secondProjection].forEach(function (projection) {
-      if (projection.internalUnusedSpaceRatio > PDF_ADAPTIVE_PROJECTED_UNUSED_SPACE_WARNING_RATIO) {
-        unusedSpacePenalty += 70 + ((projection.internalUnusedSpaceRatio - PDF_ADAPTIVE_PROJECTED_UNUSED_SPACE_WARNING_RATIO) * 520);
-      } else {
-        unusedSpacePenalty += projection.internalUnusedSpaceRatio * 80;
-      }
-      if (projection.trailingResidualSpace > PDF_ADAPTIVE_PROJECTED_TRAILING_SPACE_WARNING_PX) {
-        unusedSpacePenalty += 35 + ((projection.trailingResidualSpace - PDF_ADAPTIVE_PROJECTED_TRAILING_SPACE_WARNING_PX) * 0.8);
-      }
-    });
-    var equalizationGrowthPenalty = 0;
-    [firstProjection, secondProjection].forEach(function (projection) {
-      if (projection.equalizationGrowthRatio > PDF_ADAPTIVE_PROJECTED_EQUALIZATION_WARNING_RATIO) {
-        equalizationGrowthPenalty += 80 + ((projection.equalizationGrowthRatio - PDF_ADAPTIVE_PROJECTED_EQUALIZATION_WARNING_RATIO) * 420);
-      } else {
-        equalizationGrowthPenalty += projection.equalizationGrowthRatio * 120;
-      }
-    });
-    var mediaUsefulnessPenalty = 0;
-    [firstProjection, secondProjection].forEach(function (projection) {
-      if (projection.contentProfile && projection.contentProfile.hasMedia && !projection.contentProfile.hasMapContent) {
-        if (projection.mediaUsefulnessRatio < PDF_ADAPTIVE_PROJECTED_MEDIA_USEFULNESS_MIN_RATIO) {
-          mediaUsefulnessPenalty += 120 + ((PDF_ADAPTIVE_PROJECTED_MEDIA_USEFULNESS_MIN_RATIO - projection.mediaUsefulnessRatio) * 500);
-        }
-      }
-    });
-    var mediaSizeMismatchPenalty = Math.abs(
-      Number(firstProjection.mediaUsefulnessRatio || 0) -
-      Number(secondProjection.mediaUsefulnessRatio || 0)
-    );
-    mediaSizeMismatchPenalty = mediaSizeMismatchPenalty > PDF_ADAPTIVE_PROJECTED_MEDIA_MISMATCH_WARNING_RATIO
-      ? 45 + ((mediaSizeMismatchPenalty - PDF_ADAPTIVE_PROJECTED_MEDIA_MISMATCH_WARNING_RATIO) * 220)
-      : mediaSizeMismatchPenalty * 60;
-    var typographyMismatchPenalty = Number(firstCandidate.typographyScale || 1) === Number(secondCandidate.typographyScale || 1)
-      ? 0
-      : 22;
-    var awkwardCompositionPenalty = 0;
-    if (
-      isAdaptiveStackedLayout(firstCandidate.layout) !== isAdaptiveStackedLayout(secondCandidate.layout) &&
-      Math.abs(Number(firstProjection.internalUnusedSpace || 0) - Number(secondProjection.internalUnusedSpace || 0)) > PDF_ADAPTIVE_FREE_SPACE_WARNING_PX
-    ) {
-      awkwardCompositionPenalty += 28;
-    }
-    if (headerStrategy === "shared") {
-      [firstProjection, secondProjection].forEach(function (projection) {
-        if (projection.headerGrowthRatio > PDF_ADAPTIVE_HEADER_GROWTH_BLOCKER_RATIO) {
-          awkwardCompositionPenalty += 180 + ((projection.headerGrowthRatio - PDF_ADAPTIVE_HEADER_GROWTH_BLOCKER_RATIO) * 520);
-        } else if (projection.headerGrowthRatio > PDF_ADAPTIVE_HEADER_GROWTH_WARNING_RATIO) {
-          awkwardCompositionPenalty += 45 + ((projection.headerGrowthRatio - PDF_ADAPTIVE_HEADER_GROWTH_WARNING_RATIO) * 220);
-        }
-      });
-      if (
-        (isAdaptiveStackedLayout(firstCandidate.layout) && isAdaptiveSideMediaLayout(secondCandidate.layout)) ||
-        (isAdaptiveStackedLayout(secondCandidate.layout) && isAdaptiveSideMediaLayout(firstCandidate.layout))
-      ) {
-        awkwardCompositionPenalty += 52;
-      }
-    }
-    var cardContentBalancePenalty = Math.abs(
-      Number(firstProjection.projectedTextColumnHeight || 0) -
-      Number(secondProjection.projectedTextColumnHeight || 0)
-    ) * 0.24;
-    var containmentRiskPenalty = (
-      (firstCandidate.qualityWarnings || []).length +
-      (secondCandidate.qualityWarnings || []).length
-    ) * 40;
-    [firstProjection, secondProjection].forEach(function (projection) {
-      var geometry = projection && projection.projectedMediaGeometry ? projection.projectedMediaGeometry : null;
-      if (geometry && !geometry.valid) {
-        containmentRiskPenalty += 220;
-      } else if (geometry && geometry.severity === "warning") {
-        containmentRiskPenalty += 60;
-      }
-    });
-    return {
-      score: titleToMediaSeparationPenalty + unusedSpacePenalty + equalizationGrowthPenalty + mediaUsefulnessPenalty + mediaSizeMismatchPenalty + typographyMismatchPenalty + awkwardCompositionPenalty + cardContentBalancePenalty + containmentRiskPenalty,
-      titleToMediaSeparationPenalty: Number(titleToMediaSeparationPenalty.toFixed(2)),
-      internalUnusedSpacePenalty: Number(unusedSpacePenalty.toFixed(2)),
-      equalizationGrowthPenalty: Number(equalizationGrowthPenalty.toFixed(2)),
-      mediaUsefulnessPenalty: Number(mediaUsefulnessPenalty.toFixed(2)),
-      mediaSizeMismatchPenalty: Number(mediaSizeMismatchPenalty.toFixed(2)),
-      typographyMismatchPenalty: Number(typographyMismatchPenalty.toFixed(2)),
-      awkwardCompositionPenalty: Number(awkwardCompositionPenalty.toFixed(2)),
-      cardContentBalancePenalty: Number(cardContentBalancePenalty.toFixed(2)),
-      containmentRiskPenalty: Number(containmentRiskPenalty.toFixed(2))
-    };
-  }
-
-  function selectBestAdaptivePairCandidate(firstPlan, secondPlan) {
-    if (!firstPlan || !secondPlan || !firstPlan.halfCandidates.length || !secondPlan.halfCandidates.length) {
-      return {
-        bestPair: null,
-        evaluations: [],
-        status: "unavailable",
-        reason: "no-valid-half-candidates",
-        unavailableDiagnostics: {
-          firstCard: {
-            blockId: String(firstPlan && firstPlan.blockId || ""),
-            availableHalfCandidates: Number(firstPlan && firstPlan.halfCandidates ? firstPlan.halfCandidates.length : 0),
-            rejectedHalfCandidates: (firstPlan && firstPlan.candidateDiagnostics || []).filter(function (candidate) {
-              return candidate.widthStrategy === "half" && candidate.state === "rejected";
-            })
-          },
-          secondCard: {
-            blockId: String(secondPlan && secondPlan.blockId || ""),
-            availableHalfCandidates: Number(secondPlan && secondPlan.halfCandidates ? secondPlan.halfCandidates.length : 0),
-            rejectedHalfCandidates: (secondPlan && secondPlan.candidateDiagnostics || []).filter(function (candidate) {
-              return candidate.widthStrategy === "half" && candidate.state === "rejected";
-            })
-          }
-        }
-      };
-    }
-    var bestPair = null;
-    var evaluations = [];
-    firstPlan.halfCandidates.forEach(function (firstCandidate) {
-      secondPlan.halfCandidates.forEach(function (secondCandidate) {
-        getAdaptiveProjectedHeaderStrategyOptions(firstCandidate, secondCandidate, firstPlan, secondPlan).forEach(function (headerStrategy) {
-          var sharedScale = Number(firstCandidate.typographyScale || 1) === Number(secondCandidate.typographyScale || 1);
-          var naturalSharedHeaderHeight = Math.max(Number(firstCandidate.headerHeight || 0), Number(secondCandidate.headerHeight || 0));
-          var initialRowHeight = Math.max(firstCandidate.measuredHeight, secondCandidate.measuredHeight);
-          var firstProjection = projectAdaptiveCardRowGeometry(firstPlan, firstCandidate, initialRowHeight, {
-            headerStrategy: headerStrategy,
-            sharedHeaderHeight: naturalSharedHeaderHeight
-          });
-          var secondProjection = projectAdaptiveCardRowGeometry(secondPlan, secondCandidate, initialRowHeight, {
-            headerStrategy: headerStrategy,
-            sharedHeaderHeight: naturalSharedHeaderHeight
-          });
-          var rowHeight = Math.max(
-            Number(firstProjection && firstProjection.requiredRowHeight || initialRowHeight),
-            Number(secondProjection && secondProjection.requiredRowHeight || initialRowHeight)
-          );
-          firstProjection = projectAdaptiveCardRowGeometry(firstPlan, firstCandidate, rowHeight, {
-            headerStrategy: headerStrategy,
-            sharedHeaderHeight: naturalSharedHeaderHeight
-          });
-          secondProjection = projectAdaptiveCardRowGeometry(secondPlan, secondCandidate, rowHeight, {
-            headerStrategy: headerStrategy,
-            sharedHeaderHeight: naturalSharedHeaderHeight
-          });
-          var mismatchPenalty = Math.abs(firstCandidate.measuredHeight - secondCandidate.measuredHeight) * 0.25;
-          var compactPenalty = (firstCandidate.kind !== secondCandidate.kind) ? 12 : 0;
-          var mixedTypographyPenalty = sharedScale ? 0 : 22;
-          var rowHeightMismatchPenalty = Math.abs(firstCandidate.measuredHeight - secondCandidate.measuredHeight) * 0.18;
-          var scalePenalty = Math.round((1 - Math.min(Number(firstCandidate.typographyScale || 1), Number(secondCandidate.typographyScale || 1))) * 220);
-          var balancePenalty = getAdaptiveRowBalancePenalty(firstCandidate, secondCandidate, rowHeight);
-          var projectedPenalty = getAdaptiveProjectedPairPenalty(firstProjection, secondProjection, firstCandidate, secondCandidate, headerStrategy);
-          var projectedGeometryInvalid =
-            (firstProjection && firstProjection.projectedMediaGeometry && !firstProjection.projectedMediaGeometry.valid) ||
-            (secondProjection && secondProjection.projectedMediaGeometry && !secondProjection.projectedMediaGeometry.valid);
-          var firstSingleScore = firstPlan.preferredSingleCandidate
-            ? scoreAdaptiveSingleCandidate(firstPlan, firstPlan.preferredSingleCandidate, 2)
-            : Number.POSITIVE_INFINITY;
-          var secondSingleScore = secondPlan.preferredSingleCandidate
-            ? scoreAdaptiveSingleCandidate(secondPlan, secondPlan.preferredSingleCandidate, 1)
-            : Number.POSITIVE_INFINITY;
-          var pageEconomyBonus = 0;
-          if (isFinite(firstSingleScore) && isFinite(secondSingleScore)) {
-            pageEconomyBonus = Math.min(180, Math.max(0, (firstSingleScore + secondSingleScore) - rowHeight) * 0.26);
-          }
-          var candidateSoftPenalty = (
-            getAdaptiveCandidateSoftPenalty(firstCandidate) +
-            getAdaptiveCandidateSoftPenalty(secondCandidate) +
-            getAdaptiveCandidateVariantPenalty(firstCandidate, firstPlan) +
-            getAdaptiveCandidateVariantPenalty(secondCandidate, secondPlan)
-          );
-          var score = rowHeight + mismatchPenalty + compactPenalty + mixedTypographyPenalty + rowHeightMismatchPenalty + scalePenalty + balancePenalty.score + projectedPenalty.score + candidateSoftPenalty - pageEconomyBonus;
-          var evaluation = {
-            candidates: [String(firstCandidate.layout || firstCandidate.kind || "medium"), String(secondCandidate.layout || secondCandidate.kind || "medium")],
-            semanticContentProfile: [firstPlan.contentProfile, secondPlan.contentProfile],
-            naturalHeight: [Number(firstCandidate.naturalContentHeight || firstCandidate.measuredHeight || 0), Number(secondCandidate.naturalContentHeight || secondCandidate.measuredHeight || 0)],
-            projectedSharedRowHeight: Number(rowHeight.toFixed(2)),
-            headerStrategy: headerStrategy,
-            headerCompatibility: headerStrategy === "shared"
-              ? ((isAdaptiveStackedLayout(firstCandidate.layout) === isAdaptiveStackedLayout(secondCandidate.layout) && isAdaptiveSideMediaLayout(firstCandidate.layout) === isAdaptiveSideMediaLayout(secondCandidate.layout)) ? "compatible" : "mixed")
-              : "natural",
-            projectedSharedHeaderHeight: naturalSharedHeaderHeight,
-            equalisationGrowth: [firstProjection ? firstProjection.equalizationGrowth : 0, secondProjection ? secondProjection.equalizationGrowth : 0],
-            flexibleSpacerAmount: [
-              firstProjection ? Number(firstProjection.distribution.assignedFreeSpace.flexibleSpacer || 0) : 0,
-              secondProjection ? Number(secondProjection.distribution.assignedFreeSpace.flexibleSpacer || 0) : 0
-            ],
-            trailingResidualSpaceAmount: [
-              firstProjection ? Number(firstProjection.trailingResidualSpace || 0) : 0,
-              secondProjection ? Number(secondProjection.trailingResidualSpace || 0) : 0
-            ],
-            projectedTitleToMediaGap: [
-              firstProjection ? Number(firstProjection.projectedTitleToMediaGap || 0) : 0,
-              secondProjection ? Number(secondProjection.projectedTitleToMediaGap || 0) : 0
-            ],
-            projectedMediaGeometry: [
-              firstProjection && firstProjection.projectedMediaGeometry
-                ? {
-                    frameWidth: Number(firstProjection.projectedMediaGeometry.frameWidth || 0),
-                    frameHeight: Number(firstProjection.projectedMediaGeometry.frameHeight || 0),
-                    imageWidth: Number(firstProjection.projectedMediaGeometry.imageWidth || 0),
-                    imageHeight: Number(firstProjection.projectedMediaGeometry.imageHeight || 0),
-                    horizontalLetterboxPercent: Number(firstProjection.projectedMediaGeometry.horizontalLetterboxPercent || 0),
-                    verticalLetterboxPercent: Number(firstProjection.projectedMediaGeometry.verticalLetterboxPercent || 0),
-                    valid: !!firstProjection.projectedMediaGeometry.valid,
-                    issues: (firstProjection.projectedMediaGeometry.issues || []).slice()
-                  }
-                : null,
-              secondProjection && secondProjection.projectedMediaGeometry
-                ? {
-                    frameWidth: Number(secondProjection.projectedMediaGeometry.frameWidth || 0),
-                    frameHeight: Number(secondProjection.projectedMediaGeometry.frameHeight || 0),
-                    imageWidth: Number(secondProjection.projectedMediaGeometry.imageWidth || 0),
-                    imageHeight: Number(secondProjection.projectedMediaGeometry.imageHeight || 0),
-                    horizontalLetterboxPercent: Number(secondProjection.projectedMediaGeometry.horizontalLetterboxPercent || 0),
-                    verticalLetterboxPercent: Number(secondProjection.projectedMediaGeometry.verticalLetterboxPercent || 0),
-                    valid: !!secondProjection.projectedMediaGeometry.valid,
-                    issues: (secondProjection.projectedMediaGeometry.issues || []).slice()
-                  }
-                : null
-            ],
-            naturalHeaderHeight: [
-              firstProjection ? Number(firstProjection.naturalHeaderHeight || 0) : 0,
-              secondProjection ? Number(secondProjection.naturalHeaderHeight || 0) : 0
-            ],
-            appliedHeaderHeight: [
-              firstProjection ? Number(firstProjection.appliedHeaderHeight || 0) : 0,
-              secondProjection ? Number(secondProjection.appliedHeaderHeight || 0) : 0
-            ],
-            headerGrowth: [
-              firstProjection ? Number(firstProjection.headerGrowth || 0) : 0,
-              secondProjection ? Number(secondProjection.headerGrowth || 0) : 0
-            ],
-            mediaDimensions: [
-              firstProjection ? Number(firstProjection.projectedMediaHeight || 0) : 0,
-              secondProjection ? Number(secondProjection.projectedMediaHeight || 0) : 0
-            ],
-            internalUnusedSpaceRatio: [
-              firstProjection ? Number(firstProjection.internalUnusedSpaceRatio || 0) : 0,
-              secondProjection ? Number(secondProjection.internalUnusedSpaceRatio || 0) : 0
-            ],
-            scoreComponents: {
-              rowHeight: Number(rowHeight.toFixed(2)),
-              mismatchPenalty: Number(mismatchPenalty.toFixed(2)),
-              compactPenalty: Number(compactPenalty.toFixed(2)),
-              mixedTypographyPenalty: Number(mixedTypographyPenalty.toFixed(2)),
-              rowHeightMismatchPenalty: Number(rowHeightMismatchPenalty.toFixed(2)),
-              scalePenalty: Number(scalePenalty.toFixed(2)),
-              internalFreeSpaceDifferencePenalty: balancePenalty.internalFreeSpaceDifferencePenalty,
-              internalFreeSpaceRatioPenalty: balancePenalty.internalFreeSpaceRatioPenalty,
-              mediaAlignmentPenalty: balancePenalty.mediaAlignmentPenalty,
-              footerAlignmentPenalty: balancePenalty.footerAlignmentPenalty,
-              titleAlignmentPenalty: balancePenalty.titleAlignmentPenalty,
-              excessiveSpacerPenalty: balancePenalty.excessiveSpacerPenalty,
-              titleToMediaSeparationPenalty: projectedPenalty.titleToMediaSeparationPenalty,
-              internalUnusedSpacePenalty: projectedPenalty.internalUnusedSpacePenalty,
-              equalizationGrowthPenalty: projectedPenalty.equalizationGrowthPenalty,
-              mediaUsefulnessPenalty: projectedPenalty.mediaUsefulnessPenalty,
-              mediaSizeMismatchPenalty: projectedPenalty.mediaSizeMismatchPenalty,
-              typographyMismatchPenalty: projectedPenalty.typographyMismatchPenalty,
-              awkwardCompositionPenalty: projectedPenalty.awkwardCompositionPenalty,
-              cardContentBalancePenalty: projectedPenalty.cardContentBalancePenalty,
-              containmentRiskPenalty: projectedPenalty.containmentRiskPenalty,
-              candidateSoftPenalty: Number(candidateSoftPenalty.toFixed(2))
-            },
-            pageEconomyBonus: Number(pageEconomyBonus.toFixed(2)),
-            finalPairScore: Number(score.toFixed(2)),
-            state: projectedGeometryInvalid ? "rejected" : "evaluated",
-            hardRejectionReason: projectedGeometryInvalid ? "projected-media-geometry-invalid" : ""
-          };
-          evaluations.push(evaluation);
-          if (projectedGeometryInvalid) {
-            return;
-          }
-          if (!bestPair || score < bestPair.score) {
-            bestPair = {
-              score: score,
-              measuredHeight: rowHeight,
-              headerStrategy: headerStrategy,
-              sharedHeaderHeight: naturalSharedHeaderHeight,
-              rowHeightMismatchPenalty: rowHeightMismatchPenalty,
-              mixedTypographyPenalty: mixedTypographyPenalty,
-              internalFreeSpaceDifferencePenalty: balancePenalty.internalFreeSpaceDifferencePenalty,
-              internalFreeSpaceRatioPenalty: balancePenalty.internalFreeSpaceRatioPenalty,
-              mediaAlignmentPenalty: balancePenalty.mediaAlignmentPenalty,
-              footerAlignmentPenalty: balancePenalty.footerAlignmentPenalty,
-              titleAlignmentPenalty: balancePenalty.titleAlignmentPenalty,
-              excessiveSpacerPenalty: balancePenalty.excessiveSpacerPenalty,
-              titleToMediaSeparationPenalty: projectedPenalty.titleToMediaSeparationPenalty,
-              internalUnusedSpacePenalty: projectedPenalty.internalUnusedSpacePenalty,
-              equalizationGrowthPenalty: projectedPenalty.equalizationGrowthPenalty,
-              mediaUsefulnessPenalty: projectedPenalty.mediaUsefulnessPenalty,
-              mediaSizeMismatchPenalty: projectedPenalty.mediaSizeMismatchPenalty,
-              awkwardCompositionPenalty: projectedPenalty.awkwardCompositionPenalty,
-              cardContentBalancePenalty: projectedPenalty.cardContentBalancePenalty,
-              containmentRiskPenalty: projectedPenalty.containmentRiskPenalty,
-              candidateSoftPenalty: candidateSoftPenalty,
-              pageEconomyBonus: pageEconomyBonus,
-              sharedTypographyScale: sharedScale ? Number(firstCandidate.typographyScale || 1) : null,
-              firstCandidate: firstCandidate,
-              secondCandidate: secondCandidate,
-              firstProjection: firstProjection,
-              secondProjection: secondProjection,
-              evaluations: evaluations
-            };
-          }
-        });
-      });
-    });
-    return {
-      bestPair: bestPair,
-      evaluations: evaluations,
-      status: bestPair ? "evaluated" : "rejected",
-      reason: bestPair ? "" : "no-pair-selected"
-    };
-  }
-
-  function planAdaptiveSectionRows(cardPlans) {
-    var memo = {};
-    var pairDiagnosticsByIndex = {};
-
-    function solve(index) {
-      if (index >= cardPlans.length) {
-        return {
-          score: 0,
-          rows: []
-        };
-      }
-      if (memo[index]) {
-        return memo[index];
-      }
-
-      var currentPlan = cardPlans[index];
-      var bestPlan = null;
-
-      currentPlan.wideCandidates.forEach(function (singleCandidate) {
-        var restPlan = solve(index + 1);
-        var rowScore = scoreAdaptiveSingleCandidate(
-          currentPlan,
-          singleCandidate,
-          cardPlans.length - index
-        );
-        var singleScore = rowScore + restPlan.score;
-        if (!bestPlan || singleScore < bestPlan.score) {
-          bestPlan = {
-            score: singleScore,
-            rows: [{
-              type: "single",
-              score: Number(rowScore.toFixed(2)),
-              rowHeight: singleCandidate.measuredHeight,
-              rowNaturalHeight: Number(singleCandidate.naturalContentHeight || singleCandidate.measuredHeight || 0),
-              sharedHeaderHeight: Number(singleCandidate.headerHeight || 0),
-              sharedTypographyScale: Number(singleCandidate.typographyScale || 1),
-              cards: [{
-                cardNode: currentPlan.cardNode,
-                cardPlan: currentPlan,
-                variant: singleCandidate
-              }]
-            }].concat(restPlan.rows)
-          };
-        }
-      });
-
-      if (index + 1 < cardPlans.length) {
-        var nextPlan = cardPlans[index + 1];
-        var pairResult = selectBestAdaptivePairCandidate(currentPlan, nextPlan);
-        pairDiagnosticsByIndex[index] = {
-          status: pairResult && pairResult.status || "unavailable",
-          reason: pairResult && pairResult.reason || "",
-          evaluations: pairResult && pairResult.evaluations ? pairResult.evaluations.slice() : [],
-          unavailableDiagnostics: pairResult && pairResult.unavailableDiagnostics ? pairResult.unavailableDiagnostics : null
-        };
-        var bestPair = pairResult && pairResult.bestPair ? pairResult.bestPair : null;
-        if (bestPair) {
-          var pairRestPlan = solve(index + 2);
-          var pairScore = bestPair.score + pairRestPlan.score;
-          if (!bestPlan || pairScore < bestPlan.score) {
-            bestPlan = {
-              score: pairScore,
-              rows: [{
-                type: "pair",
-                score: Number(bestPair.score.toFixed(2)),
-              rowHeight: bestPair.measuredHeight,
-              rowNaturalHeight: Math.max(
-                Number(bestPair.firstCandidate.naturalContentHeight || bestPair.firstCandidate.measuredHeight || 0),
-                Number(bestPair.secondCandidate.naturalContentHeight || bestPair.secondCandidate.measuredHeight || 0)
-              ),
-              sharedHeaderHeight: Math.max(
-                Number(bestPair.firstProjection && bestPair.firstProjection.appliedHeaderHeight || 0),
-                Number(bestPair.secondProjection && bestPair.secondProjection.appliedHeaderHeight || 0)
-              ),
-              headerStrategy: String(bestPair.headerStrategy || "natural"),
-              sharedTypographyScale: bestPair.sharedTypographyScale,
-              internalFreeSpaceDifferencePenalty: bestPair.internalFreeSpaceDifferencePenalty,
-              internalFreeSpaceRatioPenalty: bestPair.internalFreeSpaceRatioPenalty,
-              mediaAlignmentPenalty: bestPair.mediaAlignmentPenalty,
-              footerAlignmentPenalty: bestPair.footerAlignmentPenalty,
-              titleAlignmentPenalty: bestPair.titleAlignmentPenalty,
-              excessiveSpacerPenalty: bestPair.excessiveSpacerPenalty,
-              titleToMediaSeparationPenalty: bestPair.titleToMediaSeparationPenalty,
-              internalUnusedSpacePenalty: bestPair.internalUnusedSpacePenalty,
-              equalizationGrowthPenalty: bestPair.equalizationGrowthPenalty,
-              mediaUsefulnessPenalty: bestPair.mediaUsefulnessPenalty,
-              mediaSizeMismatchPenalty: bestPair.mediaSizeMismatchPenalty,
-              awkwardCompositionPenalty: bestPair.awkwardCompositionPenalty,
-              cardContentBalancePenalty: bestPair.cardContentBalancePenalty,
-              containmentRiskPenalty: bestPair.containmentRiskPenalty,
-              pairEvaluations: bestPair.evaluations || [],
-              cards: [{
-                cardNode: currentPlan.cardNode,
-                cardPlan: currentPlan,
-                variant: bestPair.firstCandidate,
-                projection: bestPair.firstProjection
-              }, {
-                cardNode: nextPlan.cardNode,
-                cardPlan: nextPlan,
-                variant: bestPair.secondCandidate,
-                projection: bestPair.secondProjection
-              }]
-            }].concat(pairRestPlan.rows)
-            };
-          }
-        }
-      }
-
-      memo[index] = bestPlan || {
-        score: 0,
-        rows: []
-      };
-      return memo[index];
-    }
-    var solved = solve(0);
-    solved.pairDiagnostics = Object.keys(pairDiagnosticsByIndex).map(function (key) {
-      return {
-        index: Number(key),
-        status: pairDiagnosticsByIndex[key].status,
-        reason: pairDiagnosticsByIndex[key].reason,
-        evaluations: pairDiagnosticsByIndex[key].evaluations,
-        unavailableDiagnostics: pairDiagnosticsByIndex[key].unavailableDiagnostics
-      };
-    }).sort(function (left, right) {
-      return left.index - right.index;
-    });
-    return solved;
-  }
-
-  function buildAdaptiveTypographySelectionDiagnostics(cardPlan, selectedVariant, rowHeight) {
-    var selectedScale = Number(selectedVariant && selectedVariant.typographyScale || 1);
-    var alternatives = ADAPTIVE_TYPOGRAPHY_SCALES.map(function (scale) {
-      var match = (cardPlan && Array.isArray(cardPlan.candidates) ? cardPlan.candidates : []).find(function (candidate) {
-        return candidate.layout === selectedVariant.layout &&
-          !!candidate.isWide === !!selectedVariant.isWide &&
-          candidate.kind === selectedVariant.kind &&
-          Number(candidate.typographyScale || 1) === Number(scale);
-      }) || null;
-      var rowOverflow = match && rowHeight
-        ? Math.max(0, Number(match.naturalContentHeight || match.measuredHeight || 0) - Number(rowHeight || 0))
-        : 0;
-      return {
-        scale: scale,
-        valid: !!match && Number(match.containmentOverflow || 0) <= PDF_ADAPTIVE_CARD_CONTAINMENT_TOLERANCE_PX,
-        overflowPixels: match ? Math.max(Number(match.overflowPixels || 0), rowOverflow) : 0
-      };
-    });
-    var reason = "";
-    if (selectedScale < 1) {
-      var blockingAlternative = alternatives.find(function (alternative) {
-        return alternative.scale > selectedScale && (!alternative.valid || alternative.overflowPixels > 0);
-      }) || null;
-      if (blockingAlternative) {
-        reason = String(blockingAlternative.scale) + " overflowed by " + String(blockingAlternative.overflowPixels || 0) + "px";
-      } else {
-        reason = "larger scales produced a worse measured row-balance score";
-      }
-    }
-    return {
-      selectedScale: selectedScale,
-      reason: reason,
-      alternatives: alternatives
-    };
-  }
-
-  function getAdaptiveFreeSpaceDistribution(variant, rowHeight) {
-    var naturalHeight = Number(variant && (variant.naturalContentHeight || variant.measuredHeight) || 0);
-    var freeSpace = Math.max(0, Number(rowHeight || 0) - naturalHeight);
-    var remaining = freeSpace;
-    var hasMedia = !!(variant && variant.hasMedia);
-    var hasFooter = !!(variant && variant.hasFooter);
-    var paragraphCount = Math.max(0, Number(variant && variant.paragraphCount || 0));
-    var contentProfile = variant && variant.contentProfile ? variant.contentProfile : {};
-    var stackedLayout = isAdaptiveStackedLayout(variant && variant.layout);
-    var sideLayout = isAdaptiveSideMediaLayout(variant && variant.layout);
-    var mediaGrowth = 0;
-    var bodyMediaGap = 0;
-    var paragraphGrowth = 0;
-    var flexibleSpacer = 0;
-    var trailingResidualSpace = 0;
-
-    if (remaining > 0 && hasMedia) {
-      mediaGrowth = Math.min(remaining, PDF_ADAPTIVE_MAX_MEDIA_REGION_GROWTH);
-      remaining -= mediaGrowth;
-    }
-    if (remaining > 0 && (hasMedia || hasFooter)) {
-      var maxLayoutGapGrowth = PDF_ADAPTIVE_MAX_LAYOUT_GAP_GROWTH;
-      if (stackedLayout && contentProfile.headerAndMediaOnly) {
-        maxLayoutGapGrowth = 4;
-      } else if (stackedLayout && contentProfile.mostlyMediaContent) {
-        maxLayoutGapGrowth = 6;
-      }
-      bodyMediaGap = Math.min(remaining, maxLayoutGapGrowth);
-      remaining -= bodyMediaGap;
-    }
-    if (remaining > 0 && paragraphCount > 1) {
-      paragraphGrowth = Math.min(
-        remaining,
-        Math.min(PDF_ADAPTIVE_MAX_PARAGRAPH_GAP_GROWTH, Math.max(0, paragraphCount - 1) * 2)
-      );
-      remaining -= paragraphGrowth;
-    }
-    if (
-      remaining > 0 &&
-      (
-        !stackedLayout ||
-        (!contentProfile.headerAndMediaOnly && !contentProfile.mostlyMediaContent) ||
-        sideLayout
-      )
-    ) {
-      flexibleSpacer = Math.min(remaining, PDF_ADAPTIVE_MAX_FLEXIBLE_SPACER);
-      remaining -= flexibleSpacer;
-    }
-    if (remaining > 0) {
-      trailingResidualSpace = remaining;
-    }
-
-    return {
-      internalFreeSpace: freeSpace,
-      assignedFreeSpace: {
-        mediaGrowth: mediaGrowth,
-        bodyMediaGap: bodyMediaGap,
-        paragraphGrowth: paragraphGrowth,
-        flexibleSpacer: flexibleSpacer
-      },
-      trailingResidualSpace: trailingResidualSpace
-    };
-  }
-
-  function getAdaptiveCardMediaVerticalAlignmentMode(variant, rowDetails) {
-    if (!variant) {
-      return "natural";
-    }
-    var layout = String(variant.layout || "");
-    if (layout.indexOf("half-portrait-side") === -1 && layout.indexOf("wide-horizontal") === -1) {
-      return "natural";
-    }
-    var rowHeight = Number(rowDetails && rowDetails.rowHeight || variant.measuredHeight || 0);
-    var naturalHeight = Number(variant.measuredHeight || 0);
-    var freeSpace = Math.max(0, rowHeight - naturalHeight);
-    var bodyHeight = Number(variant.bodyHeight || 0);
-    var headerHeight = Number(variant.headerHeight || 0);
-    var mediaHeight = Number(variant.mediaRegionHeight || variant.mediaHeight || 0);
-    if (
-      layout.indexOf("half-portrait-side") !== -1 &&
-      freeSpace >= PDF_ADAPTIVE_MEDIA_BALANCE_GAP_WARNING_PX &&
-      bodyHeight <= Math.max(72, mediaHeight * 0.82)
-    ) {
-      return "content-group-centred";
-    }
-    if (
-      layout.indexOf("wide-horizontal") !== -1 &&
-      freeSpace >= PDF_ADAPTIVE_MEDIA_BALANCE_GAP_WARNING_PX &&
-      bodyHeight <= Math.max(60, mediaHeight * 0.6)
-    ) {
-      return "balanced-between-header-and-card-bottom";
-    }
-    return "header-aligned";
-  }
-
-  function getAdaptiveCardMediaJustifyContent(alignmentMode) {
-    if (alignmentMode === "content-group-centred" || alignmentMode === "balanced-between-header-and-card-bottom") {
-      return "center";
-    }
-    if (alignmentMode === "footer-bottom") {
-      return "flex-end";
-    }
-    return "flex-start";
-  }
-
-  function applyAdaptiveRowDistribution(cardNode, variant, rowDetails) {
-    if (!cardNode || !variant || !rowDetails) {
-      return;
-    }
-    var projection = rowDetails.projection || null;
-    var distribution = projection && projection.distribution
-      ? projection.distribution
-      : getAdaptiveFreeSpaceDistribution(variant, rowDetails.rowHeight || variant.measuredHeight || 0);
-    var headerHeight = projection
-      ? Number(projection.appliedHeaderHeight || variant.headerHeight || 0)
-      : Math.max(Number(rowDetails.sharedHeaderHeight || 0), Number(variant.headerHeight || 0));
-    cardNode.style.setProperty("--pi-export-card-header-height", headerHeight ? (headerHeight + "px") : "");
-    cardNode.style.setProperty("--pi-export-card-media-region-extra", distribution.assignedFreeSpace.mediaGrowth + "px");
-    cardNode.style.setProperty("--pi-export-card-layout-gap-extra", distribution.assignedFreeSpace.bodyMediaGap + "px");
-    cardNode.style.setProperty("--pi-export-card-paragraph-gap-extra", distribution.assignedFreeSpace.paragraphGrowth + "px");
-    cardNode.style.setProperty("--pi-export-card-flex-spacer", distribution.assignedFreeSpace.flexibleSpacer + "px");
-    cardNode.style.setProperty("--pi-export-card-trailing-space", (distribution.trailingResidualSpace || 0) + "px");
-    var mediaAlignmentMode = getAdaptiveCardMediaVerticalAlignmentMode(variant, rowDetails);
-    cardNode.style.setProperty("--pi-export-card-media-justify", getAdaptiveCardMediaJustifyContent(mediaAlignmentMode));
-    cardNode.setAttribute("data-pdf-card-header-height", String(variant.headerHeight || 0));
-    cardNode.setAttribute("data-pdf-card-applied-header-height", String(headerHeight || 0));
-    cardNode.setAttribute("data-pdf-card-body-height", String(variant.bodyHeight || 0));
-    cardNode.setAttribute("data-pdf-card-media-height", String(variant.mediaRegionHeight || variant.mediaHeight || 0));
-    cardNode.setAttribute("data-pdf-card-media-region-width", String(variant.mediaRegionWidth || variant.mediaWidth || 0));
-    cardNode.setAttribute("data-pdf-card-footer-height", String(variant.footerHeight || 0));
-    cardNode.setAttribute("data-pdf-media-vertical-alignment", mediaAlignmentMode);
-    cardNode.setAttribute("data-pdf-card-region-distribution", JSON.stringify(distribution.assignedFreeSpace));
-    cardNode.setAttribute("data-pdf-card-trailing-space", String(distribution.trailingResidualSpace || 0));
-  }
-
-  function createAdaptiveRow(documentNode, cards, className, rowDetails) {
-    var row = documentNode.createElement("div");
-    row.className = "pi-export-row " + className;
-    row.setAttribute("data-pdf-section-item", "1");
-    if (rowDetails && rowDetails.rowId) {
-      row.setAttribute("data-pdf-row-id", String(rowDetails.rowId));
-    }
-    if (rowDetails && rowDetails.sectionAnchor) {
-      row.setAttribute("data-pdf-row-section-anchor", String(rowDetails.sectionAnchor));
-    }
-    if (rowDetails && rowDetails.sourceOrder !== undefined) {
-      row.setAttribute("data-pdf-row-source-order", String(rowDetails.sourceOrder));
-    }
-    if (rowDetails && rowDetails.score !== undefined) {
-      row.setAttribute("data-pdf-row-score", String(rowDetails.score));
-    }
-    if (rowDetails && rowDetails.cards) {
-      row.setAttribute("data-pdf-row-variants", rowDetails.cards.map(function (cardEntry) {
-        return String(cardEntry.variant.layout || cardEntry.variant.kind || "medium");
-      }).join(","));
-    }
-    if (rowDetails && rowDetails.rowVariant) {
-      row.setAttribute("data-pdf-row-variant", String(rowDetails.rowVariant));
-    }
-    if (rowDetails && rowDetails.sharedTypographyScale) {
-      row.setAttribute("data-pdf-row-typography-scale", String(rowDetails.sharedTypographyScale));
-    }
-    if (rowDetails && rowDetails.rowHeight !== undefined) {
-      row.setAttribute("data-pdf-row-height", String(rowDetails.rowHeight));
-    }
-    if (rowDetails && rowDetails.rowNaturalHeight !== undefined) {
-      row.setAttribute("data-pdf-row-natural-height", String(rowDetails.rowNaturalHeight));
-    }
-    if (rowDetails && rowDetails.sharedHeaderHeight !== undefined) {
-      row.setAttribute("data-pdf-row-header-height", String(rowDetails.sharedHeaderHeight));
-    }
-    if (rowDetails && rowDetails.headerStrategy) {
-      row.setAttribute("data-pdf-row-header-strategy", String(rowDetails.headerStrategy));
-    }
-    if (rowDetails && rowDetails.titleToMediaSeparationPenalty !== undefined) {
-      row.setAttribute("data-pdf-row-title-media-penalty", String(rowDetails.titleToMediaSeparationPenalty));
-    }
-    if (rowDetails && rowDetails.internalUnusedSpacePenalty !== undefined) {
-      row.setAttribute("data-pdf-row-unused-space-penalty", String(rowDetails.internalUnusedSpacePenalty));
-    }
-    if (rowDetails && rowDetails.equalizationGrowthPenalty !== undefined) {
-      row.setAttribute("data-pdf-row-equalization-penalty", String(rowDetails.equalizationGrowthPenalty));
-    }
-    if (rowDetails && rowDetails.mediaUsefulnessPenalty !== undefined) {
-      row.setAttribute("data-pdf-row-media-usefulness-penalty", String(rowDetails.mediaUsefulnessPenalty));
-    }
-    if (rowDetails && rowDetails.mediaSizeMismatchPenalty !== undefined) {
-      row.setAttribute("data-pdf-row-media-mismatch-penalty", String(rowDetails.mediaSizeMismatchPenalty));
-    }
-    cards.forEach(function (cardNode) {
-      if (cardNode) {
-        if (rowDetails && rowDetails.rowHeight && className.indexOf("two-up") !== -1) {
-          cardNode.style.height = rowDetails.rowHeight + "px";
-          cardNode.style.minHeight = rowDetails.rowHeight + "px";
-        } else {
-          cardNode.style.height = "";
-          cardNode.style.minHeight = "";
-        }
-        row.appendChild(cardNode);
-      }
-    });
-    return row;
-  }
-
-  function getAdaptiveCardLargestBlankRegion(cardDiagnostic) {
-    var distribution = cardDiagnostic && cardDiagnostic.assignedFreeSpace
-      ? cardDiagnostic.assignedFreeSpace
-      : {};
-    return Math.max(
-      0,
-      Number(distribution.flexibleSpacer || 0),
-      Number(distribution.bodyMediaGap || 0),
-      Number(cardDiagnostic && cardDiagnostic.trailingResidualSpace || 0)
-    );
-  }
-
-  function getAdaptiveRowAlignmentMode(rowVariant, cardDiagnostics) {
-    var cards = Array.isArray(cardDiagnostics) ? cardDiagnostics : [];
-    if (rowVariant !== "two-up") {
-      return "single";
-    }
-    var variants = cards.map(function (card) {
-      return String(card.variant || "");
-    });
-    var mediaCards = cards.filter(function (card) {
-      return Number(card.mediaHeight || 0) > 0;
-    });
-    var footerCards = cards.filter(function (card) {
-      return Number(card.footerHeight || 0) > 0;
-    });
-    if (variants.every(function (variant) { return variant.indexOf("portrait-side") !== -1; })) {
-      return "media-top";
-    }
-    if (
-      mediaCards.length === cards.length &&
-      variants.some(function (variant) { return variant.indexOf("half-compact") !== -1; }) &&
-      variants.some(function (variant) { return variant.indexOf("portrait-side") !== -1; })
-    ) {
-      return "media-top";
-    }
-    if (footerCards.length === cards.length && footerCards.length > 1) {
-      return "footer-bottom";
-    }
-    if (mediaCards.length === cards.length) {
-      return "body-top";
-    }
-    return "balanced";
-  }
-
-  function classifyAdaptiveRowSeverity(rowDiagnostic) {
-    var cards = Array.isArray(rowDiagnostic && rowDiagnostic.cards) ? rowDiagnostic.cards : [];
-    var maxBlankRegion = 0;
-    var expectedAsymmetryReasons = [];
-    var visualPlacementDiagnostics = cards.map(function (card) {
-      return card && card.mediaVisualPlacement ? card.mediaVisualPlacement : null;
-    }).filter(Boolean);
-    cards.forEach(function (card) {
-      maxBlankRegion = Math.max(maxBlankRegion, getAdaptiveCardLargestBlankRegion(card));
-    });
-
-    var footerCards = cards.filter(function (card) {
-      return Number(card.footerHeight || 0) > 0;
-    });
-    var mediaCards = cards.filter(function (card) {
-      return Number(card.mediaHeight || 0) > 0;
-    });
-    if (footerCards.length === 1 && cards.length === 2) {
-      expectedAsymmetryReasons.push("one-sided-footer");
-    }
-    if (
-      mediaCards.length === cards.length &&
-      cards.some(function (card) { return String(card.variant || "").indexOf("half-compact") !== -1; }) &&
-      cards.some(function (card) { return String(card.variant || "").indexOf("portrait-side") !== -1; })
-    ) {
-      expectedAsymmetryReasons.push("mixed-media-layout");
-    }
-    if (
-      cards.length === 2 &&
-      Number(cards[0].typographyScale || 0) !== Number(cards[1].typographyScale || 0)
-    ) {
-      expectedAsymmetryReasons.push("mixed-typography-scale");
-    }
-
-    var overflow = cards.some(function (card) {
-      return Number(card.overflowPixels || 0) > 0 || card.containmentValid === false;
-    });
-    var visualPlacementBlocker = visualPlacementDiagnostics.find(function (diagnostic) {
-      return diagnostic.severity === "blocker";
-    }) || null;
-    var visualPlacementWarning = visualPlacementDiagnostics.find(function (diagnostic) {
-      return diagnostic.severity === "visual-warning";
-    }) || null;
-    if (visualPlacementBlocker) {
-      return {
-        severity: "blocker",
-        reasons: (visualPlacementBlocker.issues || []).slice(),
-        largestBlankRegion: Number(maxBlankRegion.toFixed(2))
-      };
-    }
-    if (overflow || Number(rowDiagnostic.equalizedHeightDifference || 0) > 1 || maxBlankRegion > 72) {
-      return {
-        severity: "blocker",
-        reasons: overflow
-          ? cards.some(function (card) { return card.containmentValid === false; })
-            ? ["card-containment-overflow"]
-            : ["content-overflow"]
-          : ["severe-blank-region"],
-        largestBlankRegion: Number(maxBlankRegion.toFixed(2))
-      };
-    }
-    if (maxBlankRegion > 44) {
-      return {
-        severity: "visual-warning",
-        reasons: ["large-blank-region"],
-        largestBlankRegion: Number(maxBlankRegion.toFixed(2))
-      };
-    }
-    if (visualPlacementWarning) {
-      return {
-        severity: "visual-warning",
-        reasons: (visualPlacementWarning.issues || []).slice(),
-        largestBlankRegion: Number(maxBlankRegion.toFixed(2))
-      };
-    }
-    if (
-      Number(rowDiagnostic.titleTopDifference || 0) > PDF_ADAPTIVE_TITLE_ALIGNMENT_WARNING_PX ||
-      (
-        Number(rowDiagnostic.mediaBottomDifference || 0) > PDF_ADAPTIVE_MEDIA_ALIGNMENT_WARNING_PX &&
-        expectedAsymmetryReasons.indexOf("mixed-media-layout") === -1
-      ) ||
-      (
-        Number(rowDiagnostic.footerBottomDifference || 0) > PDF_ADAPTIVE_FOOTER_ALIGNMENT_WARNING_PX &&
-        expectedAsymmetryReasons.indexOf("one-sided-footer") === -1
-      )
-    ) {
-      if (
-        Number(rowDiagnostic.titleTopDifference || 0) <= PDF_ADAPTIVE_TITLE_ALIGNMENT_WARNING_PX &&
-        Number(rowDiagnostic.footerBottomDifference || 0) <= PDF_ADAPTIVE_FOOTER_ALIGNMENT_WARNING_PX &&
-        Number(maxBlankRegion || 0) <= 8 &&
-        String(getAdaptiveRowAlignmentMode(rowDiagnostic.rowVariant, cards)) === "media-top"
-      ) {
-        return {
-          severity: "expected-asymmetry",
-          reasons: ["portrait-image-crop-offset"],
-          largestBlankRegion: Number(maxBlankRegion.toFixed(2))
-        };
-      }
-      return {
-        severity: "visual-warning",
-        reasons: ["row-alignment"],
-        largestBlankRegion: Number(maxBlankRegion.toFixed(2))
-      };
-    }
-    if (expectedAsymmetryReasons.length) {
-      return {
-        severity: "expected-asymmetry",
-        reasons: expectedAsymmetryReasons,
-        largestBlankRegion: Number(maxBlankRegion.toFixed(2))
-      };
-    }
-    if ((rowDiagnostic.warnings || []).length) {
-      return {
-        severity: "informational",
-        reasons: rowDiagnostic.warnings.slice(),
-        largestBlankRegion: Number(maxBlankRegion.toFixed(2))
-      };
-    }
-    return {
-      severity: "ok",
-      reasons: [],
-      largestBlankRegion: Number(maxBlankRegion.toFixed(2))
-    };
-  }
-
-  function buildAdaptiveRowSeverityDiagnostics(rowDiagnostic) {
-    var severityResult = classifyAdaptiveRowSeverity(rowDiagnostic);
-    var leftCard = rowDiagnostic && rowDiagnostic.cards && rowDiagnostic.cards[0]
-      ? rowDiagnostic.cards[0]
-      : null;
-    var rightCard = rowDiagnostic && rowDiagnostic.cards && rowDiagnostic.cards[1]
-      ? rowDiagnostic.cards[1]
-      : null;
-    var visualPlacementDiagnostics = Array.isArray(rowDiagnostic && rowDiagnostic.cards)
-      ? rowDiagnostic.cards.map(function (card) {
-          return card && card.mediaVisualPlacement ? card.mediaVisualPlacement : null;
-        }).filter(Boolean)
-      : [];
-    var maxBlankRegion = Number(severityResult.largestBlankRegion || 0);
-    var visualAssessment = "balanced";
-    if (severityResult.severity === "blocker") {
-      visualAssessment = "broken";
-    } else if (severityResult.severity === "visual-warning") {
-      visualAssessment = "needs-attention";
-    } else if (severityResult.severity === "expected-asymmetry") {
-      visualAssessment = "intentional-asymmetry";
-    } else if (maxBlankRegion > 24) {
-      visualAssessment = "acceptable-asymmetry";
-    }
-    return {
-      severity: severityResult.severity,
-      severityReasons: severityResult.reasons || [],
-      largestBlankRegion: maxBlankRegion,
-      expectedAsymmetryReasons: severityResult.severity === "expected-asymmetry"
-        ? (severityResult.reasons || [])
-        : [],
-      mediaVisualPlacementIssues: visualPlacementDiagnostics.reduce(function (issues, diagnostic) {
-        (diagnostic.issues || []).forEach(function (issue) {
-          if (issues.indexOf(issue) === -1) {
-            issues.push(issue);
-          }
-        });
-        return issues;
-      }, []),
-      alignmentMode: getAdaptiveRowAlignmentMode(
-        rowDiagnostic ? rowDiagnostic.rowVariant : "",
-        rowDiagnostic ? rowDiagnostic.cards : []
-      ),
-      visualAssessment: visualAssessment,
-      largestBlankRegionByCard: {
-        left: leftCard ? Number(getAdaptiveCardLargestBlankRegion(leftCard).toFixed(2)) : 0,
-        right: rightCard ? Number(getAdaptiveCardLargestBlankRegion(rightCard).toFixed(2)) : 0
-      }
-    };
-  }
-
-  function measureAdaptiveOuterHeight(node) {
-    if (!node || !node.getBoundingClientRect) {
-      return 0;
-    }
-    var rect = node.getBoundingClientRect();
-    var styles = window.getComputedStyle(node);
-    return rect.height +
-      (parseFloat(styles.marginTop || "0") || 0) +
-      (parseFloat(styles.marginBottom || "0") || 0);
-  }
-
-  function measureAdaptiveContinuationTitleHeight(exportRoot, titleNode) {
-    if (!exportRoot || !titleNode) {
-      return 0;
-    }
-    var measurementHost = createAdaptiveMeasurementHost(exportRoot);
-    var clone = titleNode.cloneNode(true);
-    clone.classList.add("pi-export-section-title--continued");
-    clone.removeAttribute("data-export-source-id");
-    clone.textContent = [
-      normalizeText(clone.textContent || ""),
-      getGuideCopyText("continued_suffix", "continued")
-    ].filter(Boolean).join(" \u2014 ");
-    measurementHost.appendChild(clone);
-    var height = measureAdaptiveOuterHeight(clone);
-    measurementHost.parentNode.removeChild(measurementHost);
-    return Math.ceil(height || 0);
-  }
-
-  function collectAdaptivePlanningSections(exportRoot, exportDocument) {
-    return Array.prototype.slice.call(exportDocument.querySelectorAll(".pi-export-section")).map(function (sectionNode) {
-      var titleNode = sectionNode.querySelector(".pi-export-section-title");
-      var sectionAnchor = String(sectionNode.getAttribute("data-pdf-section-anchor") || "").trim();
-      return {
-        anchor: sectionAnchor,
-        titleNode: titleNode,
-        titleHeight: Math.ceil(measureAdaptiveOuterHeight(titleNode) || 0),
-        continuationTitleHeight: Math.ceil(measureAdaptiveContinuationTitleHeight(exportRoot, titleNode) || 0),
-        rowNodes: Array.prototype.slice.call(sectionNode.querySelectorAll(":scope > .pi-export-row")).map(function (rowNode) {
-          return {
-            node: rowNode,
-            rowId: String(rowNode.getAttribute("data-pdf-row-id") || ""),
-            sectionAnchor: sectionAnchor,
-            sourceOrder: Number(rowNode.getAttribute("data-pdf-row-source-order") || 0),
-            height: Math.ceil(measureAdaptiveOuterHeight(rowNode) || 0),
-            naturalHeight: Number(rowNode.getAttribute("data-pdf-row-natural-height") || 0),
-            rowVariant: String(rowNode.getAttribute("data-pdf-row-variant") || ""),
-            rowScore: Number(rowNode.getAttribute("data-pdf-row-score") || 0),
-            variants: String(rowNode.getAttribute("data-pdf-row-variants") || "").split(",").filter(Boolean),
-            typographyScale: Number(rowNode.getAttribute("data-pdf-row-typography-scale") || 0)
-          };
-        })
-      };
-    }).filter(function (sectionPlan) {
-      return sectionPlan.titleNode && sectionPlan.rowNodes.length;
-    });
-  }
-
-  function collectAdaptivePlanningPositions(sectionPlans) {
-    var positions = [];
-    sectionPlans.forEach(function (sectionPlan, sectionIndex) {
-      sectionPlan.rowNodes.forEach(function (rowNode, rowIndex) {
-        positions.push({
-          sectionIndex: sectionIndex,
-          rowIndex: rowIndex,
-          anchor: sectionPlan.anchor,
-          rowNode: rowNode.node
-        });
-      });
-    });
-    return positions;
-  }
-
-  function populateAdaptivePageSegment(targetBody, sectionPlans, positions, startIndex, endIndex) {
-    var currentSlice = null;
-    var currentSectionIndex = -1;
-    for (var positionIndex = startIndex; positionIndex < endIndex; positionIndex += 1) {
-      var position = positions[positionIndex];
-      var sectionPlan = sectionPlans[position.sectionIndex];
-      if (!sectionPlan) {
-        continue;
-      }
-      if (currentSectionIndex !== position.sectionIndex) {
-        currentSlice = createSectionSlice(
-          targetBody.ownerDocument,
-          sectionPlan.titleNode,
-          position.rowIndex > 0
-        );
-        targetBody.appendChild(currentSlice.section);
-        currentSectionIndex = position.sectionIndex;
-      }
-      currentSlice.items.appendChild(position.rowNode.cloneNode(true));
-    }
-  }
-
-  function measureAdaptivePageCandidate(exportState, sectionPlans, positions, startIndex, endIndex, measurementCache) {
-    var cacheKey = [startIndex, endIndex].join(":");
-    if (measurementCache[cacheKey]) {
-      return measurementCache[cacheKey];
-    }
-    var usedHeight = 0;
-    var rowCount = 0;
-    var cardCount = 0;
-    var selectedVariants = [];
-    var rowPlan = [];
-    var rowQualityScore = 0;
-    var currentSectionIndex = -1;
-    for (var positionIndex = startIndex; positionIndex < endIndex; positionIndex += 1) {
-      var position = positions[positionIndex];
-      var sectionPlan = sectionPlans[position.sectionIndex];
-      var rowMeta = sectionPlan && sectionPlan.rowNodes[position.rowIndex];
-      if (!sectionPlan || !rowMeta) {
-        continue;
-      }
-      if (currentSectionIndex !== position.sectionIndex) {
-        usedHeight += position.rowIndex > 0
-          ? sectionPlan.continuationTitleHeight
-          : sectionPlan.titleHeight;
-        currentSectionIndex = position.sectionIndex;
-      }
-      usedHeight += rowMeta.height;
-      rowCount += 1;
-      cardCount += rowMeta.node.querySelectorAll(".pi-export-card").length;
-      rowPlan.push({
-        rowVariant: rowMeta.rowVariant,
-        score: rowMeta.rowScore,
-        variants: rowMeta.variants
-      });
-      rowQualityScore += Number(rowMeta.rowScore || 0);
-      Array.prototype.slice.call(rowMeta.node.querySelectorAll(".pi-export-card[data-pdf-selected-variant]")).forEach(function (cardNode) {
-        selectedVariants.push({
-          blockId: String(cardNode.getAttribute("data-pdf-block-id") || ""),
-          variant: String(cardNode.getAttribute("data-pdf-selected-variant") || "")
-        });
-      });
-    }
-    var occupancy = Math.max(0, Math.min(1, usedHeight / PDF_EXPORT_PAGE_BODY_HEIGHT));
-    var overflowPixels = Math.max(0, usedHeight - PDF_EXPORT_PAGE_BODY_HEIGHT);
-    var startPosition = positions[startIndex];
-    var endPosition = positions[endIndex - 1];
-    var candidate = {
-      startIndex: startIndex,
-      endIndex: endIndex,
-      fits: overflowPixels <= 1,
-      overflowPixels: overflowPixels,
-      summary: {
-        pageNumber: 0,
-        occupiedHeight: Number(usedHeight.toFixed(2)),
-        usableHeight: PDF_EXPORT_PAGE_BODY_HEIGHT,
-        remainingHeight: Number(Math.max(0, PDF_EXPORT_PAGE_BODY_HEIGHT - usedHeight).toFixed(2)),
-        occupancy: Number(occupancy.toFixed(3)),
-        sectionCount: Array.from(new Set(positions.slice(startIndex, endIndex).map(function (position) {
-          return position.sectionIndex;
-        }))).length,
-        cardCount: cardCount,
-        rowCount: rowCount,
-        rowQualityScore: Number(rowQualityScore.toFixed(2)),
-        selectedVariants: selectedVariants,
-        rowPlan: rowPlan,
-        sparseWarningReason: ""
-      },
-      startsContinuation: !!(startPosition && startPosition.rowIndex > 0),
-      endsWithSplitSection: !!(
-        endPosition &&
-        sectionPlans[endPosition.sectionIndex] &&
-        endPosition.rowIndex < sectionPlans[endPosition.sectionIndex].rowNodes.length - 1
-      ),
-      rows: positions.slice(startIndex, endIndex).map(function (position) {
-        return {
-          sectionIndex: position.sectionIndex,
-          rowIndex: position.rowIndex,
-          anchor: position.anchor
-        };
-      })
-    };
-    measurementCache[cacheKey] = candidate;
-    return candidate;
-  }
-
-  function scoreAdaptivePageCandidate(candidate, pageIndex, pageCount) {
-    var occupancy = candidate && candidate.summary ? Number(candidate.summary.occupancy || 0) : 0;
-    var penalty = 0;
-    if (!candidate || !candidate.fits) {
-      return Number.POSITIVE_INFINITY;
-    }
-    if (occupancy < 0.5) {
-      penalty += 3000 + ((0.5 - occupancy) * 10000);
-    } else if (occupancy < PDF_ADAPTIVE_SPARSE_PAGE_THRESHOLD) {
-      penalty += 900 + ((PDF_ADAPTIVE_SPARSE_PAGE_THRESHOLD - occupancy) * 4000);
-    }
-    if (occupancy > 0.95) {
-      penalty += 300 + ((occupancy - 0.95) * 6000);
-    }
-    if (candidate.summary.rowCount === 1 && occupancy < 0.7 && pageIndex < pageCount) {
-      penalty += 500;
-    }
-    if (candidate.endsWithSplitSection) {
-      penalty += 35;
-    }
-    if (candidate.startsContinuation) {
-      penalty += 20;
-    }
-    penalty += Number(candidate.summary && candidate.summary.rowQualityScore || 0) * 0.012;
-    return Number(penalty.toFixed(2));
-  }
-
-  function evaluateAdaptivePagePlans(exportState, sectionPlans) {
-    var positions = collectAdaptivePlanningPositions(sectionPlans);
-    var measurementCache = {};
-    var plannerDiagnostics = {
-      plansEvaluated: 0,
-      plansPruned: 0,
-      candidateFits: 0,
-      candidateOverflows: 0,
-      bestTwoPageScore: null,
-      bestThreePageScore: null,
-      bestFourPageScore: null,
-      bestRejectedTwoPageReason: null,
-      bestRejectedThreePageReason: null,
-      selectedPlan: null
-    };
-    if (!positions.length) {
-      return {
-        plan: [],
-        diagnostics: plannerDiagnostics
-      };
-    }
-    var finishedPlans = [];
-
-    function explore(startIndex, pages) {
-      if (pages.length > positions.length) {
-        plannerDiagnostics.plansPruned += 1;
-        return;
-      }
-      if (startIndex >= positions.length) {
-        plannerDiagnostics.plansEvaluated += 1;
-        finishedPlans.push(pages.slice());
-        return;
-      }
-      for (var endIndex = startIndex + 1; endIndex <= positions.length; endIndex += 1) {
-        var candidate = measureAdaptivePageCandidate(exportState, sectionPlans, positions, startIndex, endIndex, measurementCache);
-        if (!candidate.fits) {
-          plannerDiagnostics.candidateOverflows += 1;
-          plannerDiagnostics.plansPruned += 1;
-          break;
-        }
-        plannerDiagnostics.candidateFits += 1;
-        pages.push(candidate);
-        explore(endIndex, pages);
-        pages.pop();
-      }
-    }
-
-    explore(0, []);
-
-    var scoredPlans = finishedPlans.map(function (pages) {
-      var score = pages.length * 10000;
-      pages.forEach(function (candidate, pageIndex) {
-        score += scoreAdaptivePageCandidate(candidate, pageIndex + 1, pages.length);
-      });
-      return {
-        pages: pages,
-        pageCount: pages.length,
-        score: Number(score.toFixed(2))
-      };
-    }).sort(function (left, right) {
-      return left.score - right.score;
-    });
-
-    var bestPlan = scoredPlans[0] || null;
-    var bestTwo = scoredPlans.find(function (plan) {
-      return plan.pageCount === 2;
-    }) || null;
-    var bestThree = scoredPlans.find(function (plan) {
-      return plan.pageCount === 3;
-    }) || null;
-    var bestFour = scoredPlans.find(function (plan) {
-      return plan.pageCount === 4;
-    }) || null;
-
-    plannerDiagnostics.bestTwoPageScore = bestTwo ? bestTwo.score : null;
-    plannerDiagnostics.bestThreePageScore = bestThree ? bestThree.score : null;
-    plannerDiagnostics.bestFourPageScore = bestFour ? bestFour.score : null;
-    plannerDiagnostics.selectedPlan = bestPlan ? {
-      pageCount: bestPlan.pageCount,
-      score: bestPlan.score,
-      pages: bestPlan.pages.map(function (candidate, index) {
-        return {
-          page: index + 1,
-          occupancy: candidate.summary.occupancy,
-          rows: candidate.rows,
-          rowVariants: candidate.summary.rowPlan
-        };
-      })
-    } : null;
-    if (!bestThree) {
-      plannerDiagnostics.bestRejectedThreePageReason = "No valid 3-page composition fit within the measured A4 page body.";
-    } else if (bestPlan && bestPlan.pageCount > 3) {
-      plannerDiagnostics.bestRejectedThreePageReason = "The best 3-page composition incurred a higher density/quality penalty than the selected plan.";
-    }
-
-    return {
-      plan: bestPlan ? bestPlan.pages : [],
-      plans: scoredPlans,
-      diagnostics: plannerDiagnostics
-    };
-  }
-
-  function buildAdaptivePlannedPages(exportState, exportPages, firstPageState, sectionPlans, plannedPages) {
-    var documentNode = exportState.exportDocument.ownerDocument;
-    var pageState = firstPageState;
-
-    function nextAdaptivePage() {
-      pageState = createExportPageShell(documentNode, exportState.exportDocument);
-      exportPages.appendChild(pageState.page);
-      return pageState;
-    }
-
-    plannedPages.forEach(function (candidate, candidateIndex) {
-      if (candidateIndex > 0) {
-        nextAdaptivePage();
-      }
-      var currentSlice = null;
-      var currentSectionIndex = -1;
-      candidate.rows.forEach(function (rowRef) {
-        var sectionPlan = sectionPlans[rowRef.sectionIndex];
-        var rowMeta = sectionPlan && sectionPlan.rowNodes[rowRef.rowIndex];
-        var rowNode = rowMeta && rowMeta.node;
-        if (!sectionPlan || !rowNode) {
-          return;
-        }
-        if (currentSectionIndex !== rowRef.sectionIndex) {
-          currentSlice = createSectionSlice(
-            documentNode,
-            sectionPlan.titleNode,
-            rowRef.rowIndex > 0
-          );
-          pageState.body.appendChild(currentSlice.section);
-          currentSectionIndex = rowRef.sectionIndex;
-        }
-        currentSlice.items.appendChild(rowNode);
-      });
-      pageState.hasContent = true;
-    });
-  }
-
-  function getAdaptivePageOverflowPixels(pageNode) {
-    var viewport = pageNode && pageNode.querySelector
-      ? pageNode.querySelector(".pi-export-page-body")
-      : null;
-    if (!viewport) {
-      return 0;
-    }
-    return Math.max(0, viewport.scrollHeight - viewport.clientHeight);
-  }
-
-  function collectAdaptivePageSummary(exportPages) {
-    var pageNodes = Array.prototype.slice.call(exportPages.querySelectorAll(".pi-export-page"));
-    return pageNodes.map(function (pageNode, pageIndex) {
-      var viewport = pageNode.querySelector(".pi-export-page-body");
-      var viewportRect = viewport ? viewport.getBoundingClientRect() : null;
-      var pageDirection = String((pageNode.getAttribute("dir") || pageNode.closest(".pi-export-document") && pageNode.closest(".pi-export-document").getAttribute("dir") || "ltr")).toLowerCase();
-      var structuralBottom = viewportRect ? viewportRect.top : 0;
-      var contentBottom = viewportRect ? viewportRect.top : 0;
-      if (viewport) {
-        Array.prototype.slice.call(viewport.children).forEach(function (childNode) {
-          var childNodes = childNode.classList && childNode.classList.contains("pi-export-section")
-            ? Array.prototype.slice.call(childNode.children)
-            : [childNode];
-          childNodes.forEach(function (measuredNode) {
-            if (!measuredNode || !measuredNode.getBoundingClientRect) {
-              return;
-            }
-            var styles = window.getComputedStyle(measuredNode);
-            if (styles.display === "none" || styles.visibility === "hidden" || styles.position === "absolute") {
-              return;
-            }
-            var rect = measuredNode.getBoundingClientRect();
-            if (rect.width <= 0 || rect.height <= 0) {
-              return;
-            }
-            structuralBottom = Math.max(structuralBottom, rect.bottom);
-          });
-        });
-        Array.prototype.slice.call(viewport.querySelectorAll("*")).forEach(function (descendantNode) {
-          if (!descendantNode || !descendantNode.getBoundingClientRect) {
-            return;
-          }
-          if (
-            descendantNode.classList &&
-            (
-              descendantNode.classList.contains("pi-export-row") ||
-              descendantNode.classList.contains("pi-export-card") ||
-              descendantNode.classList.contains("pi-export-card-layout") ||
-              descendantNode.classList.contains("pi-export-card-text") ||
-              descendantNode.classList.contains("pi-export-card-flex-spacer")
-            )
-          ) {
-            return;
-          }
-          var descendantStyles = window.getComputedStyle(descendantNode);
-          if (descendantStyles.display === "none" || descendantStyles.visibility === "hidden" || descendantStyles.position === "absolute") {
-            return;
-          }
-          var descendantRect = descendantNode.getBoundingClientRect();
-          if (descendantRect.width <= 0 || descendantRect.height <= 0) {
-            return;
-          }
-          contentBottom = Math.max(contentBottom, descendantRect.bottom);
-        });
-      }
-      var structuralOccupiedHeight = viewport && viewportRect
-        ? Math.max(0, Math.min(viewport.clientHeight, structuralBottom - viewportRect.top))
-        : 0;
-      var occupiedHeight = viewport && viewportRect
-        ? Math.max(0, Math.min(viewport.clientHeight, contentBottom - viewportRect.top))
-        : 0;
-      var usableHeight = viewport ? viewport.clientHeight : 0;
-      var occupancy = usableHeight
-        ? Math.max(0, Math.min(1, occupiedHeight / usableHeight))
-        : 0;
-      var structuralOccupancy = usableHeight
-        ? Math.max(0, Math.min(1, structuralOccupiedHeight / usableHeight))
-        : 0;
-      var remainingHeight = Math.max(0, usableHeight - occupiedHeight);
-      var sectionCount = pageNode.querySelectorAll(".pi-export-section").length;
-      var rowNodes = Array.prototype.slice.call(pageNode.querySelectorAll(".pi-export-row"));
-      var hasLargeVisual = !!pageNode.querySelector(".pi-export-map, .pi-export-parking-map--adaptive");
-      var sparseWarningReason = "";
-      if (
-        pageIndex > 0 &&
-        occupancy < PDF_ADAPTIVE_SPARSE_PAGE_THRESHOLD &&
-        !hasLargeVisual &&
-        pageIndex < pageNodes.length - 1
-      ) {
-        sparseWarningReason = "low-occupancy";
-      }
-      function rectDiagnostic(node) {
-        if (!node || !node.getBoundingClientRect) {
-          return null;
-        }
-        var rect = node.getBoundingClientRect();
-        return {
-          left: Number(rect.left.toFixed(2)),
-          top: Number(rect.top.toFixed(2)),
-          right: Number(rect.right.toFixed(2)),
-          bottom: Number(rect.bottom.toFixed(2)),
-          width: Number(rect.width.toFixed(2)),
-          height: Number(rect.height.toFixed(2)),
-          centerX: Number((rect.left + (rect.width / 2)).toFixed(2)),
-          centerY: Number((rect.top + (rect.height / 2)).toFixed(2))
-        };
-      }
-      return {
-        pageNumber: pageIndex + 1,
-        pageRect: rectDiagnostic(pageNode),
-        viewportRect: rectDiagnostic(viewport),
-        occupiedHeight: Number(occupiedHeight.toFixed(2)),
-        structuralOccupiedHeight: Number(structuralOccupiedHeight.toFixed(2)),
-        usableHeight: usableHeight,
-        remainingHeight: Number(remainingHeight.toFixed(2)),
-        occupancy: Number(occupancy.toFixed(3)),
-        contentOccupancy: Number(occupancy.toFixed(3)),
-        structuralOccupancy: Number(structuralOccupancy.toFixed(3)),
-        sectionCount: sectionCount,
-        cardCount: pageNode.querySelectorAll(".pi-export-card").length,
-        rowCount: rowNodes.length,
-        selectedVariants: Array.prototype.slice.call(pageNode.querySelectorAll(".pi-export-card[data-pdf-selected-variant]")).map(function (cardNode) {
-          return {
-            blockId: String(cardNode.getAttribute("data-pdf-block-id") || ""),
-            variant: String(cardNode.getAttribute("data-pdf-selected-variant") || "")
-          };
-        }),
-        rowPlan: rowNodes.map(function (rowNode) {
-          var rowCardNodes = Array.prototype.slice.call(rowNode.querySelectorAll(".pi-export-card"));
-          var rowTypographyScales = rowCardNodes.map(function (cardNode) {
-            return Number(cardNode.getAttribute("data-pdf-card-typography-scale") || 0);
-          }).filter(Boolean);
-          var cardDiagnostics = rowCardNodes.map(function (cardNode) {
-            var badgeNode = cardNode.querySelector(".pi-export-step-badge");
-            var badgeInnerNode = badgeNode ? badgeNode.querySelector("span") : null;
-            var titleNode = cardNode.querySelector(".pi-export-card-title");
-            var headerNode = cardNode.querySelector("[data-card-region='header']");
-            var bodyRegionNode = cardNode.querySelector("[data-card-region='body']");
-            var mediaNode = cardNode.querySelector(".pi-export-card-media");
-            var footerRegionNode = cardNode.querySelector("[data-card-region='footer']");
-            var titleRect = rectDiagnostic(titleNode);
-            var badgeRect = rectDiagnostic(badgeNode);
-            var badgeInnerRect = rectDiagnostic(badgeInnerNode);
-            var headerRect = rectDiagnostic(headerNode);
-            var bodyRect = rectDiagnostic(bodyRegionNode);
-            var mediaRect = rectDiagnostic(mediaNode);
-            var footerRect = rectDiagnostic(footerRegionNode);
-            var cardRect = rectDiagnostic(cardNode);
-            var styles = window.getComputedStyle(cardNode);
-            var titleStyles = titleNode ? window.getComputedStyle(titleNode) : null;
-            var bodyNode = cardNode.querySelector(".pi-export-card-body");
-            var bodyStyles = bodyNode ? window.getComputedStyle(bodyNode) : null;
-            var captionNode = cardNode.querySelector(".pi-export-card-caption");
-            var captionStyles = captionNode ? window.getComputedStyle(captionNode) : null;
-            var linkNode = cardNode.querySelector(".pi-export-card-link");
-            var linkStyles = linkNode ? window.getComputedStyle(linkNode) : null;
-            var mediaVisualPlacement = collectAdaptiveMediaVisualPlacement(cardNode);
-            var badgeDeviationX = badgeRect && badgeInnerRect
-              ? Math.abs(badgeRect.centerX - badgeInnerRect.centerX)
-              : 0;
-            var badgeDeviationY = badgeRect && badgeInnerRect
-              ? Math.abs(badgeRect.centerY - badgeInnerRect.centerY)
-              : 0;
-            var distribution = {};
-            var contentProfile = {};
-            var rowProjection = {};
-            try {
-              distribution = JSON.parse(cardNode.getAttribute("data-pdf-card-region-distribution") || "{}");
-            } catch (error) {
-              distribution = {};
-            }
-            try {
-              contentProfile = JSON.parse(cardNode.getAttribute("data-pdf-card-content-profile") || "{}");
-            } catch (error) {
-              contentProfile = {};
-            }
-            try {
-              rowProjection = JSON.parse(cardNode.getAttribute("data-pdf-card-row-projection") || "{}");
-            } catch (error) {
-              rowProjection = {};
-            }
-            var containmentDiagnostics = collectAdaptiveCardContainment(cardNode);
-            var warnings = [];
-            if (badgeDeviationX > PDF_ADAPTIVE_BADGE_CENTER_WARNING_PX || badgeDeviationY > PDF_ADAPTIVE_BADGE_CENTER_WARNING_PX) {
-              warnings.push("badge-center-deviation");
-            }
-            if (Number(cardNode.getAttribute("data-pdf-card-internal-free-space") || 0) > 72) {
-              warnings.push("excess-internal-free-space");
-            }
-            if (Number(cardNode.getAttribute("data-pdf-card-natural-height") || 0) > Number(cardNode.getAttribute("data-pdf-card-row-height") || 0) + 1) {
-              warnings.push("content-overflow");
-            }
-            if (!containmentDiagnostics.valid) {
-              warnings.push("card-containment-overflow");
-            }
-            if (mediaVisualPlacement && mediaVisualPlacement.severity !== "ok") {
-              Array.prototype.push.apply(warnings, mediaVisualPlacement.issues || []);
-            }
-            return {
-              blockId: String(cardNode.getAttribute("data-pdf-block-id") || ""),
-              cardRect: cardRect,
-              cardBounds: containmentDiagnostics.cardBounds,
-              innerBounds: containmentDiagnostics.innerBounds,
-              stepNumber: normalizeText((badgeInnerNode && (badgeInnerNode.textContent || "")) || ""),
-              title: normalizeText((titleNode && (titleNode.textContent || "")) || ""),
-              variant: String(cardNode.getAttribute("data-pdf-selected-variant") || ""),
-              typographyScale: Number(cardNode.getAttribute("data-pdf-card-typography-scale") || 0),
-              titleFontSize: titleStyles ? Number(parseFloat(titleStyles.fontSize || "0").toFixed(2)) : 0,
-              bodyFontSize: bodyStyles ? Number(parseFloat(bodyStyles.fontSize || "0").toFixed(2)) : 0,
-              captionFontSize: captionStyles ? Number(parseFloat(captionStyles.fontSize || "0").toFixed(2)) : 0,
-              linkFontSize: linkStyles ? Number(parseFloat(linkStyles.fontSize || "0").toFixed(2)) : 0,
-              lineHeight: bodyStyles ? Number(parseFloat(bodyStyles.lineHeight || "0").toFixed(2)) : 0,
-              badgeWidth: badgeRect ? badgeRect.width : 0,
-              badgeHeight: badgeRect ? badgeRect.height : 0,
-              badgeRect: badgeRect,
-              badgeInnerRect: badgeInnerRect,
-              badgeCenterDeviationX: Number(badgeDeviationX.toFixed(2)),
-              badgeCenterDeviationY: Number(badgeDeviationY.toFixed(2)),
-              headerHeight: Number(cardNode.getAttribute("data-pdf-card-header-height") || 0),
-              appliedHeaderHeight: Number(cardNode.getAttribute("data-pdf-card-applied-header-height") || 0),
-              bodyHeight: Number(cardNode.getAttribute("data-pdf-card-body-height") || 0),
-              mediaHeight: Number(cardNode.getAttribute("data-pdf-card-media-height") || 0),
-              footerHeight: Number(cardNode.getAttribute("data-pdf-card-footer-height") || 0),
-              headerRect: headerRect,
-              bodyRect: bodyRect,
-              titleRect: titleRect,
-              titleTop: titleRect ? titleRect.top : 0,
-              titleLineCount: Math.max(0, Number(cardNode.getAttribute("data-pdf-card-title-lines") || 0)),
-              naturalContentHeight: Number(cardNode.getAttribute("data-pdf-card-natural-height") || 0),
-              renderedCardHeight: Number(cardNode.getAttribute("data-pdf-card-row-height") || 0),
-              rowHeight: Number(rowNode.getAttribute("data-pdf-row-height") || 0),
-              internalFreeSpace: Number(cardNode.getAttribute("data-pdf-card-internal-free-space") || 0),
-              overflowPixels: Math.max(0, Number(cardNode.getAttribute("data-pdf-card-natural-height") || 0) - Number(cardNode.getAttribute("data-pdf-card-row-height") || 0)),
-              overflowTop: containmentDiagnostics.overflowTop,
-              overflowRight: containmentDiagnostics.overflowRight,
-              overflowBottom: containmentDiagnostics.overflowBottom,
-              overflowLeft: containmentDiagnostics.overflowLeft,
-              containmentValid: containmentDiagnostics.valid,
-              descendantBounds: containmentDiagnostics.descendantBounds,
-              mediaTop: mediaRect ? mediaRect.top : 0,
-              mediaBottom: mediaRect ? mediaRect.bottom : 0,
-              footerTop: footerRect ? footerRect.top : 0,
-              footerBottom: footerRect ? footerRect.bottom : 0,
-              mediaVisualPlacement: mediaVisualPlacement,
-              mediaVerticalAlignmentMode: String(cardNode.getAttribute("data-pdf-media-vertical-alignment") || "natural"),
-              typographySelection: (function () {
-                try {
-                  return JSON.parse(cardNode.getAttribute("data-pdf-card-typography-selection") || "{}");
-                } catch (error) {
-                  return {};
-                }
-              })(),
-              assignedFreeSpace: distribution,
-              trailingResidualSpace: Number(cardNode.getAttribute("data-pdf-card-trailing-space") || 0),
-              contentProfile: contentProfile,
-              rowProjection: rowProjection,
-              direction: pageDirection,
-              language: String(cardNode.closest(".pi-export-document") && cardNode.closest(".pi-export-document").getAttribute("lang") || SOURCE_LANGUAGE),
-              warnings: warnings
-            };
-          });
-          var renderedHeights = cardDiagnostics.map(function (card) { return Number(card.renderedCardHeight || 0); }).filter(Boolean);
-          var equalizedHeightDifference = renderedHeights.length > 1
-            ? Math.max.apply(null, renderedHeights) - Math.min.apply(null, renderedHeights)
-            : 0;
-          var internalFreeSpaces = cardDiagnostics.map(function (card) { return Number(card.internalFreeSpace || 0); });
-          var internalFreeSpaceDifference = internalFreeSpaces.length > 1
-            ? Math.max.apply(null, internalFreeSpaces) - Math.min.apply(null, internalFreeSpaces)
-            : 0;
-          var titleTops = cardDiagnostics.map(function (card) { return Number(card.titleTop || 0); }).filter(Boolean);
-          var titleTopDifference = titleTops.length > 1
-            ? Math.max.apply(null, titleTops) - Math.min.apply(null, titleTops)
-            : 0;
-          var mediaBottoms = cardDiagnostics.map(function (card) { return Number(card.mediaBottom || 0); }).filter(Boolean);
-          var mediaBottomDifference = mediaBottoms.length > 1
-            ? Math.max.apply(null, mediaBottoms) - Math.min.apply(null, mediaBottoms)
-            : 0;
-          var footerBottoms = cardDiagnostics.filter(function (card) {
-            return Number(card.footerHeight || 0) > 0;
-          }).map(function (card) { return Number(card.footerBottom || 0); }).filter(Boolean);
-          var footerBottomDifference = footerBottoms.length > 1
-            ? Math.max.apply(null, footerBottoms) - Math.min.apply(null, footerBottoms)
-            : 0;
-          var rowWarnings = [];
-          if (equalizedHeightDifference > 1) {
-            rowWarnings.push("unequal-rendered-heights");
-          }
-          if (rowTypographyScales.length > 1 && rowTypographyScales.some(function (scale) { return scale !== rowTypographyScales[0]; })) {
-            rowWarnings.push("mixed-typography-scales");
-          }
-          if (internalFreeSpaceDifference > PDF_ADAPTIVE_FREE_SPACE_WARNING_PX) {
-            rowWarnings.push("uneven-internal-free-space");
-          }
-          if (titleTopDifference > PDF_ADAPTIVE_TITLE_ALIGNMENT_WARNING_PX) {
-            rowWarnings.push("title-misalignment");
-          }
-          if (mediaBottomDifference > PDF_ADAPTIVE_MEDIA_ALIGNMENT_WARNING_PX && cardDiagnostics.every(function (card) { return Number(card.mediaHeight || 0) > 0; })) {
-            rowWarnings.push("media-misalignment");
-          }
-          if (footerBottomDifference > PDF_ADAPTIVE_FOOTER_ALIGNMENT_WARNING_PX && footerBottoms.length > 1) {
-            rowWarnings.push("footer-misalignment");
-          }
-          if (cardDiagnostics.some(function (card) {
-            return card.mediaVisualPlacement && card.mediaVisualPlacement.severity !== "ok";
-          })) {
-            rowWarnings.push("media-visual-placement");
-          }
-          var rowDiagnostic = {
-            rowRect: rectDiagnostic(rowNode),
-            rowId: String(rowNode.getAttribute("data-pdf-row-id") || ""),
-            rowVariant: String(rowNode.getAttribute("data-pdf-row-variant") || ""),
-            score: Number(rowNode.getAttribute("data-pdf-row-score") || 0),
-            variants: String(rowNode.getAttribute("data-pdf-row-variants") || "").split(",").filter(Boolean),
-            typographyScale: Number(rowNode.getAttribute("data-pdf-row-typography-scale") || 0),
-            rowHeight: Number(rowNode.getAttribute("data-pdf-row-height") || 0),
-            rowNaturalHeight: Number(rowNode.getAttribute("data-pdf-row-natural-height") || 0),
-            headerHeight: Number(rowNode.getAttribute("data-pdf-row-header-height") || 0),
-            headerStrategy: String(rowNode.getAttribute("data-pdf-row-header-strategy") || "natural"),
-            titleToMediaSeparationPenalty: Number(rowNode.getAttribute("data-pdf-row-title-media-penalty") || 0),
-            internalUnusedSpacePenalty: Number(rowNode.getAttribute("data-pdf-row-unused-space-penalty") || 0),
-            equalizationGrowthPenalty: Number(rowNode.getAttribute("data-pdf-row-equalization-penalty") || 0),
-            mediaUsefulnessPenalty: Number(rowNode.getAttribute("data-pdf-row-media-usefulness-penalty") || 0),
-            mediaSizeMismatchPenalty: Number(rowNode.getAttribute("data-pdf-row-media-mismatch-penalty") || 0),
-            equalizedHeightDifference: Number(equalizedHeightDifference.toFixed(2)),
-            internalFreeSpaceDifference: Number(internalFreeSpaceDifference.toFixed(2)),
-            titleTopDifference: Number(titleTopDifference.toFixed(2)),
-            mediaBottomDifference: Number(mediaBottomDifference.toFixed(2)),
-            footerBottomDifference: Number(footerBottomDifference.toFixed(2)),
-            cards: cardDiagnostics,
-            warnings: rowWarnings
-          };
-          return Object.assign(rowDiagnostic, buildAdaptiveRowSeverityDiagnostics(rowDiagnostic));
-        }),
-        sparseWarningReason: sparseWarningReason
-      };
-    });
-  }
-
-  function applyAdaptiveSectionRows(exportState) {
-    var exportDocument = exportState.exportDocument;
-    var measurementHost = createAdaptiveMeasurementHost(exportState.exportRoot);
-    var measurementCache = {};
-    var adaptiveRowSequence = 0;
-    var summary = {
-      layout: "adaptive",
-      pageCount: 0,
-      compactCount: 0,
-      mediumCount: 0,
-      wideCount: 0,
-      portraitImageCount: 0,
-      landscapeImageCount: 0,
-      squareImageCount: 0,
-      sparsePageWarnings: [],
-      pageOccupancy: [],
-      sectionPlans: []
-    };
-
-    Array.prototype.slice.call(exportDocument.querySelectorAll(".pi-export-section")).forEach(function (sectionNode) {
-      var sectionAnchor = String(sectionNode.getAttribute("data-pdf-section-anchor") || "").trim();
-      var titleNode = sectionNode.querySelector(".pi-export-section-title");
-      var parkingMapNode = sectionNode.querySelector(".pi-export-parking-map");
-      var cards = Array.prototype.slice.call(sectionNode.querySelectorAll(":scope > .pi-export-card"));
-      var rows = [];
-      var cardPlans = [];
-
-      if (sectionAnchor === "parking" && parkingMapNode && cards[0]) {
-        Array.prototype.slice.call(cards[0].querySelectorAll(".pi-export-card-media [data-export-image-frame]")).forEach(function (frameNode) {
-          if (frameNode.parentNode) {
-            frameNode.parentNode.removeChild(frameNode);
-          }
-        });
-      }
-
-      cards.forEach(function (cardNode) {
-        var cardPlan = createAdaptiveCardCandidates(cardNode, measurementHost, measurementCache);
-        cardPlans.push(cardPlan);
-        if (cardPlan.orientation === "portrait") {
-          summary.portraitImageCount += 1;
-        } else if (cardPlan.orientation === "landscape") {
-          summary.landscapeImageCount += 1;
-        } else {
-          summary.squareImageCount += 1;
-        }
-      });
-
-      if (sectionAnchor === "parking" && parkingMapNode && cardPlans.length) {
-        var parkingTextPlan = cardPlans.shift();
-        var parkingVariant = getAdaptiveParkingCompositeVariant(
-          parkingTextPlan.cardNode,
-          parkingMapNode,
-          exportDocument.getAttribute("dir") || "ltr",
-          sectionNode
-        );
-        parkingTextPlan.cardNode.classList.remove(
-          "pi-export-card--adaptive-compact",
-          "pi-export-card--adaptive-medium",
-          "pi-export-card--adaptive-wide",
-          "pi-export-card--adaptive-half",
-          "pi-export-card--adaptive-full",
-          "pi-export-card--adaptive-portrait",
-          "pi-export-card--adaptive-landscape",
-          "pi-export-card--adaptive-square",
-          "pi-export-card--adaptive-layout-half-compact",
-          "pi-export-card--adaptive-layout-half-landscape-stacked",
-          "pi-export-card--adaptive-layout-half-portrait-side",
-          "pi-export-card--adaptive-layout-wide-horizontal",
-          "pi-export-card--adaptive-layout-wide-stacked"
-        );
-        parkingTextPlan.cardNode.classList.add("pi-export-card--adaptive", "pi-export-card--adaptive-parking-text");
-        parkingTextPlan.cardNode.setAttribute("data-pdf-selected-variant", "parking-text");
-        parkingTextPlan.cardNode.setAttribute("data-pdf-parking-variant", parkingVariant);
-        if (parkingVariant === "parking-map-right-list-columns") {
-          parkingTextPlan.cardNode.classList.add("pi-export-card--adaptive-parking-list-columns");
-        } else {
-          parkingTextPlan.cardNode.classList.remove("pi-export-card--adaptive-parking-list-columns");
-        }
-        parkingTextPlan.cardNode.style.width = "";
-        parkingTextPlan.cardNode.setAttribute("data-pdf-card-kind", "medium");
-        parkingTextPlan.cardNode.setAttribute("data-pdf-card-height", "0");
-        parkingMapNode.classList.add("pi-export-parking-map--adaptive");
-        parkingMapNode.setAttribute("data-pdf-parking-variant", parkingVariant);
-        if (parkingVariant === "parking-map-right-actions-stack") {
-          moveAdaptiveParkingActionsToMap(exportDocument.ownerDocument, parkingTextPlan.cardNode, parkingMapNode);
-        }
-        parkingMapNode.removeAttribute("data-pdf-section-item");
-        parkingTextPlan.cardNode.removeAttribute("data-pdf-section-item");
-        rows.push(createAdaptiveRow(
-          exportDocument.ownerDocument,
-          [parkingTextPlan.cardNode, parkingMapNode],
-          "pi-export-row--parking",
-          {
-            rowId: sectionAnchor + "-row-" + (adaptiveRowSequence + 1),
-            sectionAnchor: sectionAnchor,
-            sourceOrder: adaptiveRowSequence + 1,
-            score: 0,
-            rowVariant: parkingVariant,
-            cards: [{
-              cardNode: parkingTextPlan.cardNode,
-              variant: {
-                kind: "medium",
-                layout: parkingVariant,
-                orientation: "square",
-                isWide: false
-              }
-            }]
-          }
-        ));
-        adaptiveRowSequence += 1;
-        summary.mediumCount += 1;
-      } else if (parkingMapNode) {
-        parkingMapNode.classList.add("pi-export-parking-map--adaptive-standalone");
-        rows.push(createAdaptiveRow(exportDocument.ownerDocument, [parkingMapNode], "pi-export-row--full", {
-          rowId: sectionAnchor + "-row-" + (adaptiveRowSequence + 1),
-          sectionAnchor: sectionAnchor,
-          sourceOrder: adaptiveRowSequence + 1,
-          rowVariant: "parking-map-standalone"
-        }));
-        adaptiveRowSequence += 1;
-      }
-
-      var planResult = planAdaptiveSectionRows(cardPlans);
-      if (cardPlans.length && !planResult.rows.length) {
-        var noValidRowPlan = {
-          sectionAnchor: sectionAnchor,
-          cardPlans: cardPlans.map(function (cardPlan) {
-            return {
-              blockId: String(cardPlan.blockId || ""),
-              orientation: String(cardPlan.orientation || ""),
-              textLength: Number(cardPlan.textLength || 0),
-              hasMap: !!cardPlan.hasMap,
-              isWarning: !!cardPlan.isWarning,
-              wideCandidates: Number(cardPlan.wideCandidates ? cardPlan.wideCandidates.length : 0),
-              halfCandidates: Number(cardPlan.halfCandidates ? cardPlan.halfCandidates.length : 0),
-              candidateDiagnostics: (cardPlan.candidateDiagnostics || []).slice(0, 12)
-            };
-          })
-        };
-        window.__propertyInstructionLastPdfDiagnostics = Object.assign({}, window.__propertyInstructionLastPdfDiagnostics || {}, {
-          adaptiveNoValidRowPlan: noValidRowPlan
-        });
-        var noValidRowPlanError = new Error("adaptive-no-valid-row-plan:" + JSON.stringify(noValidRowPlan));
-        noValidRowPlanError.code = "adaptive-no-valid-row-plan";
-        noValidRowPlanError.adaptiveNoValidRowPlan = noValidRowPlan;
-        throw noValidRowPlanError;
-      }
-      summary.sectionPlans.push({
-        anchor: sectionAnchor,
-        score: Number((planResult.score || 0).toFixed(2)),
-        rowCount: planResult.rows.length,
-        cardCandidates: cardPlans.map(function (cardPlan) {
-          return {
-            blockId: String(cardPlan.blockId || ""),
-            orientation: String(cardPlan.orientation || ""),
-            textLength: Number(cardPlan.textLength || 0),
-            contentProfile: cardPlan.contentProfile || null,
-            candidateDiagnostics: cardPlan.candidateDiagnostics || []
-          };
-        }),
-        adjacentPairEvaluations: planResult.pairDiagnostics || [],
-        pairEvaluations: planResult.rows.filter(function (rowPlan) {
-          return rowPlan.type === "pair";
-        }).map(function (rowPlan) {
-          return {
-            rowHeight: Number(rowPlan.rowHeight || 0),
-            evaluations: rowPlan.pairEvaluations || []
-          };
-        }),
-        variants: planResult.rows.map(function (rowPlan) {
-          return rowPlan.cards.map(function (cardEntry) {
-            return String(cardEntry.variant.layout || cardEntry.variant.kind || "medium");
-          });
-        })
-      });
-      planResult.rows.forEach(function (rowPlan) {
-        rowPlan.cards.forEach(function (cardEntry) {
-          applyAdaptiveMeasurementVariant(cardEntry.cardNode, cardEntry.variant);
-          cardEntry.cardNode.style.width = "";
-          cardEntry.cardNode.removeAttribute("data-pdf-section-item");
-          cardEntry.cardNode.setAttribute("data-pdf-card-kind", cardEntry.variant.kind);
-          cardEntry.cardNode.setAttribute("data-pdf-card-height", String(cardEntry.variant.measuredHeight || 0));
-          cardEntry.cardNode.setAttribute("data-pdf-card-natural-height", String(cardEntry.variant.naturalContentHeight || cardEntry.variant.measuredHeight || 0));
-          cardEntry.cardNode.setAttribute("data-pdf-card-row-height", String(rowPlan.rowHeight || cardEntry.variant.measuredHeight || 0));
-          cardEntry.cardNode.setAttribute(
-            "data-pdf-card-internal-free-space",
-            String(Math.max(0, Number(rowPlan.rowHeight || cardEntry.variant.measuredHeight || 0) - Number(cardEntry.variant.naturalContentHeight || cardEntry.variant.measuredHeight || 0)))
-          );
-          cardEntry.cardNode.setAttribute("data-pdf-card-typography-scale", String(cardEntry.variant.typographyScale || 1));
-          cardEntry.cardNode.setAttribute("data-pdf-card-title-lines", String(cardEntry.variant.titleLines || 0));
-          cardEntry.cardNode.setAttribute("data-pdf-card-title-font-size", String(cardEntry.variant.titleFontSize || 0));
-          cardEntry.cardNode.setAttribute("data-pdf-card-body-font-size", String(cardEntry.variant.bodyFontSize || 0));
-          cardEntry.cardNode.setAttribute("data-pdf-card-caption-font-size", String(cardEntry.variant.captionFontSize || 0));
-          cardEntry.cardNode.setAttribute("data-pdf-card-link-font-size", String(cardEntry.variant.linkFontSize || 0));
-          cardEntry.cardNode.setAttribute("data-pdf-card-line-height", String(cardEntry.variant.lineHeight || 0));
-          cardEntry.cardNode.setAttribute("data-pdf-card-badge-size", String(cardEntry.variant.badgeSize || 0));
-          cardEntry.cardNode.setAttribute("data-pdf-card-region-order", "header,body,media,footer");
-          if (cardEntry.cardPlan && cardEntry.cardPlan.contentProfile) {
-            cardEntry.cardNode.setAttribute(
-              "data-pdf-card-content-profile",
-              JSON.stringify(cardEntry.cardPlan.contentProfile)
-            );
-          }
-          if (cardEntry.projection) {
-            cardEntry.cardNode.setAttribute(
-              "data-pdf-card-row-projection",
-              JSON.stringify(cardEntry.projection)
-            );
-          }
-          cardEntry.cardNode.setAttribute(
-            "data-pdf-card-typography-selection",
-            JSON.stringify(
-              buildAdaptiveTypographySelectionDiagnostics(
-                cardEntry.cardPlan,
-                cardEntry.variant,
-                rowPlan.rowHeight || cardEntry.variant.measuredHeight || 0
-              )
-            )
-          );
-          applyAdaptiveRowDistribution(cardEntry.cardNode, cardEntry.variant, Object.assign({}, rowPlan, {
-            projection: cardEntry.projection || null
-          }));
-          summary[cardEntry.variant.kind + "Count"] += 1;
-        });
-        rows.push(createAdaptiveRow(
-          exportDocument.ownerDocument,
-          rowPlan.cards.map(function (cardEntry) {
-            return cardEntry.cardNode;
-          }),
-          rowPlan.type === "pair" ? "pi-export-row--two-up" : "pi-export-row--full",
-          Object.assign({
-            rowId: sectionAnchor + "-row-" + (adaptiveRowSequence + 1),
-            sectionAnchor: sectionAnchor,
-            sourceOrder: adaptiveRowSequence + 1,
-            rowVariant: rowPlan.type === "pair"
-              ? "two-up"
-              : String((rowPlan.cards[0] && rowPlan.cards[0].variant && rowPlan.cards[0].variant.layout) || "single")
-          }, rowPlan)
-        ));
-        adaptiveRowSequence += 1;
-      });
-
-      Array.prototype.slice.call(sectionNode.children).forEach(function (childNode) {
-        if (childNode !== titleNode) {
-          sectionNode.removeChild(childNode);
-        }
-      });
-      rows.forEach(function (rowNode) {
-        sectionNode.appendChild(rowNode);
-      });
-    });
-
-    if (measurementHost.parentNode) {
-      measurementHost.parentNode.removeChild(measurementHost);
-    }
-    exportState.adaptiveLayoutSummary = summary;
-    exportState.exportDocument.setAttribute("data-pdf-layout-mode", "adaptive");
-    return summary;
-  }
-
-  function ensureAdaptiveContinuationTitle(titleNode) {
-    if (!titleNode || titleNode.classList.contains("pi-export-section-title--continued")) {
-      return;
-    }
-    var continuedSuffix = getGuideCopyText("continued_suffix", "continued");
-    titleNode.classList.add("pi-export-section-title--continued");
-    titleNode.textContent = String(titleNode.textContent || "").replace(/\s+[-–—]\s+.*$/, "") + " \u2014 " + continuedSuffix;
-  }
-
-  function rebalanceAdaptivePages(exportState) {
-    if (!exportState || !exportState.exportPages) {
-      return;
-    }
-    var pageNodes = Array.prototype.slice.call(exportState.exportPages.querySelectorAll(".pi-export-page"));
-    for (var passIndex = 0; passIndex < PDF_ADAPTIVE_REBALANCE_PASSES; passIndex += 1) {
-      var movedAny = false;
-      for (var pageIndex = 0; pageIndex < pageNodes.length - 1; pageIndex += 1) {
-        var currentViewport = pageNodes[pageIndex].querySelector(".pi-export-page-body");
-        var nextViewport = pageNodes[pageIndex + 1].querySelector(".pi-export-page-body");
-        if (!currentViewport || !nextViewport) {
-          continue;
-        }
-        var currentSummary = collectAdaptivePageSummary(pageNodes[pageIndex].parentNode || exportState.exportPages)[pageIndex];
-        if (!currentSummary || currentSummary.occupancy >= PDF_ADAPTIVE_SPARSE_PAGE_THRESHOLD) {
-          continue;
-        }
-        var currentSections = Array.prototype.slice.call(currentViewport.querySelectorAll(".pi-export-section"));
-        var nextSections = Array.prototype.slice.call(nextViewport.querySelectorAll(".pi-export-section"));
-        var targetSection = currentSections[currentSections.length - 1];
-        var sourceSection = nextSections[0];
-        if (!targetSection || !sourceSection) {
-          continue;
-        }
-        var sourceRow = sourceSection.querySelector(".pi-export-row");
-        if (!sourceRow) {
-          continue;
-        }
-        var targetAnchor = String(targetSection.getAttribute("data-pdf-section-anchor") || "");
-        var sourceAnchor = String(sourceSection.getAttribute("data-pdf-section-anchor") || "");
-        var titleNode = sourceSection.querySelector(".pi-export-section-title");
-        var targetItems = targetSection.querySelector(".pi-export-section-items") || targetSection;
-        var sourceItems = sourceSection.querySelector(".pi-export-section-items") || sourceSection;
-        var insertedSection = null;
-        if (targetAnchor === sourceAnchor) {
-          sourceItems.removeChild(sourceRow);
-          targetItems.appendChild(sourceRow);
-        } else {
-          insertedSection = sourceSection.cloneNode(false);
-          if (titleNode) {
-            insertedSection.appendChild(titleNode.cloneNode(true));
-          }
-          var insertedItems = sourceItems.cloneNode(false);
-          insertedSection.appendChild(insertedItems);
-          sourceItems.removeChild(sourceRow);
-          insertedItems.appendChild(sourceRow);
-          currentViewport.appendChild(insertedSection);
-          if (titleNode && sourceItems.querySelector(".pi-export-row")) {
-            ensureAdaptiveContinuationTitle(titleNode);
-          }
-        }
-        if (
-          currentViewport.scrollHeight <= currentViewport.clientHeight + 1 &&
-          nextViewport.scrollHeight <= nextViewport.clientHeight + 1
-        ) {
-          if (!sourceItems.querySelector(".pi-export-row") && sourceSection.parentNode) {
-            sourceSection.parentNode.removeChild(sourceSection);
-          }
-          movedAny = true;
-        } else {
-          if (insertedSection && insertedSection.parentNode) {
-            insertedSection.parentNode.removeChild(insertedSection);
-            sourceItems.insertBefore(sourceRow, sourceItems.querySelector(".pi-export-row"));
-          } else {
-            targetItems.removeChild(sourceRow);
-            sourceItems.insertBefore(sourceRow, sourceItems.querySelector(".pi-export-row"));
-          }
-        }
-      }
-      if (!movedAny) {
-        break;
-      }
-    }
-  }
-
   function applyExportImageSizing(exportRoot) {
     var diagnostics = [];
     var exportDocument = exportRoot && exportRoot.querySelector
       ? exportRoot.querySelector(".pi-export-document")
       : null;
-    var adaptiveLayoutMode = String(
-      (exportRoot && exportRoot.getAttribute && exportRoot.getAttribute("data-pdf-layout-mode"))
-      || (exportDocument && exportDocument.getAttribute && exportDocument.getAttribute("data-pdf-layout-mode"))
-      || ""
-    );
     Array.prototype.slice.call(exportRoot.querySelectorAll("img")).forEach(function (img) {
       if (!img.naturalWidth || !img.naturalHeight) {
         return;
@@ -8688,12 +4517,7 @@
       var containingCardNode = img.closest(".pi-export-card");
       var chosenLayout = null;
       var mediaWidth = availableWidth;
-      var adaptivePdfMode = adaptiveLayoutMode === "adaptive";
-      var webFlowPdfMode = adaptiveLayoutMode === "web-flow";
-      var adaptiveLayout = adaptivePdfMode && cardNode;
-      var adaptiveManagedMedia = adaptivePdfMode && (role === "qr" || role === "map" || !!cardNode);
-
-      if (webFlowPdfMode && !containingCardNode && role === "cover") {
+      if (!containingCardNode && role === "cover") {
         var webFlowCoverWidth = Math.max(1, frame.getBoundingClientRect().width || availableWidth);
         var webFlowCoverFitted = fitImageSize(
           img.naturalWidth,
@@ -8733,7 +4557,7 @@
         return;
       }
 
-      if (webFlowPdfMode && containingCardNode && role !== "qr") {
+      if (containingCardNode && role !== "qr") {
         var webFlowRow = containingCardNode.closest(".pi-export-row--web-flow");
         var webFlowFullWidth = !!(webFlowRow && webFlowRow.classList.contains("pi-export-row--full"));
         var webFlowThreeUp = !!(webFlowRow && webFlowRow.classList.contains("pi-export-row--three-up"));
@@ -8768,7 +4592,7 @@
         }
         containingCardNode.classList.remove("pi-export-card--portrait-side", "pi-export-card--landscape-stacked");
         containingCardNode.classList.add(
-          img.naturalHeight > img.naturalWidth * PDF_ADAPTIVE_PORTRAIT_RATIO_THRESHOLD
+          img.naturalHeight > img.naturalWidth * PDF_PORTRAIT_RATIO_THRESHOLD
             ? "pi-export-card--web-flow-portrait"
             : "pi-export-card--web-flow-landscape"
         );
@@ -8789,100 +4613,6 @@
           imageRatio: Number((img.naturalWidth / img.naturalHeight).toFixed(6)),
           framePolicy: "shrink-wrap-natural",
           chosenLayout: webFlowFullWidth ? "web-flow-full" : "web-flow-half"
-        });
-        return;
-      }
-
-      if (adaptiveManagedMedia) {
-        var fitPolicy = getAdaptiveMediaFitPolicy(img, cardNode);
-        var adaptiveFitted = null;
-        var adaptiveFramePolicy = null;
-        if (adaptiveLayout) {
-          var orientation = String(cardNode.getAttribute("data-pdf-card-orientation") || getAdaptiveImageOrientation(img.naturalWidth, img.naturalHeight));
-          var layout = String(cardNode.getAttribute("data-pdf-selected-variant") || "wide-horizontal");
-          var regionDistribution = parsePdfJsonAttribute(cardNode.getAttribute("data-pdf-card-region-distribution"), {});
-          var measuredMediaHeight = Number(cardNode.getAttribute("data-pdf-card-media-height") || 0);
-          var mediaGrowth = Number(regionDistribution && regionDistribution.mediaGrowth || 0);
-          var allowedMediaHeight = Math.max(0, Math.round(measuredMediaHeight + mediaGrowth));
-          var aspectRatio = "";
-          frame.style.minHeight = "0";
-          frame.style.height = "auto";
-          frame.style.maxHeight = "none";
-          frame.style.aspectRatio = "";
-          if (allowedMediaHeight > 0) {
-            frame.style.maxHeight = allowedMediaHeight + "px";
-            if (frame.parentNode && frame.parentNode.style) {
-              frame.parentNode.style.maxHeight = allowedMediaHeight + "px";
-            }
-          }
-          if (layout === "half-portrait-side" || layout === "half-portrait-side-narrow" || layout === "half-portrait-side-wide") {
-            aspectRatio = orientation === "portrait" ? "3 / 4" : "4 / 5";
-          } else if (layout === "half-portrait-stacked" || layout === "half-portrait-stacked-compact") {
-            aspectRatio = orientation === "portrait" ? "4 / 5" : "1 / 1";
-          } else if (layout === "parking-map-right") {
-            aspectRatio = "4 / 3";
-          } else if (layout === "parking-map-right-compact") {
-            aspectRatio = "16 / 10";
-          } else if (layout === "half-compact") {
-            aspectRatio = orientation === "portrait" ? "4 / 5" : "16 / 10";
-          } else if (layout === "half-landscape-stacked") {
-            aspectRatio = orientation === "square" ? "4 / 3" : "16 / 10";
-          } else if (layout === "wide-stacked") {
-            aspectRatio = orientation === "portrait" ? "4 / 5" : "16 / 9";
-          } else {
-            aspectRatio = orientation === "portrait"
-              ? "3 / 4"
-              : (orientation === "square" ? "1 / 1" : "16 / 10");
-          }
-          frame.style.aspectRatio = aspectRatio;
-          adaptiveFramePolicy = applyAdaptiveMediaFramePolicy(
-            frame,
-            frame.parentNode,
-            cardNode,
-            img,
-            {
-              availableWidth: availableWidth,
-              availableHeight: allowedMediaHeight || getPdfImageMaxHeight(img),
-              fitPolicy: fitPolicy
-            }
-          );
-          adaptiveFitted = applyAdaptiveMediaDimensions(frame, img, {
-            fitPolicy: fitPolicy,
-            fallbackWidth: adaptiveFramePolicy && adaptiveFramePolicy.framePolicy === "shrink-wrap-natural"
-              ? adaptiveFramePolicy.frameWidth
-              : availableWidth,
-            fallbackHeight: allowedMediaHeight || getPdfImageMaxHeight(img)
-          });
-        } else {
-          if (role === "qr") {
-            var qrBoxSize = Math.max(1, Math.min(frame.clientWidth || availableWidth, frame.clientHeight || frame.clientWidth || availableWidth));
-            frame.style.width = qrBoxSize + "px";
-            frame.style.height = qrBoxSize + "px";
-            frame.style.minHeight = qrBoxSize + "px";
-          }
-          adaptiveFitted = applyAdaptiveMediaDimensions(frame, img, {
-            fitPolicy: fitPolicy,
-            fallbackWidth: frame.clientWidth || availableWidth,
-            fallbackHeight: frame.clientHeight || getPdfImageMaxHeight(img)
-          });
-        }
-        diagnostics.push({
-          image: summarizeDiagnosticImageSource(
-            img.getAttribute("data-export-image-original-src") || img.currentSrc || img.src || "",
-            role
-          ),
-          mediaType: getExportMediaType(img),
-          fitPolicy: fitPolicy,
-          role: role,
-          naturalWidth: img.naturalWidth,
-          naturalHeight: img.naturalHeight,
-          renderedWidth: adaptiveFitted ? adaptiveFitted.fittedWidth : 0,
-          renderedHeight: adaptiveFitted ? adaptiveFitted.fittedHeight : 0,
-          frameWidth: adaptiveFitted ? adaptiveFitted.frameWidth : Number(frame.clientWidth.toFixed ? frame.clientWidth.toFixed(2) : frame.clientWidth),
-          frameHeight: adaptiveFitted ? adaptiveFitted.frameHeight : Number((frame.clientHeight || parseFloat(frame.style.maxHeight || "0") || 0).toFixed ? (frame.clientHeight || parseFloat(frame.style.maxHeight || "0") || 0).toFixed(2) : (frame.clientHeight || parseFloat(frame.style.maxHeight || "0") || 0)),
-          imageRatio: Number((img.naturalWidth / img.naturalHeight).toFixed(6)),
-          framePolicy: adaptiveFramePolicy ? adaptiveFramePolicy.framePolicy : "",
-          chosenLayout: adaptiveLayout ? ("adaptive-" + layout + "-" + orientation) : ("adaptive-static-" + role)
         });
         return;
       }
@@ -8990,213 +4720,6 @@
       }
       return diagnostics;
     });
-  }
-
-  function validateAdaptiveCardContainment(exportRoot) {
-    var diagnostics = Array.prototype.slice.call(exportRoot.querySelectorAll(".pi-export-card--adaptive")).map(function (cardNode) {
-      var cardDiagnostics = collectAdaptiveCardContainment(cardNode);
-      return {
-        cardId: String(cardNode.getAttribute("data-pdf-block-id") || ""),
-        language: String(cardNode.closest(".pi-export-document") && cardNode.closest(".pi-export-document").getAttribute("lang") || SOURCE_LANGUAGE),
-        direction: String(cardNode.closest(".pi-export-document") && cardNode.closest(".pi-export-document").getAttribute("dir") || "ltr"),
-        page: (function () {
-          var pageNode = cardNode.closest("[data-pdf-page]");
-          return pageNode && pageNode.parentNode
-            ? Array.prototype.indexOf.call(pageNode.parentNode.children, pageNode) + 1
-            : 0;
-        })(),
-        row: String((cardNode.closest(".pi-export-row") || {}).getAttribute ? cardNode.closest(".pi-export-row").getAttribute("data-pdf-row-id") || "" : ""),
-        card: normalizeText((cardNode.querySelector(".pi-export-card-title") || {}).textContent || ""),
-        selectedVariant: String(cardNode.getAttribute("data-pdf-selected-variant") || ""),
-        typographyScale: Number(cardNode.getAttribute("data-pdf-card-typography-scale") || 0),
-        fixedCardHeight: Number(cardNode.getAttribute("data-pdf-card-row-height") || 0),
-        naturalCardHeight: Number(cardNode.getAttribute("data-pdf-card-natural-height") || 0),
-        computedStyles: {
-          overflow: window.getComputedStyle(cardNode).overflow,
-          overflowX: window.getComputedStyle(cardNode).overflowX,
-          overflowY: window.getComputedStyle(cardNode).overflowY,
-          minWidth: window.getComputedStyle(cardNode).minWidth,
-          minHeight: window.getComputedStyle(cardNode).minHeight,
-          width: window.getComputedStyle(cardNode).width,
-          height: window.getComputedStyle(cardNode).height
-        },
-        cardBounds: cardDiagnostics.cardBounds,
-        innerBounds: cardDiagnostics.innerBounds,
-        descendantBounds: cardDiagnostics.descendantBounds,
-        overflowTop: cardDiagnostics.overflowTop,
-        overflowRight: cardDiagnostics.overflowRight,
-        overflowBottom: cardDiagnostics.overflowBottom,
-        overflowLeft: cardDiagnostics.overflowLeft,
-        valid: cardDiagnostics.valid
-      };
-    });
-    var blockers = diagnostics.filter(function (entry) { return !entry.valid; });
-    window.__propertyInstructionLastPdfDiagnostics = Object.assign({}, window.__propertyInstructionLastPdfDiagnostics || {}, {
-      cardContainmentDiagnostics: diagnostics,
-      cardContainmentBlockers: blockers
-    });
-    if (blockers.length) {
-      throw new Error("adaptive-card-containment-overflow");
-    }
-    return diagnostics;
-  }
-
-  function validateAdaptiveMediaVisualPlacement(exportRoot) {
-    var diagnostics = Array.prototype.slice.call(exportRoot.querySelectorAll(".pi-export-card--adaptive")).map(function (cardNode) {
-      var visualPlacement = collectAdaptiveMediaVisualPlacement(cardNode);
-      if (!visualPlacement) {
-        return null;
-      }
-      return {
-        cardId: String(cardNode.getAttribute("data-pdf-block-id") || ""),
-        language: String(cardNode.closest(".pi-export-document") && cardNode.closest(".pi-export-document").getAttribute("lang") || SOURCE_LANGUAGE),
-        direction: String(cardNode.closest(".pi-export-document") && cardNode.closest(".pi-export-document").getAttribute("dir") || "ltr"),
-        page: (function () {
-          var pageNode = cardNode.closest("[data-pdf-page]");
-          return pageNode && pageNode.parentNode
-            ? Array.prototype.indexOf.call(pageNode.parentNode.children, pageNode) + 1
-            : 0;
-        })(),
-        rowId: String((cardNode.closest(".pi-export-row") || {}).getAttribute ? cardNode.closest(".pi-export-row").getAttribute("data-pdf-row-id") || "" : ""),
-        stepNumber: normalizeText(((cardNode.querySelector(".pi-export-step-badge span") || {}).textContent || "")),
-        title: normalizeText(((cardNode.querySelector(".pi-export-card-title") || {}).textContent || "")),
-        variant: String(cardNode.getAttribute("data-pdf-selected-variant") || ""),
-        typographyScale: Number(cardNode.getAttribute("data-pdf-card-typography-scale") || 0),
-        visualPlacement: visualPlacement
-      };
-    }).filter(Boolean);
-    var blockers = diagnostics.filter(function (entry) {
-      return entry.visualPlacement && entry.visualPlacement.severity === "blocker";
-    });
-    if (blockers.length) {
-      var blockerSummary = blockers.slice(0, 3).map(function (entry) {
-        return {
-          cardId: entry.cardId,
-          rowId: entry.rowId,
-          page: entry.page,
-          variant: entry.variant,
-          alignmentMode: entry.visualPlacement.mediaVerticalAlignmentMode,
-          issues: entry.visualPlacement.issues || []
-        };
-      });
-      window.__propertyInstructionLastPdfDiagnostics = Object.assign({}, window.__propertyInstructionLastPdfDiagnostics || {}, {
-        mediaVisualPlacementDiagnostics: diagnostics,
-        mediaVisualPlacementBlockers: blockerSummary
-      });
-      if (isPdfArtifactModeEnabled()) {
-        setPdfArtifactModeResult({
-          mediaVisualPlacementDiagnostics: diagnostics,
-          mediaVisualPlacementBlockers: blockerSummary
-        });
-      }
-      var blockerError = new Error("adaptive-media-visual-placement-invalid:" + JSON.stringify(blockerSummary));
-      blockerError.code = "adaptive-media-visual-placement-invalid";
-      blockerError.mediaVisualPlacementDiagnostics = diagnostics;
-      blockerError.mediaVisualPlacementBlockers = blockerSummary;
-      throw blockerError;
-    }
-    return diagnostics;
-  }
-
-  function applyAdaptiveFinalMediaSizing(exportRoot) {
-    if (!exportRoot || !exportRoot.querySelectorAll) {
-      return;
-    }
-    Array.prototype.slice.call(exportRoot.querySelectorAll(".pi-export-card--adaptive")).forEach(function (cardNode) {
-      var mediaNode = cardNode.querySelector(".pi-export-card-media");
-      var frameNode = cardNode.querySelector(".pi-export-card-media [data-export-image-frame]");
-      var imageNode = frameNode ? frameNode.querySelector("img") : null;
-      var selectedLayout = String(cardNode.getAttribute("data-pdf-selected-variant") || "");
-      var stretchableMediaLayout = (
-        selectedLayout === "half-portrait-side" ||
-        selectedLayout === "half-portrait-side-narrow" ||
-        selectedLayout === "half-portrait-side-wide" ||
-        selectedLayout === "wide-horizontal"
-      );
-      if (!mediaNode || !frameNode || !imageNode) {
-        return;
-      }
-      var distribution = parsePdfJsonAttribute(cardNode.getAttribute("data-pdf-card-region-distribution"), {});
-      var projection = parsePdfJsonAttribute(cardNode.getAttribute("data-pdf-card-row-projection"), {});
-      var measuredMediaHeight = Number(cardNode.getAttribute("data-pdf-card-media-height") || 0);
-      var mediaGrowth = Number(distribution && distribution.mediaGrowth || 0);
-      var cardRect = cardNode.getBoundingClientRect();
-      var cardStyles = window.getComputedStyle(cardNode);
-      var actualAvailableMediaHeight = Math.max(
-        0,
-        Math.floor(
-          cardRect.bottom -
-          (parseFloat(cardStyles.borderBottomWidth || "0") || 0) -
-          mediaNode.getBoundingClientRect().top
-        )
-      );
-      var allowedMediaHeight = Math.max(0, Math.round(measuredMediaHeight + mediaGrowth));
-      if (actualAvailableMediaHeight > 0) {
-        allowedMediaHeight = allowedMediaHeight
-          ? Math.min(allowedMediaHeight, actualAvailableMediaHeight)
-          : actualAvailableMediaHeight;
-      }
-      if (!allowedMediaHeight) {
-        return;
-      }
-      var availableFrameHeight = getAdaptiveAvailableFrameHeight(mediaNode, frameNode, allowedMediaHeight);
-      if (!availableFrameHeight) {
-        return;
-      }
-      mediaNode.style.minHeight = "0";
-      mediaNode.style.height = stretchableMediaLayout ? "100%" : "auto";
-      mediaNode.style.maxHeight = stretchableMediaLayout ? "none" : (allowedMediaHeight + "px");
-      mediaNode.style.overflow = "hidden";
-      frameNode.style.minHeight = "0";
-      frameNode.style.height = "auto";
-      frameNode.style.maxHeight = availableFrameHeight + "px";
-      var projectedMediaGeometry = projection && projection.projectedMediaGeometry
-        ? projection.projectedMediaGeometry
-        : null;
-      if (!projectedMediaGeometry && imageNode.naturalWidth && imageNode.naturalHeight) {
-        projectedMediaGeometry = resolveAdaptiveFinalMediaGeometry({
-          layout: selectedLayout,
-          mediaType: getExportMediaType(imageNode),
-          fitPolicy: getAdaptiveMediaFitPolicy(imageNode, cardNode),
-          naturalWidth: imageNode.naturalWidth,
-          naturalHeight: imageNode.naturalHeight,
-          availableWidth: Number(cardNode.getAttribute("data-pdf-card-media-region-width") || frameNode.clientWidth || mediaNode.clientWidth || cardNode.clientWidth || 1),
-          availableHeight: availableFrameHeight
-        });
-      }
-      var framePolicy = applyAdaptiveMediaFramePolicy(
-        frameNode,
-        mediaNode,
-        cardNode,
-        imageNode,
-        {
-          availableWidth: projectedMediaGeometry ? projectedMediaGeometry.availableWidth : (frameNode.clientWidth || mediaNode.clientWidth || cardNode.clientWidth || 1),
-          availableHeight: projectedMediaGeometry ? projectedMediaGeometry.availableHeight : availableFrameHeight,
-          fitPolicy: getAdaptiveMediaFitPolicy(imageNode, cardNode),
-          resolvedGeometry: projectedMediaGeometry
-        }
-      );
-      applyAdaptiveMediaDimensions(frameNode, imageNode, {
-        fitPolicy: getAdaptiveMediaFitPolicy(imageNode, cardNode),
-        fallbackWidth: framePolicy && framePolicy.framePolicy === "shrink-wrap-natural"
-          ? framePolicy.frameWidth
-          : (projectedMediaGeometry ? projectedMediaGeometry.frameWidth : (frameNode.clientWidth || mediaNode.clientWidth || cardNode.clientWidth || 1)),
-        fallbackHeight: projectedMediaGeometry ? projectedMediaGeometry.frameHeight : availableFrameHeight,
-        resolvedGeometry: projectedMediaGeometry
-      });
-    });
-  }
-
-  function parseNumericDataAttribute(element, attributeName) {
-    if (!element) {
-      return null;
-    }
-    var rawValue = String(element.getAttribute(attributeName) || "").trim();
-    if (!rawValue) {
-      return null;
-    }
-    var parsedValue = Number(rawValue);
-    return Number.isFinite(parsedValue) ? parsedValue : null;
   }
 
   function getSectionGoogleMapsLink(sectionModel) {
@@ -9404,50 +4927,12 @@
     parentNode.appendChild(item);
   }
 
-  function createPdfContentsPanel(documentNode, model) {
-    if (!model.contentsEntries || !model.contentsEntries.length) {
-      return null;
-    }
-    var panel = documentNode.createElement("section");
-    panel.className = "pi-export-contents";
-    panel.setAttribute("data-pdf-contents-panel", "1");
-    setPdfSemantic(panel, "rect", "contents-panel");
-    var title = documentNode.createElement("h2");
-    title.className = "pi-export-panel-title";
-    title.textContent = model.contentsTitle || getGuideCopyText("in_this_guide", "In this guide");
-    setPdfSemantic(title, "text", "panel-title", { fontWeight: 700 });
-    panel.appendChild(title);
-
-    var list = documentNode.createElement("ol");
-    list.className = "pi-export-contents-list";
-    panel.appendChild(list);
-
-    (model.contentsEntries || []).forEach(function (entry) {
-      var item = documentNode.createElement("li");
-      var link = documentNode.createElement("a");
-      link.className = "pi-export-contents-link";
-      link.href = "#" + entry.anchor;
-      link.setAttribute("data-pdf-internal-target", entry.anchor);
-      link.textContent = entry.title || entry.anchor;
-      link.setAttribute("data-export-source-id", "section:" + entry.anchor + ":title");
-      setPdfSemantic(link, "text", "contents-link", { linkHref: "#" + entry.anchor, fontWeight: 600 });
-      item.appendChild(link);
-      var pageNumber = documentNode.createElement("span");
-      pageNumber.className = "pi-export-contents-page";
-      pageNumber.setAttribute("data-pdf-contents-page", entry.anchor);
-      setPdfSemantic(pageNumber, "text", "contents-page", { fontWeight: 600 });
-      item.appendChild(pageNumber);
-      list.appendChild(item);
-    });
-    return panel;
-  }
-
   function createPdfQrPanel(documentNode, titleText, qrEntries, panelClassName) {
     if (!qrEntries || !qrEntries.length) {
       return null;
     }
     var panel = documentNode.createElement("section");
-    panel.className = panelClassName || "pi-export-quick-access";
+    panel.className = panelClassName || "pi-export-qr-panel";
     setPdfSemantic(panel, "rect", panelClassName === "pi-export-card-qr-panel" ? "card-qr-panel" : "quick-access-panel");
     if (titleText !== "") {
       var title = documentNode.createElement("h2");
@@ -9464,6 +4949,8 @@
       var card = documentNode.createElement("article");
       card.className = "pi-export-qr-card";
       setPdfSemantic(card, "rect", "qr-card");
+      var copy = documentNode.createElement("div");
+      copy.className = "pi-export-qr-copy";
       if (entry.linkHref) {
         var link = documentNode.createElement("a");
         link.href = entry.linkHref;
@@ -9475,14 +4962,22 @@
           link.setAttribute("data-export-source-id", entry.sourceNodeId);
         }
         setPdfSemantic(link, "text", "qr-link", { linkHref: entry.linkHref, fontWeight: 600 });
-        card.appendChild(link);
+        copy.appendChild(link);
       } else {
         var text = documentNode.createElement("p");
         text.className = "pi-export-qr-label";
         text.textContent = entry.label;
         setPdfSemantic(text, "text", "qr-label", { fontWeight: 600 });
-        card.appendChild(text);
+        copy.appendChild(text);
       }
+      if (entry.actionLabel && normalizeText(entry.actionLabel) !== normalizeText(entry.label)) {
+        var action = documentNode.createElement("p");
+        action.className = "pi-export-qr-action";
+        action.textContent = entry.actionLabel;
+        setPdfSemantic(action, "text", "qr-action", { fontWeight: 700 });
+        copy.appendChild(action);
+      }
+      card.appendChild(copy);
       var qrNode = createManagedImage(documentNode, {
           src: entry.qrImageSrc,
           alt: entry.label || "",
@@ -9497,111 +4992,6 @@
     });
 
     return panel;
-  }
-
-  function moveAdaptiveParkingActionsToMap(documentNode, parkingTextCard, parkingMapNode) {
-    if (!documentNode || !parkingTextCard || !parkingMapNode) {
-      return false;
-    }
-    var actionNodes = [];
-    var linkNode = parkingTextCard.querySelector(".pi-export-card-link");
-    var qrPanelNode = parkingTextCard.querySelector(".pi-export-card-qr-panel");
-    if (linkNode) {
-      actionNodes.push(linkNode);
-    }
-    if (qrPanelNode) {
-      actionNodes.push(qrPanelNode);
-    }
-    if (!actionNodes.length) {
-      return false;
-    }
-    var actionsNode = parkingMapNode.querySelector(".pi-export-parking-map-actions");
-    if (!actionsNode) {
-      actionsNode = documentNode.createElement("div");
-      actionsNode.className = "pi-export-parking-map-actions";
-      parkingMapNode.appendChild(actionsNode);
-    }
-    actionNodes.forEach(function (actionNode) {
-      actionsNode.appendChild(actionNode);
-    });
-    Array.prototype.slice.call(parkingTextCard.querySelectorAll(".pi-export-card-footer-region")).forEach(function (footerRegionNode) {
-      if (!footerRegionNode.children.length && footerRegionNode.parentNode) {
-        footerRegionNode.parentNode.removeChild(footerRegionNode);
-      }
-    });
-    return true;
-  }
-
-  function moveAdaptiveParkingCardActionsToMedia(cardNode, variant) {
-    if (!cardNode) {
-      return false;
-    }
-    var generationDiagnostics = getPdfGenerationDiagnostics();
-    var cardId = String(cardNode.getAttribute("data-pdf-block-id") || cardNode.getAttribute("data-export-source-id") || "parking-card");
-    var existingActionsNode = cardNode.querySelector(".pi-export-parking-media-actions");
-    if (cardNode.getAttribute("data-pdf-parking-actions-relocated") === "1") {
-      recordParkingMutationDiagnostic({
-        cardId: cardId,
-        variant: String(variant && (variant.layout || variant.kind) || cardNode.getAttribute("data-pdf-selected-variant") || "parking-map-right"),
-        measurementClone: cardNode.getAttribute("data-pdf-measurement-clone") === "1",
-        skipped: true,
-        reason: "already-relocated",
-        actionsNodeAlreadyExisted: !!existingActionsNode
-      });
-      return false;
-    }
-    var startedAt = Date.now();
-    var linkNode = cardNode.querySelector(".pi-export-card-link");
-    var qrPanelNode = cardNode.querySelector(".pi-export-card-qr-panel");
-    var mediaNode = cardNode.querySelector(".pi-export-card-media");
-    if (!mediaNode || (!linkNode && !qrPanelNode)) {
-      recordParkingMutationDiagnostic({
-        cardId: cardId,
-        variant: String(variant && (variant.layout || variant.kind) || cardNode.getAttribute("data-pdf-selected-variant") || "parking-map-right"),
-        measurementClone: cardNode.getAttribute("data-pdf-measurement-clone") === "1",
-        skipped: true,
-        reason: !mediaNode ? "missing-media" : "missing-actions",
-        hadLink: !!linkNode,
-        hadQrPanel: !!qrPanelNode
-      });
-      return false;
-    }
-    var actionsNode = existingActionsNode || mediaNode.querySelector(".pi-export-parking-media-actions");
-    if (!actionsNode) {
-      actionsNode = cardNode.ownerDocument.createElement("div");
-      actionsNode.className = "pi-export-parking-media-actions";
-      mediaNode.appendChild(actionsNode);
-    }
-    var originalLinkParentRole = linkNode && linkNode.parentElement ? String(linkNode.parentElement.getAttribute("data-card-region") || linkNode.parentElement.className || "") : "";
-    var originalQrParentRole = qrPanelNode && qrPanelNode.parentElement ? String(qrPanelNode.parentElement.getAttribute("data-card-region") || qrPanelNode.parentElement.className || "") : "";
-    if (linkNode) {
-      actionsNode.appendChild(linkNode);
-    }
-    if (qrPanelNode) {
-      actionsNode.appendChild(qrPanelNode);
-    }
-    Array.prototype.slice.call(cardNode.querySelectorAll(".pi-export-card-footer-region")).forEach(function (footerRegionNode) {
-      if (!footerRegionNode.children.length && footerRegionNode.parentNode) {
-        footerRegionNode.parentNode.removeChild(footerRegionNode);
-      }
-    });
-    cardNode.setAttribute("data-pdf-parking-actions-relocated", "1");
-    generationDiagnostics.counters.parkingActionRelocations += 1;
-    generationDiagnostics.counters.parkingActionRelocationByCard[cardId] = (generationDiagnostics.counters.parkingActionRelocationByCard[cardId] || 0) + 1;
-    recordParkingMutationDiagnostic({
-      cardId: cardId,
-      variant: String(variant && (variant.layout || variant.kind) || cardNode.getAttribute("data-pdf-selected-variant") || "parking-map-right"),
-      measurementClone: cardNode.getAttribute("data-pdf-measurement-clone") === "1",
-      hadLink: !!linkNode,
-      hadQrPanel: !!qrPanelNode,
-      hadMedia: !!mediaNode,
-      actionsNodeAlreadyExisted: !!existingActionsNode,
-      originalLinkParentRole: originalLinkParentRole,
-      originalQrParentRole: originalQrParentRole,
-      finalParentRole: String(actionsNode.className || "pi-export-parking-media-actions"),
-      durationMs: Number((Date.now() - startedAt).toFixed(2))
-    });
-    return true;
   }
 
   function createExportRoot() {
@@ -9663,17 +5053,13 @@
     exportDocument.className = "pi-export-document";
     exportDocument.setAttribute("lang", model.languageCode || "en");
     exportDocument.setAttribute("dir", model.direction || "ltr");
-    if (isWebFlowPdfLayoutEnabled()) {
-      exportDocument.setAttribute("data-pdf-layout-mode", "web-flow");
-      exportDocument.style.width = PDF_EXPORT_CONTENT_WIDTH + "px";
-    }
+    exportDocument.setAttribute("data-pdf-layout-mode", "web-flow");
+    exportDocument.style.width = PDF_EXPORT_CONTENT_WIDTH + "px";
     markExportNodeNotranslate(exportDocument);
 
     var header = document.createElement("header");
     header.className = "pi-export-header";
-    if (isWebFlowPdfLayoutEnabled()) {
-      header.setAttribute("data-pdf-section-anchor", "stay-info");
-    }
+    header.setAttribute("data-pdf-section-anchor", "stay-info");
 
     var heroTop = document.createElement("div");
     heroTop.className = "pi-export-hero-top";
@@ -9721,7 +5107,22 @@
     if (model.address && model.address.value) {
       appendExportMetaItem(document, metaList, model.address);
     }
+    if (model.quickAccessEntries && model.quickAccessEntries.length) {
+      var wifiQrEntries = model.quickAccessEntries.filter(function (entry) {
+        return entry && entry.kind === "wifi";
+      });
+      var wifiQrPanel = createPdfQrPanel(
+        document,
+        "",
+        wifiQrEntries,
+        "pi-export-wifi-qr-panel"
+      );
+      if (wifiQrPanel) {
+        metaList.appendChild(wifiQrPanel);
+      }
+    }
     heroCopy.appendChild(metaList);
+
     heroTop.appendChild(heroCopy);
 
     if (model.coverImage && model.coverImage.src) {
@@ -9745,15 +5146,10 @@
     }
 
     header.appendChild(heroTop);
-    var webFlowInfoGrid = null;
-    if (isWebFlowPdfLayoutEnabled()) {
-      webFlowInfoGrid = document.createElement("section");
-      webFlowInfoGrid.className = "pi-export-info-grid";
-      webFlowInfoGrid.appendChild(header);
-      exportDocument.appendChild(webFlowInfoGrid);
-    } else {
-      exportDocument.appendChild(header);
-    }
+    var webFlowInfoGrid = document.createElement("section");
+    webFlowInfoGrid.className = "pi-export-info-grid";
+    webFlowInfoGrid.appendChild(header);
+    exportDocument.appendChild(webFlowInfoGrid);
 
     if (model.map.linkHref || model.map.imageSrc || (model.map.qrEntries && model.map.qrEntries.length)) {
       var mapSection = document.createElement("section");
@@ -9783,7 +5179,22 @@
               : ""
           }, pendingImages);
         setPdfSemantic(overviewMapImage, "image", "property-map", { imageKind: "map" });
-        mapSection.appendChild(overviewMapImage);
+        var overviewMapMedia = document.createElement("div");
+        overviewMapMedia.className = "pi-export-map-media-slot";
+        var overviewMapHref = normalizeHref(model.map.openUrl || model.map.linkHref || "");
+        if (overviewMapHref) {
+          var overviewMapLink = document.createElement("a");
+          overviewMapLink.className = "pi-export-map-image-link";
+          overviewMapLink.href = overviewMapHref;
+          overviewMapLink.target = "_blank";
+          overviewMapLink.rel = "noopener noreferrer nofollow";
+          overviewMapLink.setAttribute("aria-label", model.map.linkLabel || "Open map");
+          overviewMapLink.appendChild(overviewMapImage);
+          overviewMapMedia.appendChild(overviewMapLink);
+        } else {
+          overviewMapMedia.appendChild(overviewMapImage);
+        }
+        mapSection.appendChild(overviewMapMedia);
       }
 
       if (model.map.qrEntries && model.map.qrEntries.length) {
@@ -9820,36 +5231,8 @@
         mapSection.appendChild(mapMeta);
       }
 
-      if (isWebFlowPdfLayoutEnabled() && webFlowInfoGrid) {
-        webFlowInfoGrid.classList.add("pi-export-info-grid--has-map");
-        webFlowInfoGrid.appendChild(mapSection);
-      } else {
-        exportDocument.appendChild(mapSection);
-      }
-    }
-
-    var pageOneExtras = document.createElement("section");
-    pageOneExtras.className = "pi-export-page-one-extras";
-    var contentsPanel = isWebFlowPdfLayoutEnabled()
-      ? null
-      : createPdfContentsPanel(document, model);
-    if (contentsPanel) {
-      pageOneExtras.appendChild(contentsPanel);
-    }
-    var quickAccessPanel = isWebFlowPdfLayoutEnabled()
-      ? null
-      : createPdfQrPanel(
-          document,
-          model.quickAccessTitle,
-          model.quickAccessEntries || [],
-          "pi-export-quick-access"
-        );
-    if (quickAccessPanel) {
-      pageOneExtras.appendChild(quickAccessPanel);
-    }
-    if (pageOneExtras.childNodes.length) {
-      pageOneExtras.setAttribute("data-pdf-section-item", "1");
-      exportDocument.appendChild(pageOneExtras);
+      webFlowInfoGrid.classList.add("pi-export-info-grid--has-map");
+      webFlowInfoGrid.appendChild(mapSection);
     }
 
     model.sections.forEach(function (sectionModel) {
@@ -9971,7 +5354,19 @@
                 : ""
             }, pendingImages);
           setPdfSemantic(blockMap, "image", "block-map", { imageKind: "map" });
-          mediaColumn.appendChild(blockMap);
+          var blockMapHref = normalizeHref(blockModel.mapOpenUrl || blockModel.mapExternalUrl || "");
+          if (blockMapHref) {
+            var blockMapLink = document.createElement("a");
+            blockMapLink.className = "pi-export-map-image-link pi-export-map-image-link--block";
+            blockMapLink.href = blockMapHref;
+            blockMapLink.target = "_blank";
+            blockMapLink.rel = "noopener noreferrer nofollow";
+            blockMapLink.setAttribute("aria-label", blockModel.linkLabel || "Open map");
+            blockMapLink.appendChild(blockMap);
+            mediaColumn.appendChild(blockMapLink);
+          } else {
+            mediaColumn.appendChild(blockMap);
+          }
         }
 
         if (blockModel.caption) {
@@ -9990,7 +5385,14 @@
           normalizeHref(blockModel.mapOpenUrl) === normalizeHref(blockModel.linkHref)
         );
 
-        if (blockModel.linkHref && !linkBelongsToQrMap) {
+        var linkRepresentedByWebFlowQr = !!(
+          blockModel.linkHref &&
+          (blockModel.qrEntries || []).some(function (entry) {
+            return entry && entry.linkHref && normalizeHref(entry.linkHref) === normalizeHref(blockModel.linkHref);
+          })
+        );
+
+        if (blockModel.linkHref && !linkBelongsToQrMap && !linkRepresentedByWebFlowQr) {
           var linkWrap = document.createElement("p");
           linkWrap.className = "pi-export-card-link";
           var link = document.createElement("a");
@@ -10030,6 +5432,10 @@
         cardLayout.appendChild(textColumn);
         if (blockModel.imageSrc || blockModel.mapImageSrc) {
           cardLayout.appendChild(mediaColumn);
+        }
+        var webFlowCardQrPanel = footerRegion.querySelector(":scope > .pi-export-card-qr-panel");
+        if (webFlowCardQrPanel) {
+          cardLayout.appendChild(webFlowCardQrPanel);
         }
         card.appendChild(cardLayout);
 
@@ -10086,12 +5492,10 @@
       PDF_EXPORT_PAGE_PADDING_BOTTOM + "px " +
       PDF_EXPORT_PAGE_PADDING_LEFT + "px";
 
-    if (isWebFlowPdfLayoutEnabled()) {
-      var backdrop = documentNode.createElement("div");
-      backdrop.className = "pi-export-page-backdrop";
-      setPdfSemantic(backdrop, "rect", "page-background");
-      page.appendChild(backdrop);
-    }
+    var backdrop = documentNode.createElement("div");
+    backdrop.className = "pi-export-page-backdrop";
+    setPdfSemantic(backdrop, "rect", "page-background");
+    page.appendChild(backdrop);
 
     var viewport = documentNode.createElement("div");
     viewport.className = "pi-export-page-body";
@@ -10127,6 +5531,26 @@
 
   function pageBodyOverflows(pageState) {
     return pageState.viewport.scrollHeight > pageState.viewport.clientHeight + 1;
+  }
+
+  function collectPdfPageSummary(exportPages) {
+    return Array.prototype.slice.call(exportPages.querySelectorAll(".pi-export-page")).map(function (pageNode, pageIndex) {
+      var viewport = pageNode.querySelector(".pi-export-page-body");
+      var body = viewport && viewport.querySelector(":scope > .pi-export-document");
+      var usableHeight = viewport ? Number(viewport.clientHeight || 0) : 0;
+      var occupiedHeight = body ? Math.min(usableHeight, body.getBoundingClientRect().height) : 0;
+      var occupancy = usableHeight ? Math.max(0, Math.min(1, occupiedHeight / usableHeight)) : 0;
+      return {
+        pageNumber: pageIndex + 1,
+        occupiedHeight: Number(occupiedHeight.toFixed(2)),
+        usableHeight: usableHeight,
+        remainingHeight: Number(Math.max(0, usableHeight - occupiedHeight).toFixed(2)),
+        occupancy: Number(occupancy.toFixed(3)),
+        sectionCount: pageNode.querySelectorAll(".pi-export-section").length,
+        cardCount: pageNode.querySelectorAll(".pi-export-card").length,
+        rowCount: pageNode.querySelectorAll(".pi-export-row--web-flow").length
+      };
+    });
   }
 
   function createSectionSlice(documentNode, titleNode, isContinuation) {
@@ -10262,6 +5686,83 @@
     return summary;
   }
 
+  function balanceWebFlowPageRows(exportState) {
+    if (!exportState || !exportState.exportPages) {
+      return [];
+    }
+    var pageNodes = Array.prototype.slice.call(exportState.exportPages.querySelectorAll(".pi-export-page"));
+    var diagnostics = [];
+    pageNodes.forEach(function (pageNode, pageIndex) {
+      var viewport = pageNode.querySelector(".pi-export-page-body");
+      var body = viewport && viewport.querySelector(":scope > .pi-export-document");
+      var rows = body ? Array.prototype.slice.call(body.querySelectorAll(".pi-export-row--web-flow")) : [];
+      if (!viewport || !body || !rows.length) {
+        return;
+      }
+      var naturalBodyHeight = body.getBoundingClientRect().height;
+      var availableHeight = Number(viewport.clientHeight || 0);
+      var bottomReserve = 14;
+      var spareHeight = Math.max(0, availableHeight - naturalBodyHeight - bottomReserve);
+      var isLastPage = pageIndex === pageNodes.length - 1;
+      var growthRatio = isLastPage ? 0.32 : 0.55;
+      var absoluteGrowthCap = isLastPage ? 120 : 180;
+      var rowSpecs = rows.map(function (rowNode) {
+        var naturalHeight = rowNode.getBoundingClientRect().height;
+        var growthCap = Math.min(absoluteGrowthCap, naturalHeight * growthRatio);
+        return {
+          node: rowNode,
+          naturalHeight: naturalHeight,
+          maxHeight: naturalHeight + growthCap
+        };
+      });
+      var totalGrowthCapacity = rowSpecs.reduce(function (total, spec) {
+        return total + Math.max(0, spec.maxHeight - spec.naturalHeight);
+      }, 0);
+      var requestedGrowth = Math.min(spareHeight, totalGrowthCapacity);
+      if (requestedGrowth > 1) {
+        var low = Math.min.apply(Math, rowSpecs.map(function (spec) { return spec.naturalHeight; }));
+        var high = Math.max.apply(Math, rowSpecs.map(function (spec) { return spec.maxHeight; }));
+        for (var pass = 0; pass < 36; pass += 1) {
+          var level = (low + high) / 2;
+          var growthAtLevel = rowSpecs.reduce(function (total, spec) {
+            var targetHeight = Math.min(spec.maxHeight, Math.max(spec.naturalHeight, level));
+            return total + (targetHeight - spec.naturalHeight);
+          }, 0);
+          if (growthAtLevel < requestedGrowth) {
+            low = level;
+          } else {
+            high = level;
+          }
+        }
+        rowSpecs.forEach(function (spec) {
+          var targetHeight = Math.min(spec.maxHeight, Math.max(spec.naturalHeight, high));
+          spec.node.style.height = Number(targetHeight.toFixed(2)) + "px";
+          spec.node.setAttribute("data-pdf-web-flow-filled", "1");
+        });
+      }
+      var finalBodyHeight = body.getBoundingClientRect().height;
+      diagnostics.push({
+        pageNumber: pageIndex + 1,
+        isLastPage: isLastPage,
+        availableHeight: Number(availableHeight.toFixed(2)),
+        naturalBodyHeight: Number(naturalBodyHeight.toFixed(2)),
+        finalBodyHeight: Number(finalBodyHeight.toFixed(2)),
+        spareBefore: Number(Math.max(0, availableHeight - naturalBodyHeight).toFixed(2)),
+        spareAfter: Number(Math.max(0, availableHeight - finalBodyHeight).toFixed(2)),
+        appliedGrowth: Number(Math.max(0, finalBodyHeight - naturalBodyHeight).toFixed(2)),
+        rows: rowSpecs.map(function (spec) {
+          return {
+            naturalHeight: Number(spec.naturalHeight.toFixed(2)),
+            finalHeight: Number(spec.node.getBoundingClientRect().height.toFixed(2)),
+            maxHeight: Number(spec.maxHeight.toFixed(2))
+          };
+        })
+      });
+    });
+    exportState.webFlowPageFillSummary = diagnostics;
+    return diagnostics;
+  }
+
   function paginateWebFlowDocument(exportState) {
     var documentNode = exportState.exportDocument.ownerDocument;
     var childNodes = Array.from(exportState.exportDocument.children);
@@ -10336,7 +5837,9 @@
     });
 
     exportState.exportPages = exportPages;
+    balanceWebFlowPageRows(exportState);
     exportState.webFlowLayoutSummary = Object.assign({}, exportState.webFlowLayoutSummary || {}, {
+      pageFill: exportState.webFlowPageFillSummary || [],
       paginationPages: Array.prototype.slice.call(exportPages.querySelectorAll(".pi-export-page")).map(function (pageNode, pageIndex) {
         var bodyNode = pageNode.querySelector(".pi-export-page-body");
         return {
@@ -10398,21 +5901,24 @@
         link.classList.add("is-active");
         link.setAttribute("aria-current", "location");
       }
+      var content = documentNode.createElement("span");
+      content.className = "pi-export-bookmark-content";
       var label = documentNode.createElement("span");
       label.className = "pi-export-bookmark-label";
       label.textContent = entry.title;
       var badge = documentNode.createElement("span");
       badge.className = "pi-export-bookmark-badge";
       badge.setAttribute("data-pdf-bookmark-icon", entry.icon || "info");
-      link.appendChild(label);
-      link.appendChild(badge);
+      content.appendChild(label);
+      content.appendChild(badge);
+      link.appendChild(content);
       rail.appendChild(link);
     });
     return rail;
   }
 
   function decorateWebFlowPagesWithBookmarks(exportState) {
-    if (!isWebFlowPdfLayoutEnabled() || !exportState || !exportState.exportPages) {
+    if (!exportState || !exportState.exportPages) {
       return;
     }
     var model = exportState.model || {};
@@ -10427,142 +5933,7 @@
   }
 
   function paginateExportDocument(exportState) {
-    if (isWebFlowPdfLayoutEnabled()) {
-      return paginateWebFlowDocument(exportState);
-    }
-    var documentNode = exportState.exportDocument.ownerDocument;
-    var adaptiveChildNodes = null;
-    var adaptivePreludeNodes = null;
-    var adaptiveSectionNodes = null;
-    var adaptiveSectionPlans = null;
-    var adaptiveEvaluatedPlans = null;
-
-    adaptiveChildNodes = Array.from(exportState.exportDocument.children);
-    var adaptiveFirstSectionIndex = adaptiveChildNodes.findIndex(function (childNode) {
-      return childNode.classList && childNode.classList.contains("pi-export-section");
-    });
-    adaptivePreludeNodes = adaptiveFirstSectionIndex >= 0
-      ? adaptiveChildNodes.slice(0, adaptiveFirstSectionIndex)
-      : adaptiveChildNodes.slice();
-    adaptiveSectionNodes = adaptiveFirstSectionIndex >= 0
-      ? adaptiveChildNodes.slice(adaptiveFirstSectionIndex).filter(function (childNode) {
-        return childNode.classList && childNode.classList.contains("pi-export-section");
-      })
-      : [];
-    if (adaptiveSectionNodes.length) {
-      adaptiveSectionPlans = collectAdaptivePlanningSections(
-        exportState.exportRoot,
-        exportState.exportDocument
-      );
-      adaptiveEvaluatedPlans = evaluateAdaptivePagePlans(exportState, adaptiveSectionPlans);
-      exportState.adaptiveLayoutSummary = exportState.adaptiveLayoutSummary || {};
-      exportState.adaptiveLayoutSummary.plannerDiagnostics = adaptiveEvaluatedPlans.diagnostics;
-    }
-
-    var exportPages = documentNode.createElement("div");
-    exportPages.className = "pi-export-pages";
-    var sourcePaginatableItemCount = exportState.exportDocument.querySelectorAll("[data-pdf-section-item='1']").length;
-    exportState.exportPage.innerHTML = "";
-    exportState.exportPage.appendChild(exportPages);
-
-    var pageState = createExportPageShell(documentNode, exportState.exportDocument);
-    exportPages.appendChild(pageState.page);
-
-    function newPage() {
-      pageState = createExportPageShell(documentNode, exportState.exportDocument);
-      exportPages.appendChild(pageState.page);
-      return pageState;
-    }
-
-    function appendStandaloneNode(node) {
-      pageState.body.appendChild(node);
-      if (pageBodyOverflows(pageState) && pageState.hasContent) {
-        pageState.body.removeChild(node);
-        newPage();
-        pageState.body.appendChild(node);
-      }
-      pageState.hasContent = true;
-    }
-
-    function renderAdaptivePlan(planPages) {
-        exportPages.innerHTML = "";
-        pageState = createExportPageShell(documentNode, exportState.exportDocument);
-        exportPages.appendChild(pageState.page);
-        (adaptivePreludeNodes || []).forEach(function (childNode) {
-          appendStandaloneNode(childNode);
-        });
-        if ((adaptiveSectionNodes || []).length && adaptiveSectionPlans && planPages.length) {
-          if (pageState.hasContent) {
-            newPage();
-          }
-          buildAdaptivePlannedPages(
-            exportState,
-            exportPages,
-            pageState,
-            adaptiveSectionPlans,
-            planPages
-          );
-        }
-        var overflowPage = Array.prototype.slice.call(exportPages.querySelectorAll(".pi-export-page")).find(function (pageNode) {
-          return getAdaptivePageOverflowPixels(pageNode) > 1;
-        }) || null;
-        return {
-          overflowPage: overflowPage,
-          overflowPixels: overflowPage ? getAdaptivePageOverflowPixels(overflowPage) : 0
-        };
-      }
-
-      var candidatePlans = adaptiveEvaluatedPlans && adaptiveEvaluatedPlans.plans && adaptiveEvaluatedPlans.plans.length
-        ? adaptiveEvaluatedPlans.plans
-        : [{
-          pageCount: adaptiveEvaluatedPlans && adaptiveEvaluatedPlans.plan ? adaptiveEvaluatedPlans.plan.length : 0,
-          pages: adaptiveEvaluatedPlans && adaptiveEvaluatedPlans.plan ? adaptiveEvaluatedPlans.plan : [],
-          score: 0
-        }];
-      var acceptedPlan = null;
-      for (var adaptivePlanIndex = 0; adaptivePlanIndex < candidatePlans.length; adaptivePlanIndex += 1) {
-        var candidatePlan = candidatePlans[adaptivePlanIndex];
-        var renderResult = renderAdaptivePlan(candidatePlan.pages || []);
-        if (!renderResult.overflowPage) {
-          acceptedPlan = candidatePlan;
-          break;
-        }
-        if (
-          adaptiveEvaluatedPlans &&
-          adaptiveEvaluatedPlans.diagnostics &&
-          candidatePlan.pageCount === 2 &&
-          !adaptiveEvaluatedPlans.diagnostics.bestRejectedTwoPageReason
-        ) {
-          var overflowPageNumber = Array.prototype.slice.call(exportPages.querySelectorAll(".pi-export-page")).indexOf(renderResult.overflowPage) + 1;
-          adaptiveEvaluatedPlans.diagnostics.bestRejectedTwoPageReason =
-            "The best 2-section-page composition overflowed rendered page " +
-            overflowPageNumber +
-            " by " + Number(renderResult.overflowPixels.toFixed(2)) + "px.";
-        }
-      }
-      if (!acceptedPlan) {
-        renderAdaptivePlan(adaptiveEvaluatedPlans.plan || []);
-      } else if (adaptiveEvaluatedPlans && adaptiveEvaluatedPlans.diagnostics) {
-        adaptiveEvaluatedPlans.diagnostics.selectedPlan = {
-          pageCount: acceptedPlan.pageCount,
-          score: acceptedPlan.score,
-          pages: (acceptedPlan.pages || []).map(function (candidate, index) {
-            return {
-              page: index + 1,
-              occupancy: candidate.summary.occupancy,
-              rows: candidate.rows,
-              rowVariants: candidate.summary.rowPlan
-            };
-          })
-        };
-      }
-
-      exportState.exportPages = exportPages;
-      var adaptiveItemCount = exportPages.querySelectorAll("[data-pdf-section-item='1']").length;
-      if (sourcePaginatableItemCount !== adaptiveItemCount) {
-        throw new Error("PDF pagination dropped export content");
-      }
-      return exportState;
+    return paginateWebFlowDocument(exportState);
   }
 
   function populatePageFooters(exportState, guideTitle) {
@@ -11102,37 +6473,53 @@
     });
   }
 
+  function getPrintableQrActionLabel(kind, fallbackLabel) {
+    var normalizedKind = String(kind || "").trim().toLowerCase();
+    if (normalizedKind === "wifi") {
+      return getGuideCopyText("scan_wifi", "Scan to connect to Wi-Fi");
+    }
+    if (normalizedKind.indexOf("map") !== -1 || normalizedKind === "parking-map") {
+      return getGuideCopyText("scan_map", "Scan to open map");
+    }
+    return getGuideCopyText("scan_link", "Scan to open link");
+  }
+
   function buildMainCustomMapQrEntries(model) {
     var mapModel = model && model.map ? model.map : null;
-    if (!mapModel || !shouldUseQrForCustomMap(mapModel.finalPdfRepresentation || mapModel.pdfRepresentation, mapModel.isCustomGoogleMap)) {
+    if (!mapModel) {
       return [];
     }
-    if (!mapModel.openUrl) {
+    var mapUrl = normalizeHref(mapModel.openUrl || mapModel.linkHref || "");
+    if (!mapUrl) {
       return [];
     }
     return [{
       kind: "property-map",
       label: mapModel.linkLabel || "Open in Google Maps",
-      linkHref: mapModel.openUrl,
+      actionLabel: getPrintableQrActionLabel("property-map", "Scan to open map"),
+      linkHref: mapUrl,
       sourceNodeId: "map:link_label",
-      payload: mapModel.openUrl
+      payload: mapUrl
     }];
   }
 
   function buildBlockCustomMapQrEntries(blockModel) {
-    if (!blockModel || !shouldUseQrForCustomMap(blockModel.finalPdfRepresentation || blockModel.mapPdfRepresentation, blockModel.mapIsCustomGoogleMap)) {
+    if (!blockModel) {
       return [];
     }
-    if (!blockModel.mapOpenUrl) {
+    var hasMap = !!(blockModel.mapEmbedUrl || blockModel.mapOpenUrl || blockModel.mapExternalUrl || blockModel.mapImageSrc);
+    var mapUrl = normalizeHref(blockModel.mapOpenUrl || blockModel.mapExternalUrl || "");
+    if (!hasMap || !mapUrl) {
       return [];
     }
     return [{
       kind: "block-map",
       label: blockModel.linkLabel || "Open in Google Maps",
-      linkHref: blockModel.mapOpenUrl,
+      actionLabel: getPrintableQrActionLabel("block-map", "Scan to open map"),
+      linkHref: mapUrl,
       sourceNodeId: blockModel.id ? ("block:" + blockModel.id + ":link_label") : "",
       blockId: blockModel.id || "",
-      payload: blockModel.mapOpenUrl
+      payload: mapUrl
     }];
   }
 
@@ -11143,7 +6530,8 @@
     if (wifiPayload) {
       quickEntries.push({
         kind: "wifi",
-        label: ((model.wifiName && model.wifiName.label) || "Wi-Fi") + ": " + ((model.wifiName && model.wifiName.value) || ""),
+        label: getPrintableQrActionLabel("wifi", (model.wifiName && model.wifiName.label) || "Wi-Fi"),
+        actionLabel: "",
         linkHref: "",
         sourceNodeId: (model.wifiName && model.wifiName.valueNodeId) || "",
         payload: wifiPayload
@@ -11156,6 +6544,7 @@
         return {
           kind: entry.kind,
           label: entry.label,
+          actionLabel: getPrintableQrActionLabel(entry.kind, entry.label),
           linkHref: entry.href,
           sourceNodeId: entry.sourceNodeId || "",
           blockId: entry.blockId || "",
@@ -11419,13 +6808,15 @@
       }
 
       var model = extractGuideModel();
-      var needsCustomMapQr = shouldUseQrForCustomMap(model.map && model.map.pdfRepresentation, model.map && model.map.isCustomGoogleMap)
-        || (model.sections || []).some(function (sectionModel) {
+      var hasPrintableMapQr = !!(
+        (model.map && normalizeHref(model.map.openUrl || model.map.linkHref || "")) ||
+        (model.sections || []).some(function (sectionModel) {
           return (sectionModel.blocks || []).some(function (blockModel) {
-            return shouldUseQrForCustomMap(blockModel.mapPdfRepresentation, blockModel.mapIsCustomGoogleMap);
+            return !!normalizeHref(blockModel.mapOpenUrl || blockModel.mapExternalUrl || "");
           });
-        });
-      if (buildWifiQrPayload(model) || (model.guideLinks || []).length || needsCustomMapQr) {
+        })
+      );
+      if (buildWifiQrPayload(model) || (model.guideLinks || []).length || hasPrintableMapQr) {
         await ensureQrCodeLibrary();
       }
       var preparedAssets = await prepareGuideModelAssets(
@@ -11680,17 +7071,9 @@
       return {
         sourceId: String((cardNode.querySelector("[data-export-source-id]") || {}).getAttribute ? cardNode.querySelector("[data-export-source-id]").getAttribute("data-export-source-id") : "" ).trim(),
         imageRatio: Number((imageNode.naturalWidth / imageNode.naturalHeight).toFixed(6)),
-        chosenLayout: cardNode.classList.contains("pi-export-card--adaptive")
-          ? [
-              "adaptive",
-              String(cardNode.getAttribute("data-pdf-card-kind") || "wide"),
-              String(cardNode.getAttribute("data-pdf-card-orientation") || "square")
-            ].join("-")
-          : (
-            cardNode.classList.contains("pi-export-card--portrait-side")
-              ? "portrait-side-by-side"
-              : "landscape-stacked"
-          ),
+        chosenLayout: cardNode.classList.contains("pi-export-card--web-flow-portrait")
+          ? "web-flow-portrait"
+          : "web-flow-landscape",
         cardWidth: Number(cardRect.width.toFixed(2)),
         cardHeight: Number(cardRect.height.toFixed(2)),
         textColumnWidth: textRect ? Number(textRect.width.toFixed(2)) : 0,
@@ -11736,67 +7119,6 @@
       var mediaType = getExportMediaType(img);
       var fitPolicy = String(img.getAttribute("data-export-media-fit-policy") || (mediaType === "photo" ? "contain" : "contain"));
       var frameNode = img.closest("[data-export-image-frame]");
-      if (
-        exportRoot &&
-        exportRoot.querySelector &&
-        exportRoot.querySelector(".pi-export-document[data-pdf-layout-mode='adaptive']") &&
-        frameNode &&
-        (mediaType === "photo" || mediaType === "map" || mediaType === "qr")
-      ) {
-        var liveFrameRect = frameNode.getBoundingClientRect();
-        var containmentInnerBounds = getNearestExportContainmentInnerBounds(frameNode, exportRoot);
-        var constrainedFrameWidth = liveFrameRect.width;
-        var constrainedFrameHeight = mediaType === "qr" ? liveFrameRect.width : liveFrameRect.height;
-        if (containmentInnerBounds) {
-          if (containmentInnerBounds.width > 0) {
-            constrainedFrameWidth = Math.min(constrainedFrameWidth || containmentInnerBounds.width, containmentInnerBounds.width);
-          }
-          if (mediaType !== "qr" && containmentInnerBounds.height > 0) {
-            constrainedFrameHeight = Math.min(constrainedFrameHeight || containmentInnerBounds.height, containmentInnerBounds.height);
-          }
-        }
-        if (constrainedFrameWidth > 0) {
-          frameNode.style.width = constrainedFrameWidth + "px";
-        }
-        if (constrainedFrameHeight > 0) {
-          frameNode.style.height = constrainedFrameHeight + "px";
-          frameNode.style.maxHeight = constrainedFrameHeight + "px";
-        }
-        if (mediaType === "qr" && constrainedFrameWidth > 0) {
-          frameNode.style.width = constrainedFrameWidth + "px";
-          frameNode.style.height = constrainedFrameWidth + "px";
-          frameNode.style.minHeight = constrainedFrameWidth + "px";
-          frameNode.style.maxHeight = constrainedFrameWidth + "px";
-        }
-        applyAdaptiveMediaDimensions(frameNode, img, {
-          fitPolicy: fitPolicy,
-          fallbackWidth: constrainedFrameWidth || img.getBoundingClientRect().width || 1,
-          fallbackHeight: constrainedFrameHeight || img.getBoundingClientRect().height || 1,
-          preferFallbackFrameRect: true
-        });
-        if (fitPolicy !== "cover") {
-          var validatedFrameRect = getFrameRectWithFallback(
-            frameNode,
-            constrainedFrameWidth || img.getBoundingClientRect().width || 1,
-            constrainedFrameHeight || img.getBoundingClientRect().height || 1,
-            true
-          );
-          if (mediaType === "map") {
-            img.style.width = validatedFrameRect.width + "px";
-            img.style.height = "auto";
-          } else {
-            var validatedFitted = fitMediaWithinBounds(
-              img.naturalWidth,
-              img.naturalHeight,
-              validatedFrameRect.width,
-              validatedFrameRect.height,
-              false
-            );
-            img.style.width = validatedFitted.width + "px";
-            img.style.height = validatedFitted.height + "px";
-          }
-        }
-      }
       var computedStyles = window.getComputedStyle(img);
       var rect = img.getBoundingClientRect();
       if (!img.naturalWidth || !img.naturalHeight || !rect.width || !rect.height) {
@@ -11832,7 +7154,7 @@
         role: role,
         mediaType: mediaType,
         fitPolicy: fitPolicy,
-        distorted: ratioDifference > PDF_ADAPTIVE_MEDIA_RATIO_BLOCKER
+        distorted: ratioDifference > PDF_MEDIA_RATIO_BLOCKER
       };
       diagnostics.push(diagnosticsEntry);
 
@@ -12078,10 +7400,8 @@
     var exportFrameRole = !!node.getAttribute("data-export-image-frame");
     var semanticPanel =
       semanticRole === "overview-map-panel" ||
-      semanticRole === "parking-map-panel" ||
       node.classList.contains("pi-export-map") ||
       node.classList.contains("pi-export-card") ||
-      node.classList.contains("pi-export-parking-map") ||
       node.classList.contains("pi-export-image-frame") ||
       node.classList.contains("pi-export-map-image-frame") ||
       node.classList.contains("pi-export-card-image-frame");
@@ -12544,7 +7864,7 @@
     };
   }
 
-  function buildAdaptiveVectorLayoutModel(exportState, pdfWidth, pdfHeight) {
+  function buildVectorLayoutModel(exportState, pdfWidth, pdfHeight) {
     var pageNodes = Array.prototype.slice.call(exportState.exportRoot.querySelectorAll("[data-pdf-page]"));
     return {
       version: 1,
@@ -12667,12 +7987,25 @@
     var scale = Math.min(bounds.width, bounds.height) / 30;
     var centerX = bounds.x + (bounds.width / 2);
     var centerY = bounds.y + (bounds.height / 2);
+    var name = String(iconName || "info");
+    // Match the optical centering used by the webpage bookmark SVGs.
+    // Values are SVG-viewBox units applied before the -90deg bookmark rotation.
+    var opticalShiftByIcon = {
+      info: { x: 0, y: 0.5 },
+      alert: { x: 0, y: 0.5 },
+      location: { x: 0, y: 0.5 },
+      key: { x: 0.25, y: 0.5 },
+      car: { x: 0, y: -2.75 },
+      wifi: { x: 0, y: -0.4721 },
+      "log-out": { x: 1, y: 0 }
+    };
+    var opticalShift = opticalShiftByIcon[name] || { x: 0, y: 0 };
     function point(x, y) {
-      var dx = (x - 12) * scale;
-      var dy = (y - 12) * scale;
+      var dx = ((x + opticalShift.x) - 12) * scale;
+      var dy = ((y + opticalShift.y) - 12) * scale;
       return {
-        x: centerX - dy,
-        y: centerY + dx
+        x: centerX + dy,
+        y: centerY - dx
       };
     }
     function line(x1, y1, x2, y2) {
@@ -12686,7 +8019,6 @@
     }
     pdf.setDrawColor(color.r, color.g, color.b);
     pdf.setLineWidth(Math.max(0.55, 1.6 * scale));
-    var name = String(iconName || "info");
     if (name === "key") {
       circle(8, 15, 3.2);
       line(10.5, 12.5, 18.5, 4.5);
@@ -12786,7 +8118,7 @@
   }
 
   function drawWebFlowBookmarkRail(pdf, pageNode, pdfWidth, pdfHeight) {
-    if (!isWebFlowPdfLayoutEnabled() || !pageNode) {
+    if (!pageNode) {
       return;
     }
     var scaleMetrics = getPageScaleMetrics(pageNode, pdfWidth, pdfHeight);
@@ -12804,29 +8136,16 @@
       } else {
         pdf.rect(bounds.x, bounds.y, bounds.width, bounds.height, "FD");
       }
+      var contentNode = linkNode.querySelector(".pi-export-bookmark-content");
+      var contentBounds = contentNode
+        ? convertRectToPdfBounds(contentNode.getBoundingClientRect(), pageRect, scaleMetrics)
+        : bounds;
+      var contentCenterX = contentBounds.x + (contentBounds.width / 2);
       var badgeNode = linkNode.querySelector(".pi-export-bookmark-badge");
-      if (badgeNode) {
-        var badgeBounds = convertRectToPdfBounds(badgeNode.getBoundingClientRect(), pageRect, scaleMetrics);
-        pdf.setDrawColor(ink.r, ink.g, ink.b);
-        pdf.setLineWidth(0.65);
-        pdf.circle(
-          badgeBounds.x + (badgeBounds.width / 2),
-          badgeBounds.y + (badgeBounds.height / 2),
-          Math.min(badgeBounds.width, badgeBounds.height) / 2,
-          "S"
-        );
-        drawWebFlowBookmarkIcon(
-          pdf,
-          String(linkNode.getAttribute("data-pdf-bookmark-icon") || "info"),
-          badgeBounds,
-          ink
-        );
-      }
       var labelNode = linkNode.querySelector(".pi-export-bookmark-label");
-      if (!labelNode) {
+      if (!badgeNode || !labelNode) {
         return;
       }
-      var labelBounds = convertRectToPdfBounds(labelNode.getBoundingClientRect(), pageRect, scaleMetrics);
       var labelText = String(labelNode.textContent || "").trim();
       if (!labelText) {
         return;
@@ -12836,12 +8155,49 @@
         ? pdf.processArabic(labelText)
         : labelText;
       pdf.setFont(fontFace.family, fontFace.style);
-      pdf.setFontSize(Math.max(4.8, 5.5 * scaleMetrics.scaleY));
+      var bookmarkLabelFontSize = Math.max(4.8, 5.5 * scaleMetrics.scaleY);
+      var measuredBadgeBounds = convertRectToPdfBounds(badgeNode.getBoundingClientRect(), pageRect, scaleMetrics);
+      var badgeSize = Math.min(measuredBadgeBounds.width, measuredBadgeBounds.height);
+      var bookmarkGap = Math.max(2.5, 4 * scaleMetrics.scaleY);
+      pdf.setFontSize(bookmarkLabelFontSize);
+      var labelAdvance = Math.max(0, pdf.getTextWidth(renderedLabel) || 0);
+      var availableStackHeight = Math.max(1, contentBounds.height - (2 * scaleMetrics.scaleY));
+      var maxLabelAdvance = Math.max(1, availableStackHeight - bookmarkGap - badgeSize);
+      if (labelAdvance > maxLabelAdvance) {
+        bookmarkLabelFontSize = Math.max(3.6, bookmarkLabelFontSize * (maxLabelAdvance / labelAdvance));
+        pdf.setFontSize(bookmarkLabelFontSize);
+        labelAdvance = Math.max(0, pdf.getTextWidth(renderedLabel) || 0);
+      }
+      var stackHeight = labelAdvance + bookmarkGap + badgeSize;
+      var stackTop = contentBounds.y + Math.max(0, (contentBounds.height - stackHeight) / 2);
+      var labelAnchorY = stackTop + labelAdvance;
+      var badgeBounds = {
+        x: contentCenterX - (badgeSize / 2),
+        y: labelAnchorY + bookmarkGap,
+        width: badgeSize,
+        height: badgeSize
+      };
+      pdf.setDrawColor(ink.r, ink.g, ink.b);
+      pdf.setLineWidth(0.65);
+      pdf.circle(
+        contentCenterX,
+        badgeBounds.y + (badgeBounds.height / 2),
+        badgeSize / 2,
+        "S"
+      );
+      drawWebFlowBookmarkIcon(
+        pdf,
+        String(linkNode.getAttribute("data-pdf-bookmark-icon") || "info"),
+        badgeBounds,
+        ink
+      );
+      // jsPDF's rotated text baseline sits visually left of the geometric centerline.
+      var bookmarkLabelOpticalX = bookmarkLabelFontSize * 0.3;
       pdf.setTextColor(ink.r, ink.g, ink.b);
       pdf.text(
         renderedLabel,
-        labelBounds.x + (labelBounds.width / 2),
-        labelBounds.y + labelBounds.height,
+        contentCenterX + bookmarkLabelOpticalX,
+        labelAnchorY,
         {
           angle: 90,
           align: "left",
@@ -13182,7 +8538,7 @@
     var pdfWidth = pdf.internal.pageSize.getWidth();
     var pdfHeight = pdf.internal.pageSize.getHeight();
     var modelStartedAt = Date.now();
-    var layoutModel = buildAdaptiveVectorLayoutModel(exportState, pdfWidth, pdfHeight);
+    var layoutModel = buildVectorLayoutModel(exportState, pdfWidth, pdfHeight);
     var vectorMediaClipDiagnostics = layoutModel.pages.reduce(function (all, pageModel) {
       return all.concat((pageModel.elements || []).filter(function (element) {
         return element.type === "image";
@@ -13271,17 +8627,15 @@
     var imageSourceDiagnostics = assertExportImageSourcesAreCapturable(exportState.exportRoot);
     var imageDiagnostics = await waitForImages(exportState.exportRoot);
     await waitForTwoAnimationFrames();
-    recordPdfGenerationStage("adaptive-validation-started", {
+    recordPdfGenerationStage("validation-started", {
       pageCount: pageNodes.length
     });
-    var cardContainmentDiagnostics = validateAdaptiveCardContainment(exportState.exportRoot);
-    var mediaVisualPlacementDiagnostics = validateAdaptiveMediaVisualPlacement(exportState.exportRoot);
+    var cardContainmentDiagnostics = [];
+    var mediaVisualPlacementDiagnostics = [];
     var imageRatioDiagnostics = validateImageAspectRatios(exportState.exportRoot);
     var imageClipDiagnostics = validateExportImageClipping(exportState.exportRoot);
-    recordPdfGenerationStage("adaptive-validation-completed", {
-      pageCount: pageNodes.length,
-      containmentCount: cardContainmentDiagnostics.length,
-      mediaPlacementCount: mediaVisualPlacementDiagnostics.length
+    recordPdfGenerationStage("validation-completed", {
+      pageCount: pageNodes.length
     });
     validateExportDomParity(exportState.exportRoot, modelParityMap, "post-fonts-images", mutationGuardState);
 
@@ -13326,18 +8680,14 @@
       return null;
     }
     var blobUrl = createPdfArtifactModeBlobUrl(artifact.pdfBlob);
-    var adaptiveSummary = artifact.adaptiveSummary || null;
-    var plannerDiagnostics = adaptiveSummary && adaptiveSummary.plannerDiagnostics
-      ? adaptiveSummary.plannerDiagnostics
-      : (artifact.plannerDiagnostics || null);
+    var layoutSummary = artifact.layoutSummary || null;
     return {
       status: "complete",
       filename: String(artifact.filename || ""),
       blob: artifact.pdfBlob,
       blobUrl: blobUrl,
       pageCount: Number(artifact.pageCount || 0),
-      adaptiveSummary: adaptiveSummary,
-      plannerDiagnostics: plannerDiagnostics,
+      layoutSummary: layoutSummary,
       performance: artifact.performance || {},
       language: String(artifact.languageCode || SOURCE_LANGUAGE),
       direction: String(artifact.direction || "ltr"),
@@ -13581,24 +8931,14 @@
       await waitForImages(exportState.exportRoot);
       recordPdfGenerationStage("assets-completed");
       updateExportProgress(triggerElement, statusElement, null, null, "prepare-layout");
-      if (isWebFlowPdfLayoutEnabled()) {
-        recordPdfGenerationStage("web-flow-layout-started");
-        applyWebFlowSectionRows(exportState);
-        recordPdfGenerationStage("web-flow-layout-completed");
-      }
+      recordPdfGenerationStage("web-flow-layout-started");
+      applyWebFlowSectionRows(exportState);
+      recordPdfGenerationStage("web-flow-layout-completed");
       var sizingDiagnostics = applyExportImageSizing(exportState.exportRoot);
       recordPdfGenerationStage("browser-fonts-started");
       await waitForFonts();
       recordPdfGenerationStage("browser-fonts-completed");
       await waitForTwoAnimationFrames();
-      if (!isWebFlowPdfLayoutEnabled()) {
-        recordPdfGenerationStage("adaptive-layout-started");
-        applyAdaptiveSectionRows(exportState);
-        recordPdfGenerationStage("adaptive-layout-completed", {
-          pageCount: exportState && exportState.exportPages ? exportState.exportPages.querySelectorAll(".pi-export-page").length : 0
-        });
-        recordPdfGenerationStage("adaptive-final-sizing-started");
-      }
       var prePaginationRatioDiagnostics = validateImageAspectRatios(exportState.exportRoot);
       var prePaginationClipDiagnostics = validateExportImageClipping(exportState.exportRoot);
       recordPdfPerformance(performanceState, "imagePreparationMs", imagePrepStartedAt);
@@ -13606,44 +8946,26 @@
       updateExportProgress(triggerElement, statusElement, null, null, "paginate");
       var paginationStartedAt = Date.now();
       paginateExportDocument(exportState);
-      if (isWebFlowPdfLayoutEnabled()) {
-        decorateWebFlowPagesWithBookmarks(exportState);
-      } else {
-        applyAdaptiveFinalMediaSizing(exportState.exportRoot);
-        recordPdfGenerationStage("adaptive-final-sizing-completed");
-      }
+      decorateWebFlowPagesWithBookmarks(exportState);
       populatePageFooters(exportState, guideModel.title || guideTitle);
       populatePdfContentsDestinations(exportState);
       recordPdfPerformance(performanceState, "paginationMs", paginationStartedAt);
       var layoutDiagnostics = collectCardLayoutDiagnostics(exportState.exportRoot);
-      var pageOccupancy = collectAdaptivePageSummary(exportState.exportPages);
-      if (isWebFlowPdfLayoutEnabled()) {
-        exportState.webFlowLayoutSummary = Object.assign({}, exportState.webFlowLayoutSummary || {}, {
-          pageOccupancy: pageOccupancy,
-          pageCount: exportState.exportPages.querySelectorAll(".pi-export-page").length,
-          sparsePageWarnings: pageOccupancy.filter(function (pageSummary) {
-            return pageSummary.occupancy < PDF_ADAPTIVE_SPARSE_PAGE_THRESHOLD && pageSummary.rowCount <= 1;
-          }).map(function (pageSummary) {
-            return pageSummary.pageNumber;
-          })
-        });
-        exportState.adaptiveLayoutSummary = exportState.webFlowLayoutSummary;
-        window.__propertyInstructionPdfWebFlowLayoutSummary = exportState.webFlowLayoutSummary;
-      } else {
-        exportState.adaptiveLayoutSummary = exportState.adaptiveLayoutSummary || {};
-        exportState.adaptiveLayoutSummary.pageOccupancy = pageOccupancy;
-        exportState.adaptiveLayoutSummary.pageCount = exportState.exportPages.querySelectorAll(".pi-export-page").length;
-        exportState.adaptiveLayoutSummary.sparsePageWarnings = pageOccupancy.filter(function (pageSummary) {
-          return pageSummary.occupancy < PDF_ADAPTIVE_SPARSE_PAGE_THRESHOLD && pageSummary.rowCount <= 1;
+      var pageOccupancy = collectPdfPageSummary(exportState.exportPages);
+      exportState.webFlowLayoutSummary = Object.assign({}, exportState.webFlowLayoutSummary || {}, {
+        pageOccupancy: pageOccupancy,
+        pageCount: exportState.exportPages.querySelectorAll(".pi-export-page").length,
+        sparsePageWarnings: pageOccupancy.filter(function (pageSummary) {
+          return pageSummary.occupancy < PDF_SPARSE_PAGE_THRESHOLD && pageSummary.rowCount <= 1;
         }).map(function (pageSummary) {
           return pageSummary.pageNumber;
-        });
-        window.__propertyInstructionPdfAdaptiveLayoutSummary = exportState.adaptiveLayoutSummary;
-      }
+        })
+      });
+      window.__propertyInstructionPdfWebFlowLayoutSummary = exportState.webFlowLayoutSummary;
       validateExportDomParity(exportState.exportRoot, preMountParity.modelParityMap, "post-pagination");
       mutationGuardState = startExportMutationGuard(exportState.exportRoot);
       updateExportProgress(triggerElement, statusElement, null, null, "validate");
-      recordPdfGenerationStage("adaptive-validation-started");
+      recordPdfGenerationStage("validation-started");
       validateExportParity(guideModel, exportState, settledSnapshot);
       var finalSnapshot = captureSemanticSnapshot();
       updateTranslationDiagnostics({
@@ -13656,7 +8978,7 @@
       if (translationState.generation !== exportGeneration || (translationState.requestedLanguage || SOURCE_LANGUAGE) !== exportLanguage) {
         throw new Error("Selected translation changed during PDF export");
       }
-      recordPdfGenerationStage("adaptive-validation-completed", {
+      recordPdfGenerationStage("validation-completed", {
         pageCount: exportState.exportPages.querySelectorAll(".pi-export-page").length
       });
 
@@ -13723,10 +9045,7 @@
         cacheKey: cacheKey,
         artifactCacheHit: false,
         performance: Object.assign({}, performanceState),
-        adaptiveSummary: exportState.adaptiveLayoutSummary ? JSON.parse(JSON.stringify(exportState.adaptiveLayoutSummary)) : null,
-        plannerDiagnostics: exportState.adaptiveLayoutSummary && exportState.adaptiveLayoutSummary.plannerDiagnostics
-          ? JSON.parse(JSON.stringify(exportState.adaptiveLayoutSummary.plannerDiagnostics))
-          : null,
+        layoutSummary: exportState.webFlowLayoutSummary ? JSON.parse(JSON.stringify(exportState.webFlowLayoutSummary)) : null,
         filename: getPdfFilename(triggerElement),
         renderer: PDF_RENDERER_ID,
         embeddedFonts: (renderResult.embeddedFonts || []).slice(),
@@ -13987,8 +9306,7 @@
         return {
           blob: artifact.pdfBlob,
           blobUrl: pdfArtifactModeController.objectUrl || createPdfArtifactModeBlobUrl(artifact.pdfBlob),
-          summary: artifact.adaptiveSummary || null,
-          plannerDiagnostics: artifact.plannerDiagnostics || null,
+          summary: artifact.layoutSummary || null,
           performance: artifact.performance || {},
           renderer: artifact.renderer || PDF_RENDERER_ID,
           embeddedFonts: Array.isArray(artifact.embeddedFonts) ? artifact.embeddedFonts.slice() : [],

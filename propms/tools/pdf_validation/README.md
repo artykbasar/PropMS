@@ -1,6 +1,6 @@
-## Adaptive PDF Validation Tooling
+## Property Instruction PDF Validation Tooling
 
-These scripts are the repository-owned replacement for the temporary `/tmp` browser runners used during adaptive PDF development.
+These scripts are the repository-owned browser runners for validating the production Property Instruction PDF renderer.
 
 ### Browser matrix
 
@@ -32,8 +32,8 @@ NODE_PATH=/Users/artykbasar/.cache/codex-runtimes/codex-primary-runtime/dependen
   --output-dir /tmp/propms_pdf_matrix
 ```
 
-The runner uses the normal route, not artifact mode. It validates the one
-adaptive-vector renderer through one-click Download and the Print popup flow.
+The runner uses the normal route, not artifact mode. It validates the single
+`web-flow-vector` renderer through one-click Download and the Print popup flow.
 
 ### Output
 
@@ -45,7 +45,7 @@ Each run writes:
 
 Each JSON result includes:
 
-- adaptive-vector renderer identity
+- `web-flow-vector` renderer identity
 - page lifecycle state
 - interaction diagnostics
 - generation diagnostics
@@ -57,7 +57,6 @@ Each JSON result includes:
 
 ### Renderer
 
-Property Instruction exports use one production architecture: the adaptive
-layout rendered directly by jsPDF as `adaptive-vector`. Renderer and layout
-query parameters are intentionally ignored; the validation matrix varies
-browser, viewport, language, and action rather than PDF implementation.
+Property Instruction exports use one production architecture: the webpage-style
+A4 flow rendered directly by jsPDF as `web-flow-vector`. The validation matrix
+varies browser, viewport, language, and action rather than PDF implementation.

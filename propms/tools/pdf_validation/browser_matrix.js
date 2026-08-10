@@ -9,7 +9,7 @@ const DEFAULTS = {
   baseUrl: "http://127.0.0.1:8000",
   propertySlug: "99a-burlington-road",
   browsers: ["chromium", "firefox", "webkit"],
-  renderer: "adaptive-vector",
+  renderer: "web-flow-vector",
   actions: ["download", "print"],
   languages: ["en"],
   outputDir: "/tmp/propms_pdf_matrix",
