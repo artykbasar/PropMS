@@ -1922,6 +1922,54 @@
   [data-property-instruction-export] .pi-export-card-body p:last-child {
     margin-bottom: 0;
   }
+  [data-property-instruction-export] .pi-export-card-body .pi-export-rich-heading {
+    margin: 0 0 8px;
+    color: inherit;
+    line-height: 1.2;
+    overflow-wrap: anywhere;
+  }
+  [data-property-instruction-export] .pi-export-card-body .pi-export-rich-heading--h1 {
+    font-size: 24px;
+    font-weight: 700;
+  }
+  [data-property-instruction-export] .pi-export-card-body .pi-export-rich-heading--h2 {
+    font-size: 20px;
+    font-weight: 700;
+  }
+  [data-property-instruction-export] .pi-export-card-body .pi-export-rich-heading--h3 {
+    font-size: 16px;
+    font-weight: 700;
+  }
+  [data-property-instruction-export] .pi-export-card-body .pi-export-rich-list {
+    margin: 0 0 8px;
+    padding-inline-start: 1.35em;
+  }
+  [data-property-instruction-export] .pi-export-card-body .pi-export-rich-table {
+    width: 100%;
+    margin: 10px 0;
+    border-collapse: collapse;
+    table-layout: fixed;
+    background: #fff;
+    font-size: 12px;
+    line-height: 1.35;
+  }
+  [data-property-instruction-export] .pi-export-card-body .pi-export-rich-table th,
+  [data-property-instruction-export] .pi-export-card-body .pi-export-rich-table td {
+    padding: 7px 8px;
+    border: 1px solid #cfd7d1;
+    vertical-align: middle;
+    overflow-wrap: anywhere;
+    word-break: normal;
+  }
+  [data-property-instruction-export] .pi-export-card-body .pi-export-rich-table th {
+    background: #f4f7f4;
+    font-weight: 700;
+  }
+  [data-property-instruction-export] .pi-export-card-body .pi-export-rich-table-cell-text {
+    display: block;
+    width: 100%;
+    min-width: 0;
+  }
   [data-property-instruction-export] .pi-export-card-image-frame {
     margin: 0;
     border-radius: 14px;
@@ -2256,10 +2304,10 @@
     height: auto;
     padding-bottom: 0;
   }
-  [data-property-instruction-export] .pi-export-document[data-pdf-layout-mode="web-flow"] .pi-export-row--web-flow[data-pdf-web-flow-filled="1"] .pi-export-card--web-flow {
+  [data-property-instruction-export] .pi-export-document[data-pdf-layout-mode="web-flow"] .pi-export-row--web-flow:is([data-pdf-web-flow-filled="1"], [data-pdf-web-flow-compressed="1"]) .pi-export-card--web-flow {
     height: 100%;
   }
-  [data-property-instruction-export] .pi-export-document[data-pdf-layout-mode="web-flow"] .pi-export-row--web-flow[data-pdf-web-flow-filled="1"] .pi-export-card-layout {
+  [data-property-instruction-export] .pi-export-document[data-pdf-layout-mode="web-flow"] .pi-export-row--web-flow:is([data-pdf-web-flow-filled="1"], [data-pdf-web-flow-compressed="1"]) .pi-export-card-layout {
     flex: 1 1 auto;
     height: 100%;
     min-height: 0;
