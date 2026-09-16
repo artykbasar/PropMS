@@ -1,4 +1,35 @@
 (() => {
+  const root = document.documentElement;
+  const rootStyles = getComputedStyle(root);
+  const themeColor = document.querySelector('meta[name="theme-color"]');
+  const header = document.querySelector(".v2-header");
+  const footer = document.querySelector(".v2-footer");
+  const resolveChromeColor = (element, fallbackToken) => {
+    if (element instanceof HTMLElement) {
+      const background = getComputedStyle(element).backgroundColor.trim();
+      if (
+        background
+        && background !== "transparent"
+        && background !== "rgba(0, 0, 0, 0)"
+      ) return background;
+    }
+    return rootStyles.getPropertyValue(fallbackToken).trim();
+  };
+  const headerColor = resolveChromeColor(header, "--brand-secondary");
+  const footerColor = resolveChromeColor(footer, "--brand-dark");
+  const setBrowserChromeColor = (color) => {
+    if (!color) return;
+    root.style.backgroundColor = color;
+    if (themeColor instanceof HTMLMetaElement) themeColor.setAttribute("content", color);
+  };
+  setBrowserChromeColor(headerColor);
+  if (footer instanceof HTMLElement && "IntersectionObserver" in window) {
+    const footerObserver = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => setBrowserChromeColor(entry.isIntersecting ? footerColor : headerColor));
+    }, { threshold: 0.01 });
+    footerObserver.observe(footer);
+  }
+
   const toggle = document.querySelector(".v2-nav-toggle");
   const navigation = document.querySelector("#primary-navigation");
   if (!toggle || !navigation) return;
@@ -112,18 +143,13 @@
     const activateFixedMedia = (section) => {
       const image = section.querySelector(".v2-hero__image, .v2-cta__media img");
       if (!(image instanceof HTMLImageElement)) return;
-      const applyImage = () => {
-        const source = image.currentSrc || image.src;
-        if (!source) return;
-        section.style.setProperty("--v2-fixed-media", `url(${JSON.stringify(source)})`);
-        section.classList.add("v2-media-fixed-ready");
-      };
+      const markReady = () => section.classList.add("v2-media-fixed-ready");
       if (image.complete && image.naturalWidth) {
-        applyImage();
+        markReady();
         return;
       }
       image.loading = "eager";
-      image.addEventListener("load", applyImage, { once: true });
+      image.addEventListener("load", markReady, { once: true });
     };
 
     if ("IntersectionObserver" in window) {

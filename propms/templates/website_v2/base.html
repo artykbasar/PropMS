@@ -1,8 +1,9 @@
 <!doctype html>
-<html lang="{{ (seo.language if seo else shell.language) | e }}">
+<html lang="{{ (seo.language if seo else shell.language) | e }}" style="background-color: {{ shell.design_tokens['--brand-secondary'] | e }};">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="{{ shell.design_tokens['--brand-secondary'] | e }}">
   {% if seo %}
   <title>{{ seo.title | e }}</title>
   <meta name="description" content="{{ seo.description | e }}">
