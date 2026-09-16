@@ -1,0 +1,32 @@
+{% extends "www/login.html" %}
+
+{% block meta_block %}
+{{ super() }}
+<meta name="robots" content="noindex, nofollow">
+{% endblock %}
+
+{% block head_include %}
+{{ super() }}
+<link rel="stylesheet" href="/assets/propms/css/website_v2.css?v={{ asset_version or build_version or '' }}">
+{% if home_parity %}<link rel="stylesheet" href="/assets/propms/css/home_v2.css?v={{ asset_version or build_version or '' }}">{% endif %}
+<link rel="stylesheet" href="/assets/propms/css/login.css?v={{ asset_version or build_version or '' }}">
+<script defer src="/assets/propms/js/website_v2.js?v={{ asset_version or build_version or '' }}"></script>
+<style>
+:root {
+{% for token, value in shell.design_tokens.items() %}  {{ token }}: {{ value }};
+{% endfor %}}
+</style>
+{% endblock %}
+
+{% block banner %}{% endblock %}
+
+{% block navbar %}
+<a class="v2-skip-link" href="#page-login">Skip to sign in</a>
+<h1 class="v2-visually-hidden">Sign in to {{ shell.brand_name | e }}</h1>
+{% include "propms/templates/website_v2/includes/topbar.html" %}
+{% include "propms/templates/website_v2/includes/header.html" %}
+{% endblock %}
+
+{% block footer %}
+{% if show_footer_on_login %}{% include "propms/templates/website_v2/includes/footer.html" %}{% endif %}
+{% endblock %}

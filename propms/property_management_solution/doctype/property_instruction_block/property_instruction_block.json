@@ -1,0 +1,143 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2026-07-22 00:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "section",
+  "block_type",
+  "step_number",
+  "title",
+  "body",
+  "image",
+  "caption",
+  "link_url",
+  "link_label",
+  "custom_map_embed_url",
+  "custom_map_snapshot",
+  "custom_map_snapshot_status",
+  "custom_map_snapshot_source_hash",
+  "custom_map_snapshot_generated_at",
+  "custom_map_snapshot_error_log"
+ ],
+ "fields": [
+  {
+   "fieldname": "section",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Section",
+   "options": "Finding the Property\nCheck-In\nParking\nWiFi\nDuring Your Stay\nRubbish\nHouse Rules\nCheck-Out\nEmergency",
+   "reqd": 1
+  },
+  {
+   "fieldname": "block_type",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Block Type",
+   "options": "Text\nStep\nImage\nWarning\nLink\nMap",
+   "reqd": 1
+  },
+  {
+   "fieldname": "step_number",
+   "fieldtype": "Int",
+   "label": "Step Number"
+  },
+  {
+   "fieldname": "title",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Title"
+  },
+  {
+   "fieldname": "body",
+   "fieldtype": "Text Editor",
+   "label": "Body"
+  },
+  {
+   "fieldname": "image",
+   "fieldtype": "Attach Image",
+   "label": "Image"
+  },
+  {
+   "fieldname": "caption",
+   "fieldtype": "Data",
+   "label": "Caption"
+  },
+  {
+   "fieldname": "link_url",
+   "fieldtype": "Data",
+   "label": "Link URL"
+  },
+  {
+   "fieldname": "link_label",
+   "fieldtype": "Data",
+   "label": "Link Label"
+  },
+  {
+   "depends_on": "eval:doc.block_type",
+   "description": "Paste a Google Maps embed iframe or its src URL. Required for Map blocks. Optional for Step/Text/Image/Warning/Link.",
+   "fieldname": "custom_map_embed_url",
+   "fieldtype": "Small Text",
+   "label": "Google Maps Embed iframe or URL",
+   "mandatory_depends_on": "eval:doc.block_type == \"Map\""
+  },
+  {
+   "depends_on": "eval:doc.custom_map_embed_url",
+   "fieldname": "custom_map_snapshot",
+   "fieldtype": "Attach Image",
+   "hidden": 1,
+   "in_list_view": 0,
+   "label": "Generated Google Map Snapshot",
+   "read_only": 1
+  },
+  {
+   "default": "Not Required",
+   "depends_on": "eval:doc.custom_map_embed_url",
+   "fieldname": "custom_map_snapshot_status",
+   "fieldtype": "Select",
+   "in_list_view": 0,
+   "label": "Google Map Snapshot Status",
+   "options": "Not Required\nPending\nProcessing\nReady\nFailed",
+   "read_only": 1
+  },
+  {
+   "fieldname": "custom_map_snapshot_source_hash",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "in_list_view": 0,
+   "label": "Google Map Snapshot Source Hash",
+   "read_only": 1
+  },
+  {
+   "depends_on": "eval:doc.custom_map_embed_url",
+   "fieldname": "custom_map_snapshot_generated_at",
+   "fieldtype": "Datetime",
+   "in_list_view": 0,
+   "label": "Google Map Snapshot Generated At",
+   "read_only": 1
+  },
+  {
+   "depends_on": "eval:doc.custom_map_embed_url",
+   "fieldname": "custom_map_snapshot_error_log",
+   "fieldtype": "Link",
+   "in_list_view": 0,
+   "label": "Google Map Snapshot Error Log",
+   "options": "Error Log",
+   "read_only": 1
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-07-22 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Property Management Solution",
+ "name": "Property Instruction Block",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

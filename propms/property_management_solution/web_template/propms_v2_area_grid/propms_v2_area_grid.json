@@ -1,0 +1,107 @@
+{
+ "doctype": "Web Template",
+ "name": "PropMS V2 Area Grid",
+ "module": "Property Management Solution",
+ "standard": 1,
+ "type": "Section",
+ "template": "",
+ "fields": [
+  {
+   "fieldname": "section_id",
+   "fieldtype": "Data",
+   "label": "Section ID"
+  },
+  {
+   "fieldname": "theme",
+   "fieldtype": "Select",
+   "label": "Colour theme",
+   "options": "default\nprimary\nsecondary\nsoft\ndark\ninverse",
+   "default": "default"
+  },
+  {
+   "fieldname": "variant",
+   "fieldtype": "Select",
+   "label": "Variant",
+   "options": "cards\nmedia\nlogos",
+   "default": "cards"
+  },
+  {
+   "fieldname": "show_heading",
+   "fieldtype": "Check",
+   "label": "Show heading",
+   "default": "1"
+  },
+  {
+   "fieldname": "heading_alignment",
+   "fieldtype": "Select",
+   "label": "Heading alignment",
+   "options": "left\ncenter",
+   "default": "left"
+  },
+  {
+   "fieldname": "heading_case",
+   "fieldtype": "Select",
+   "label": "Heading case",
+   "options": "normal\nuppercase",
+   "default": "normal"
+  },
+  {
+   "fieldname": "logo_density",
+   "fieldtype": "Select",
+   "label": "Logo density",
+   "options": "standard\ncompact",
+   "default": "standard"
+  },
+  {
+   "fieldname": "grid_columns",
+   "fieldtype": "Select",
+   "label": "Desktop logo columns",
+   "options": "auto\n3\n5\n6",
+   "default": "auto"
+  },
+  {
+   "fieldname": "grid_width",
+   "fieldtype": "Select",
+   "label": "Logo grid width",
+   "options": "full\nnarrow",
+   "default": "full"
+  },
+  {
+   "fieldname": "title",
+   "fieldtype": "Data",
+   "label": "Title",
+   "reqd": 1
+  },
+  {
+   "fieldname": "description",
+   "fieldtype": "Small Text",
+   "label": "Description"
+  },
+  {
+   "fieldname": "items",
+   "fieldtype": "Table Break",
+   "label": "Areas"
+  },
+  {
+   "fieldname": "title",
+   "fieldtype": "Data",
+   "label": "Area name",
+   "reqd": 1
+  },
+  {
+   "fieldname": "image",
+   "fieldtype": "Attach Image",
+   "label": "Image"
+  },
+  {
+   "fieldname": "image_alt",
+   "fieldtype": "Data",
+   "label": "Image alternative text"
+  },
+  {
+   "fieldname": "url",
+   "fieldtype": "Data",
+   "label": "URL"
+  }
+ ]
+}

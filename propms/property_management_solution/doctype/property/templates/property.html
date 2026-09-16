@@ -1,0 +1,53 @@
+{% extends "propms/templates/website_v2/base.html" %}
+{% block content %}
+<article class="v2-property-page">
+  <header class="v2-property-page__header">
+    <p class="v2-eyebrow">Development</p>
+    <h1>{{ page_title | e }}</h1>
+    {% if property_location %}<p class="v2-property-page__location">{{ property_location | e }}</p>{% endif %}
+  </header>
+
+  {% if gallery %}
+  <section class="v2-property-gallery" aria-labelledby="property-gallery-title">
+    <h2 id="property-gallery-title">Gallery</h2>
+    <div class="v2-property-gallery__grid">
+      {% for image in gallery %}
+      <button type="button" class="v2-property-gallery__item" data-property-gallery-open="{{ loop.index0 }}" aria-label="Open image {{ loop.index }} of {{ gallery | length }}">
+        <img src="{{ image.src | e }}" alt="{{ image.alt | e }}" loading="{{ 'eager' if loop.first else 'lazy' }}">
+      </button>
+      {% endfor %}
+    </div>
+    <dialog class="v2-property-gallery__dialog" data-property-gallery-dialog aria-label="Property image gallery">
+      <button type="button" class="v2-property-gallery__close" data-property-gallery-close aria-label="Close gallery">&times;</button>
+      <button type="button" class="v2-property-gallery__previous" data-property-gallery-previous aria-label="Previous image">&#8249;</button>
+      <img data-property-gallery-image src="" alt="">
+      <button type="button" class="v2-property-gallery__next" data-property-gallery-next aria-label="Next image">&#8250;</button>
+    </dialog>
+  </section>
+  {% endif %}
+
+  {% if property_description or property_bullets %}
+  <section class="v2-property-copy">
+    {% if property_description %}<div class="v2-richtext">{{ property_description | safe }}</div>{% endif %}
+    {% if property_bullets %}
+    <h2>Why choose {{ page_title | e }}</h2>
+    <ul>{% for item in property_bullets %}<li>{{ item | e }}</li>{% endfor %}</ul>
+    {% endif %}
+  </section>
+  {% endif %}
+
+  {% if public_children %}
+  <section class="v2-property-units" aria-labelledby="property-units-title">
+    <h2 id="property-units-title">Published properties</h2>
+    <div class="v2-property-grid">
+      {% for child in public_children %}
+      <article class="v2-property-card">
+        {% if child.image %}<img src="{{ child.image | e }}" alt="{{ child.title | e }}" loading="lazy">{% endif %}
+        <h3>{% if child.href %}<a href="{{ child.href | e }}">{{ child.title | e }}</a>{% else %}{{ child.title | e }}{% endif %}</h3>
+      </article>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+</article>
+{% endblock %}

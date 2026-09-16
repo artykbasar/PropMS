@@ -1,0 +1,62 @@
+{
+ "doctype": "Web Template",
+ "name": "PropMS V2 CTA",
+ "module": "Property Management Solution",
+ "standard": 1,
+ "type": "Section",
+ "template": "",
+ "fields": [
+  {
+   "fieldname": "section_id",
+   "fieldtype": "Data",
+   "label": "Section ID"
+  },
+  {
+   "fieldname": "theme",
+   "fieldtype": "Select",
+   "label": "Colour theme",
+   "options": "default\nprimary\nsecondary\nsoft\ndark\ninverse",
+   "default": "primary"
+  },
+  {
+   "fieldname": "variant",
+   "fieldtype": "Select",
+   "label": "Variant",
+   "options": "default\ncentered",
+   "default": "default"
+  },
+  {
+   "fieldname": "title",
+   "fieldtype": "Data",
+   "label": "Title",
+   "reqd": 1
+  },
+  {
+   "fieldname": "description",
+   "fieldtype": "Small Text",
+   "label": "Description"
+  },
+  {
+   "fieldname": "background_image",
+   "fieldtype": "Attach Image",
+   "label": "Background image"
+  },
+  {
+   "fieldname": "background_scroll",
+   "fieldtype": "Select",
+   "label": "Background scroll behaviour",
+   "options": "normal\nfixed",
+   "default": "normal"
+  },
+  {
+   "fieldname": "button_label",
+   "fieldtype": "Data",
+   "label": "Button label"
+  },
+  {
+   "fieldname": "button_url",
+   "fieldtype": "Data",
+   "label": "Button URL"
+  }
+ ]
+}

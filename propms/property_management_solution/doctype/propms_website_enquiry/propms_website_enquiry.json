@@ -1,0 +1,53 @@
+{
+  "actions": [],
+  "autoname": "format:WEB-ENQ-{YYYY}-{#####}",
+  "doctype": "DocType",
+  "document_type": "Document",
+  "engine": "InnoDB",
+  "field_order": [
+    "contact_section", "sender_name", "email", "telephone", "enquiry_type", "subject", "message",
+    "source_section", "source_page", "utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content",
+    "consent_section", "marketing_consent", "consent_timestamp",
+    "processing_section", "validation_state", "processing_status", "notification_status", "crm_status", "crm_lead",
+    "internal_section", "submission_fingerprint", "spam_reason"
+  ],
+  "fields": [
+    {"fieldname": "contact_section", "fieldtype": "Section Break", "label": "Contact"},
+    {"fieldname": "sender_name", "fieldtype": "Data", "label": "Name", "reqd": 1, "in_list_view": 1},
+    {"fieldname": "email", "fieldtype": "Data", "label": "Email", "options": "Email", "reqd": 1, "in_list_view": 1},
+    {"fieldname": "telephone", "fieldtype": "Data", "label": "Telephone"},
+    {"fieldname": "enquiry_type", "fieldtype": "Data", "label": "Enquiry Type"},
+    {"fieldname": "subject", "fieldtype": "Data", "label": "Subject", "reqd": 1},
+    {"fieldname": "message", "fieldtype": "Text", "label": "Message", "reqd": 1},
+    {"fieldname": "source_section", "fieldtype": "Section Break", "label": "Source and Attribution"},
+    {"fieldname": "source_page", "fieldtype": "Data", "label": "Source Page", "reqd": 1},
+    {"fieldname": "utm_source", "fieldtype": "Data", "label": "UTM Source"},
+    {"fieldname": "utm_medium", "fieldtype": "Data", "label": "UTM Medium"},
+    {"fieldname": "utm_campaign", "fieldtype": "Data", "label": "UTM Campaign"},
+    {"fieldname": "utm_term", "fieldtype": "Data", "label": "UTM Term"},
+    {"fieldname": "utm_content", "fieldtype": "Data", "label": "UTM Content"},
+    {"fieldname": "consent_section", "fieldtype": "Section Break", "label": "Consent"},
+    {"default": "0", "fieldname": "marketing_consent", "fieldtype": "Check", "label": "Marketing Consent", "read_only": 1},
+    {"fieldname": "consent_timestamp", "fieldtype": "Datetime", "label": "Consent Timestamp", "read_only": 1},
+    {"fieldname": "processing_section", "fieldtype": "Section Break", "label": "Processing"},
+    {"default": "Validated", "fieldname": "validation_state", "fieldtype": "Select", "label": "Validation State", "options": "Validated\nSuspected Spam", "read_only": 1, "in_list_view": 1},
+    {"default": "Received", "fieldname": "processing_status", "fieldtype": "Select", "label": "Processing Status", "options": "Received\nProcessing\nCompleted\nNeeds Attention\nSpam", "read_only": 1, "in_list_view": 1},
+    {"default": "Pending", "fieldname": "notification_status", "fieldtype": "Select", "label": "Notification Status", "options": "Pending\nSent\nFailed\nSkipped", "read_only": 1},
+    {"default": "Disabled", "fieldname": "crm_status", "fieldtype": "Select", "label": "CRM Status", "options": "Disabled\nPending\nLinked\nFailed\nSkipped", "read_only": 1},
+    {"fieldname": "crm_lead", "fieldtype": "Link", "label": "CRM Lead", "options": "Lead", "read_only": 1},
+    {"fieldname": "internal_section", "fieldtype": "Section Break", "label": "Internal", "collapsible": 1},
+    {"fieldname": "submission_fingerprint", "fieldtype": "Data", "label": "Submission Fingerprint", "hidden": 1, "read_only": 1, "search_index": 1},
+    {"fieldname": "spam_reason", "fieldtype": "Small Text", "label": "Spam Reason", "read_only": 1}
+  ],
+  "index_web_pages_for_search": 0,
+  "links": [],
+  "module": "Property Management Solution",
+  "name": "PropMS Website Enquiry",
+  "permissions": [
+    {"create": 1, "read": 1, "report": 1, "write": 1, "role": "System Manager"},
+    {"create": 1, "read": 1, "report": 1, "write": 1, "role": "Website Manager"}
+  ],
+  "sort_field": "creation",
+  "sort_order": "DESC",
+  "track_changes": 1
+}

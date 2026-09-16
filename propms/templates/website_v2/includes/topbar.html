@@ -1,0 +1,29 @@
+<div class="v2-topbar">
+  <div class="v2-container v2-topbar__inner">
+    {% if home_parity %}
+    <div class="v2-topbar__links">
+      {% for item in top_bar_items or [] %}<a href="{{ item.href | e }}">{{ item.label | e }}</a>{% endfor %}
+    </div>
+    {% if top_bar_social or language_picker %}
+    <div class="v2-topbar__right">
+      {% if top_bar_social %}
+      <div class="v2-topbar__social" aria-label="Social links">
+        {% for item in top_bar_social %}<a href="{{ item.href | e }}" aria-label="{{ item.label | e }}"><span aria-hidden="true">{{ item.label[0] | e }}</span></a>{% endfor %}
+      </div>
+      {% endif %}
+      {% if language_picker %}
+      <select id="language-switcher" class="v2-topbar__language" aria-label="Language">
+        <option value="{{ language_picker.code | e }}" selected>{{ language_picker.name | e }}</option>
+      </select>
+      {% endif %}
+    </div>
+    {% endif %}
+    {% else %}
+    <span>{{ shell.brand_name }}</span>
+    {% if top_bar_items %}
+    <div class="v2-topbar__links">      {% for item in top_bar_items %}<a href="{{ item.href | e }}">{{ item.label | e }}</a>{% endfor %}
+    </div>
+    {% elif top_bar_label %}<span>{{ top_bar_label }}</span>{% endif %}
+    {% endif %}
+  </div>
+</div>

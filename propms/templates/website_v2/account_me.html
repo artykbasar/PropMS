@@ -1,0 +1,24 @@
+{% extends "www/me.html" %}
+
+{% block head_include %}
+{{ super() }}
+{% include "propms/templates/website_v2/includes/account_head.html" %}
+{% endblock %}
+
+{% block banner %}{% endblock %}
+
+{% block navbar %}
+<a class="v2-skip-link" href="#page-me">Skip to account settings</a>
+{% include "propms/templates/website_v2/includes/topbar.html" %}
+{% include "propms/templates/website_v2/includes/header.html" %}
+{% endblock %}
+
+{% block page_content %}
+<h1 class="v2-visually-hidden">My Account</h1>
+{% set native_account_content = super() %}
+{{ native_account_content | replace('href="/"', 'href="/home"', 1) }}
+{% endblock %}
+
+{% block footer %}
+{% include "propms/templates/website_v2/includes/footer.html" %}
+{% endblock %}

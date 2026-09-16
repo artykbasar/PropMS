@@ -1,0 +1,9 @@
+{% extends "propms/templates/website_v2/base.html" %}
+{% block content %}
+<section class="v2-preview v2-error-page">
+  <p class="v2-eyebrow">{{ error_status | e }}</p>
+  <h1>{{ page_title | e }}</h1>
+  <p>{{ error_message | e }}</p>
+  <a class="v2-button" href="/">Back to home</a>
+</section>
+{% endblock %}

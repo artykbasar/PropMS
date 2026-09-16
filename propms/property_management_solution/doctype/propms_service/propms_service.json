@@ -1,0 +1,260 @@
+{
+  "actions": [],
+  "autoname": "hash",
+  "doctype": "DocType",
+  "engine": "InnoDB",
+  "field_order": [
+    "content_section",
+    "title",
+    "slug",
+    "route",
+    "summary",
+    "hero_image",
+    "hero_image_alt",
+    "introduction",
+    "benefits",
+    "service_process",
+    "suitability",
+    "trust_content",
+    "relationships_section",
+    "related_services",
+    "related_areas",
+    "optional_sections",
+    "cta_section",
+    "cta_title",
+    "cta_text",
+    "cta_label",
+    "cta_url",
+    "seo_section",
+    "seo_title",
+    "seo_description",
+    "canonical_url",
+    "social_image",
+    "publication_section",
+    "publication_status",
+    "published",
+    "index_state",
+    "approved_by",
+    "approved_on"
+  ],
+  "fields": [
+    {
+      "fieldname": "content_section",
+      "fieldtype": "Section Break",
+      "label": "Content"
+    },
+    {
+      "fieldname": "title",
+      "fieldtype": "Data",
+      "label": "Title",
+      "reqd": 1,
+      "in_list_view": 1
+    },
+    {
+      "fieldname": "slug",
+      "fieldtype": "Data",
+      "label": "Slug",
+      "reqd": 1,
+      "unique": 1,
+      "in_list_view": 1
+    },
+    {
+      "fieldname": "route",
+      "fieldtype": "Data",
+      "label": "Route",
+      "read_only": 1,
+      "unique": 1
+    },
+    {
+      "fieldname": "summary",
+      "fieldtype": "Small Text",
+      "label": "Summary"
+    },
+    {
+      "fieldname": "hero_image",
+      "fieldtype": "Attach Image",
+      "label": "Hero Image"
+    },
+    {
+      "fieldname": "hero_image_alt",
+      "fieldtype": "Data",
+      "label": "Hero Image Alt Text"
+    },
+    {
+      "fieldname": "introduction",
+      "fieldtype": "Text Editor",
+      "label": "Introduction"
+    },
+    {
+      "fieldname": "benefits",
+      "fieldtype": "Text Editor",
+      "label": "Benefits"
+    },
+    {
+      "fieldname": "service_process",
+      "fieldtype": "Text Editor",
+      "label": "Process"
+    },
+    {
+      "fieldname": "suitability",
+      "fieldtype": "Text Editor",
+      "label": "Eligibility / Suitability"
+    },
+    {
+      "fieldname": "trust_content",
+      "fieldtype": "Text Editor",
+      "label": "Trust Content"
+    },
+    {
+      "fieldname": "relationships_section",
+      "fieldtype": "Section Break",
+      "label": "Relationships"
+    },
+    {
+      "fieldname": "related_services",
+      "fieldtype": "Table",
+      "label": "Related Services",
+      "options": "PropMS Service Link"
+    },
+    {
+      "fieldname": "related_areas",
+      "fieldtype": "Table",
+      "label": "Related Areas",
+      "options": "PropMS Area Link"
+    },
+    {
+      "fieldname": "optional_sections",
+      "fieldtype": "Table",
+      "label": "Optional Controlled Sections",
+      "options": "PropMS Content Section"
+    },
+    {
+      "fieldname": "cta_section",
+      "fieldtype": "Section Break",
+      "label": "Call to Action"
+    },
+    {
+      "fieldname": "cta_title",
+      "fieldtype": "Data",
+      "label": "CTA Title"
+    },
+    {
+      "fieldname": "cta_text",
+      "fieldtype": "Small Text",
+      "label": "CTA Text"
+    },
+    {
+      "fieldname": "cta_label",
+      "fieldtype": "Data",
+      "label": "CTA Button Label"
+    },
+    {
+      "fieldname": "cta_url",
+      "fieldtype": "Data",
+      "label": "CTA URL"
+    },
+    {
+      "fieldname": "seo_section",
+      "fieldtype": "Section Break",
+      "label": "SEO"
+    },
+    {
+      "fieldname": "seo_title",
+      "fieldtype": "Data",
+      "label": "SEO Title"
+    },
+    {
+      "fieldname": "seo_description",
+      "fieldtype": "Small Text",
+      "label": "SEO Description"
+    },
+    {
+      "fieldname": "canonical_url",
+      "fieldtype": "Data",
+      "label": "Canonical URL",
+      "description": "Leave empty to use the generated self-canonical URL."
+    },
+    {
+      "fieldname": "social_image",
+      "fieldtype": "Attach Image",
+      "label": "Social Image"
+    },
+    {
+      "fieldname": "publication_section",
+      "fieldtype": "Section Break",
+      "label": "Publication"
+    },
+    {
+      "fieldname": "publication_status",
+      "fieldtype": "Select",
+      "label": "Publication Status",
+      "options": "Draft\nApproved",
+      "default": "Draft",
+      "read_only": 1,
+      "in_list_view": 1
+    },
+    {
+      "fieldname": "published",
+      "fieldtype": "Check",
+      "label": "Published",
+      "default": "0",
+      "read_only": 1,
+      "in_list_view": 1
+    },
+    {
+      "fieldname": "index_state",
+      "fieldtype": "Select",
+      "label": "Index State",
+      "options": "noindex\nindex",
+      "default": "noindex",
+      "read_only": 1
+    },
+    {
+      "fieldname": "approved_by",
+      "fieldtype": "Link",
+      "label": "Approved By",
+      "options": "User",
+      "read_only": 1
+    },
+    {
+      "fieldname": "approved_on",
+      "fieldtype": "Datetime",
+      "label": "Approved On",
+      "read_only": 1
+    }
+  ],
+  "index_web_pages_for_search": 1,
+  "links": [],
+  "module": "Property Management Solution",
+  "name": "PropMS Service",
+  "permissions": [
+    {
+      "create": 1,
+      "read": 1,
+      "report": 1,
+      "write": 1,
+      "delete": 1,
+      "role": "System Manager"
+    },
+    {
+      "create": 1,
+      "read": 1,
+      "report": 1,
+      "write": 1,
+      "role": "Website Manager"
+    },
+    {
+      "create": 1,
+      "read": 1,
+      "report": 1,
+      "write": 1,
+      "role": "Website Publisher"
+    }
+  ],
+  "sort_field": "modified",
+  "sort_order": "DESC",
+  "track_changes": 1,
+  "title_field": "title",
+  "is_published_field": "published",
+  "allow_guest_to_view": 1
+}

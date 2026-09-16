@@ -1,0 +1,14 @@
+{% if not hide_footer_signup %}
+<div class="col-lg-4 col-md-6 footer-newsletter">
+    <form action="" novalidate>
+        <input type="email"
+            id="footer-subscribe-email"
+            placeholder="{{ _('Your email address...') }}"
+            aria-label="{{ _('Your email address...') }}"
+            aria-describedby="footer-subscribe-button footer-subscribe-status"
+            required>
+        <input type="submit" value='{{ _("Get Updates") }}' id="footer-subscribe-button">
+        <div id="footer-subscribe-status" role="status" aria-live="polite"></div>
+    </form>
+</div>
+{% endif %}

@@ -1,0 +1,10 @@
+<meta name="robots" content="noindex, nofollow">
+<link rel="stylesheet" href="/assets/propms/css/website_v2.css?v={{ asset_version or build_version or '' }}">
+{% if home_parity %}<link rel="stylesheet" href="/assets/propms/css/home_v2.css?v={{ asset_version or build_version or '' }}">{% endif %}
+<link rel="stylesheet" href="/assets/propms/css/account_v2.css?v={{ asset_version or build_version or '' }}">
+<script defer src="/assets/propms/js/website_v2.js?v={{ asset_version or build_version or '' }}"></script>
+<style>
+:root {
+{% for token, value in shell.design_tokens.items() %}  {{ token }}: {{ value }};
+{% endfor %}}
+</style>

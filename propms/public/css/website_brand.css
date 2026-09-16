@@ -1,0 +1,219 @@
+/* Minimal structural shell for the shared Day navbar/footer. Brand colours
+   continue to come from the active Frappe Website Theme. */
+html,
+body {
+  margin: 0;
+  max-width: 100%;
+  overflow-x: clip;
+}
+#topbar,
+#header,
+#topbar *,
+#header * {
+  box-sizing: border-box;
+}
+#topbar,
+#header {
+  font-family: "Open Sans", sans-serif;
+}
+#topbar {
+  height: 40px;
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  font-size: 15px;
+}
+#topbar > .container {
+  width: 100%;
+  margin: 0 auto;
+  padding: 0 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+#topbar .contact-info,
+#topbar .social-links {
+  display: flex;
+  align-items: center;
+}
+#topbar .contact-info a,
+#topbar .social-links a { text-decoration: none; }
+#topbar .contact-info i { margin-right: 5px; }
+#topbar .contact-info .phone-icon { margin-left: 15px; }
+#topbar .social-links a { padding: 4px 8px; }
+#topbar #language-switcher { padding: 0; margin-left: 8px; }
+#topbar #language-switcher.hide { display: none !important; }
+#topbar #language-switcher select {
+  min-width: 150px;
+  height: 30px;
+  padding: 2px 28px 2px 8px;
+  border: 1px solid #ced4da;
+  border-radius: 4px;
+  background: #fff;
+  color: #212529;
+  font: inherit;
+}
+@media (max-width: 767px) {
+  #topbar { height: auto; min-height: 40px; }
+  #topbar > .container { justify-content: center; padding-top: 5px; padding-bottom: 5px; }
+  #topbar .social-links { display: none; }
+  #topbar .contact-info {
+    width: 100%;
+    justify-content: center;
+    gap: 4px 8px;
+    flex-wrap: wrap;
+    font-size: 13px;
+  }
+  #topbar .contact-info .phone-icon { margin-left: 0; }
+  #topbar .contact-info a { white-space: nowrap; }
+}
+@media (min-width: 576px) { #topbar > .container, #header > .container { max-width: 540px; } }
+@media (min-width: 768px) { #topbar > .container, #header > .container { max-width: 720px; } }
+@media (min-width: 992px) { #topbar > .container, #header > .container { max-width: 960px; } }
+@media (min-width: 1200px) { #topbar > .container, #header > .container { max-width: 1140px; } }
+@media (min-width: 1400px) { #topbar > .container, #header > .container { max-width: 1320px; } }
+
+#header {
+  height: 70px;
+  min-height: 70px;
+  transition: all .3s ease;
+  z-index: 997;
+}
+#header, #header > .container {
+  display: flex;
+  align-items: center;
+}
+#header > .container {
+  width: 100%;
+  margin: 0 auto;
+  padding: 0 12px;
+  justify-content: space-between;
+}
+#header .logo { line-height: 1; margin: 0; padding: 0; }
+#header .logos { position: relative; flex: 0 0 auto; }
+#header .logo1,
+#header .logo2,
+#header .logo3,
+#header .logo4 { position: absolute; left: 0; top: 0; }
+#header .logo1 { transform-origin: 8.9% 50%; }
+#header img {
+  display: block;
+  width: auto;
+  max-height: 48px;
+  object-fit: contain;
+}
+#header .logo img { max-height: 40px; }
+#header > .container > img { max-height: 48px; }
+.page_content img {
+  max-width: 100%;
+  height: auto;
+  aspect-ratio: auto 4 / 3;
+}
+#navbar { padding: 0; }
+#navbar ul {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+#navbar li { position: relative; }
+#navbar > ul > li { margin-left: 5px; }
+#navbar a, #navbar a:focus {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 25px 15px 24px;
+  font-size: 14px;
+  white-space: nowrap;
+  text-decoration: none;
+  transition: .2s ease;
+}
+#navbar .dropdown ul {
+  display: block;
+  position: absolute;
+  left: 0;
+  top: calc(100% + 20px);
+  min-width: 200px;
+  padding: 10px 0;
+  opacity: 0;
+  visibility: hidden;
+  z-index: 1000;
+  transition: .2s ease;
+}
+#navbar .dropdown:hover > ul { top: 100%; opacity: 1; visibility: visible; }
+#navbar .dropdown ul a { padding: 10px 20px; }
+.mobile-nav-toggle {
+  display: none;
+  cursor: pointer;
+  font-size: 28px;
+  line-height: 1;
+}
+@media (max-width: 991px) {
+  #header > .container { min-width: 0; }
+  #header .logos,
+  #header > .container > img { max-width: calc(100% - 52px); }
+  .mobile-nav-toggle { display: block; flex: 0 0 auto; }
+  #navbar > ul { display: none; }
+  #navbar.navbar-mobile {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    padding: 55px 15px 15px;
+  }
+  #navbar.navbar-mobile > ul {
+    display: block;
+    max-height: calc(100vh - 80px);
+    overflow-y: auto;
+    padding: 10px 0;
+  }
+  #navbar.navbar-mobile .mobile-nav-toggle {
+    position: absolute;
+    top: 15px;
+    right: 15px;
+  }
+  #navbar.navbar-mobile a { padding: 10px 20px; }
+  #navbar.navbar-mobile .dropdown ul {
+    position: static;
+    display: none;
+    margin: 5px 20px;
+    opacity: 1;
+    visibility: visible;
+  }
+  #navbar.navbar-mobile .dropdown > .dropdown-active { display: block; }
+}
+#footer { padding: 0 0 30px; font-size: 14px; }
+#footer .footer-top { padding: 60px 0 30px; }
+#footer .row { display: flex; flex-wrap: wrap; margin: 0 -12px; }
+#footer [class*="col-"] { width: 100%; padding: 0 12px; }
+#footer .footer-info { margin-bottom: 15px; text-align: center; padding: 30px 20px; }
+#footer .footer-info h3 { font-size: 36px; line-height: 1; margin: 0 0 20px; }
+#footer .footer-links { margin-bottom: 30px; }
+#footer .footer-links ul { list-style: none; margin: 0; padding: 0; }
+#footer .footer-links li { display: flex; align-items: center; padding: 10px 0; }
+#footer .footer-links a { text-decoration: none; }
+#footer .footer-newsletter form { margin-top: 30px; padding: 6px 10px; position: relative; }
+#footer .footer-newsletter input[type="email"] { border: 0; padding: 4px; width: calc(100% - 110px); }
+#footer .footer-newsletter input[type="submit"] {
+  position: absolute; inset: 0 0 0 auto; border: 0; padding: 0 20px;
+}
+#footer .copyright { text-align: center; padding-top: 30px; }
+#footer .credits { padding-top: 5px; text-align: center; font-size: 13px; }
+@media (min-width: 768px) { #footer .col-md-6 { width: 50%; } }
+@media (min-width: 992px) {
+  #footer .col-lg-2 { width: 16.666667%; }
+  #footer .col-lg-4 { width: 33.333333%; }
+}
+/* The legacy template always renders these. Heavy main.js used to clear them. */
+#preloader { display: none !important; }
+body[data-path="login"] .back-to-top { display: none !important; }
+
+@media (prefers-reduced-motion: reduce) {
+  #header,
+  #navbar a,
+  #navbar .dropdown ul,
+  .mobile-nav-toggle {
+    transition: none !important;
+  }
+}

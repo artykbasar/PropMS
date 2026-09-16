@@ -1,0 +1,21 @@
+{% extends "propms/templates/website_v2/base.html" %}
+{% block content %}
+<section class="v2-property-page v2-property-hub">
+  <header class="v2-property-page__header">
+    <p class="v2-eyebrow">Property</p>
+    <h1>{{ page_title | e }}</h1>
+    <p>Explore the developments currently published by {{ shell.brand_name | e }}.</p>
+  </header>
+  {% if properties %}
+  <div class="v2-property-grid">
+    {% for property in properties %}
+    <article class="v2-property-card">
+      <h2><a href="/new-developments/{{ (property.web_name or property.name) | urlencode }}">{{ (property.web_name or property.name) | e }}</a></h2>
+      {% if property.location %}<p>{{ property.location | e }}</p>{% endif %}
+      {% if property.description %}<p>{{ property.description | striptags | truncate(180) }}</p>{% endif %}
+    </article>
+    {% endfor %}
+  </div>
+  {% else %}<p>No developments are currently published.</p>{% endif %}
+</section>
+{% endblock %}

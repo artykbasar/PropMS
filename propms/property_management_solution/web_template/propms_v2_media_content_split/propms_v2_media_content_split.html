@@ -1,0 +1,12 @@
+<section{% if section_id %} id="{{ section_id | e }}"{% endif %} class="v2-component v2-component--media-split v2-theme-{{ theme or 'default' }}">
+  <div class="v2-component__inner v2-split v2-split--{{ variant or 'image-left' }}">
+    {% if image %}<figure class="v2-split__media">{{ render_responsive_image(image, image_alt or '', usage='content', decorative=image_decorative or false, css_class='v2-split__image') | safe }}</figure>{% endif %}
+    <div class="v2-split__content">
+      {% if eyebrow %}<p class="v2-eyebrow">{{ eyebrow | e }}</p>{% endif %}
+      <h2>{{ title | e }}</h2>
+      {% if content %}<p>{{ content | e }}</p>{% endif %}
+      {% if items %}<ul class="v2-split__list">{% for item in items %}<li>{{ item.text | e }}</li>{% endfor %}</ul>{% endif %}
+      {% if link_label and link_url %}<a class="v2-text-link" href="{{ link_url | e }}">{{ link_label | e }}</a>{% endif %}
+    </div>
+  </div>
+</section>

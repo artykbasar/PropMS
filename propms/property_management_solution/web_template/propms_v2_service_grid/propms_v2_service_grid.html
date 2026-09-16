@@ -1,0 +1,14 @@
+<section{% if section_id %} id="{{ section_id | e }}"{% endif %} class="v2-component v2-component--service-grid v2-theme-{{ theme or 'default' }}">
+  <div class="v2-component__inner">
+    <div class="v2-section-heading" data-shadow-heading="{{ title | e }}"><h2>{{ title | e }}</h2>{% if description %}<p>{{ description | e }}</p>{% endif %}</div>
+    <div class="v2-grid v2-grid--services v2-grid--{{ variant or 'cards' }}">
+      {% for item in items or [] %}
+      <article class="v2-card v2-card--interactive">
+        {% if item.icon %}<span class="v2-card__icon v2-card__icon--{{ item.icon | e }}" aria-hidden="true"></span>{% endif %}
+        <h3>{% if item.url %}<a href="{{ item.url | e }}">{{ item.title | e }}</a>{% else %}{{ item.title | e }}{% endif %}</h3>
+        {% if item.description %}<p>{{ item.description | e }}</p>{% endif %}
+      </article>
+      {% endfor %}
+    </div>
+  </div>
+</section>

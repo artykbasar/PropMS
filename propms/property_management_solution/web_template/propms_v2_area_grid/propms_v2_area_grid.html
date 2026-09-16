@@ -1,0 +1,13 @@
+<section{% if section_id %} id="{{ section_id | e }}"{% endif %} class="v2-component v2-component--area-grid v2-theme-{{ theme or 'default' }} v2-area-grid--heading-{{ heading_alignment or 'left' }} v2-area-grid--heading-case-{{ heading_case or 'normal' }} v2-area-grid--logos-{{ logo_density or 'standard' }} v2-area-grid--columns-{{ grid_columns or 'auto' }} v2-area-grid--grid-{{ grid_width or 'full' }}">
+  <div class="v2-component__inner">
+    <div class="v2-section-heading{% if show_heading == 0 or show_heading == '0' %} v2-visually-hidden{% endif %}"><h2>{{ title | e }}</h2>{% if description %}<p>{{ description | e }}</p>{% endif %}</div>
+    <div class="v2-grid v2-grid--areas v2-grid--{{ variant or 'cards' }}">
+      {% for item in items or [] %}
+      <article class="v2-card v2-card--area{% if variant == 'logos' %} v2-card--logo{% endif %}">
+        {% if item.image %}{% if item.url %}<a class="v2-card__media-link" href="{{ item.url | e }}" aria-label="{{ item.title | e }}">{% endif %}<img src="{{ item.image | e }}" alt="{{ item.image_alt | e }}" width="480" height="320" loading="lazy">{% if item.url %}</a>{% endif %}{% endif %}
+        <h3>{% if item.url %}<a href="{{ item.url | e }}">{{ item.title | e }}</a>{% else %}{{ item.title | e }}{% endif %}</h3>
+      </article>
+      {% endfor %}
+    </div>
+  </div>
+</section>

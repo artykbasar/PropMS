@@ -1,0 +1,216 @@
+{
+    "actions": [],
+    "creation": "2019-01-10 09:46:13.704896",
+    "doctype": "DocType",
+    "document_type": "Setup",
+    "editable_grid": 1,
+    "engine": "InnoDB",
+    "field_order": [
+        "company",
+        "section_break_2",
+        "security_deposit_item",
+        "column_break_5",
+        "security_deposit_payment_type",
+        "damage_charge_item",
+        "section_break_8",
+        "column_break_10",
+        "section_break_9",
+        "invoice_start_date",
+        "section_break_12",
+        "group_maintenance_job_items",
+        "submit_maintenance_invoice",
+        "column_break_14",
+        "maintenance_item_group",
+        "section_break_17",
+        "self_consumption_customer",
+        "section_break_5djc",
+        "advanced_property_management",
+        "section_break_ubgp",
+        "default_rent_uom",
+        "column_break_pfvd",
+        "default_security_deposit_period",
+        "section_break_guest_guides",
+        "enable_guest_guide_google_translate",
+        "guest_guide_source_language",
+        "guest_guide_translate_languages"
+    ],
+    "fields": [
+        {
+            "fieldname": "company",
+            "fieldtype": "Link",
+            "label": "Company",
+            "options": "Company"
+        },
+        {
+            "fieldname": "security_deposit_item",
+            "fieldtype": "Link",
+            "label": "Security Deposit Item",
+            "options": "Item"
+        },
+        {
+            "fieldname": "damage_charge_item",
+            "fieldtype": "Link",
+            "label": "Damage Charge Item",
+            "options": "Item"
+        },
+        {
+            "fieldname": "security_deposit_payment_type",
+            "fieldtype": "Link",
+            "label": "Security Deposit Payment Type",
+            "options": "Mode of Payment"
+        },
+        {
+            "default": "0",
+            "fieldname": "group_maintenance_job_items",
+            "fieldtype": "Check",
+            "label": "Group Maintenance Job Items"
+        },
+        {
+            "fieldname": "section_break_2",
+            "fieldtype": "Section Break"
+        },
+        {
+            "fieldname": "column_break_5",
+            "fieldtype": "Column Break"
+        },
+        {
+            "fieldname": "section_break_8",
+            "fieldtype": "Section Break"
+        },
+        {
+            "fieldname": "column_break_10",
+            "fieldtype": "Column Break"
+        },
+        {
+            "fieldname": "section_break_12",
+            "fieldtype": "Section Break"
+        },
+        {
+            "fieldname": "column_break_14",
+            "fieldtype": "Column Break"
+        },
+        {
+            "fieldname": "maintenance_item_group",
+            "fieldtype": "Table MultiSelect",
+            "label": "Maintenance Item Group",
+            "options": "MultiSelect Item Group"
+        },
+        {
+            "default": "0",
+            "fieldname": "submit_maintenance_invoice",
+            "fieldtype": "Check",
+            "label": "Submit Maintenance Invoice"
+        },
+        {
+            "fieldname": "section_break_17",
+            "fieldtype": "Section Break"
+        },
+        {
+            "fieldname": "self_consumption_customer",
+            "fieldtype": "Link",
+            "label": "Self Consumption Customer",
+            "options": "Customer"
+        },
+        {
+            "fieldname": "section_break_9",
+            "fieldtype": "Section Break"
+        },
+        {
+            "fieldname": "invoice_start_date",
+            "fieldtype": "Date",
+            "label": "Invoice Start Date"
+        },
+        {
+            "default": "0",
+            "fieldname": "advanced_property_management",
+            "fieldtype": "Check",
+            "label": "Advanced Property Management"
+        },
+        {
+            "fieldname": "section_break_5djc",
+            "fieldtype": "Section Break"
+        },
+        {
+            "depends_on": "eval: doc.advanced_property_management == 1",
+            "fetch_if_empty": 1,
+            "fieldname": "default_rent_uom",
+            "fieldtype": "Link",
+            "label": "Default Rent UOM",
+            "options": "UOM"
+        },
+        {
+            "depends_on": "eval: doc.advanced_property_management == 1",
+            "fieldname": "default_security_deposit_period",
+            "fieldtype": "Link",
+            "label": "Default Security Deposit Period",
+            "options": "UOM"
+        },
+        {
+            "fieldname": "column_break_pfvd",
+            "fieldtype": "Column Break"
+        },
+        {
+            "fieldname": "section_break_ubgp",
+            "fieldtype": "Section Break"
+        },
+        {
+            "fieldname": "section_break_guest_guides",
+            "fieldtype": "Section Break",
+            "label": "Guest Guide Website"
+        },
+        {
+            "default": "0",
+            "fieldname": "enable_guest_guide_google_translate",
+            "fieldtype": "Check",
+            "label": "Enable Guest Guide Google Translate"
+        },
+        {
+            "default": "en",
+            "depends_on": "eval: doc.enable_guest_guide_google_translate == 1",
+            "fieldname": "guest_guide_source_language",
+            "fieldtype": "Data",
+            "label": "Guest Guide Source Language"
+        },
+        {
+            "depends_on": "eval: doc.enable_guest_guide_google_translate == 1",
+            "description": "Leave empty to display all languages supported by the Google Translate widget. Enter comma-separated language codes only when you want to restrict the list.",
+            "fieldname": "guest_guide_translate_languages",
+            "fieldtype": "Small Text",
+            "label": "Guest Guide Translate Languages"
+        }
+    ],
+    "index_web_pages_for_search": 1,
+    "issingle": 1,
+    "links": [],
+    "modified": "2023-06-13 14:30:53.697366",
+    "modified_by": "Administrator",
+    "module": "Property Management Solution",
+    "name": "Property Management Settings",
+    "owner": "Administrator",
+    "permissions": [
+        {
+            "create": 1,
+            "delete": 1,
+            "email": 1,
+            "print": 1,
+            "read": 1,
+            "role": "System Manager",
+            "share": 1,
+            "write": 1
+        },
+        {
+            "create": 1,
+            "delete": 1,
+            "email": 1,
+            "print": 1,
+            "read": 1,
+            "role": "Property Manager",
+            "share": 1,
+            "write": 1
+        }
+    ],
+    "sort_field": "modified",
+    "sort_order": "DESC",
+    "states": [],
+    "track_changes": 1
+}

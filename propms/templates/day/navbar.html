@@ -1,0 +1,19 @@
+<!-- ======= Header ======= -->
+<header id="header" class="d-flex align-items-center">
+    <div class="container d-flex align-items-center justify-content-between">
+
+      {%- if brand_html -%}
+				{{ brand_html }}
+			{%- elif banner_image -%}
+        <a href="{{ url_prefix }}{{ home_page or "/" }}" class="logo" aria-label="{{ (app_name or title_prefix or _("Home")) | e }} home"><img src="{{ banner_image }}" alt="{{ (app_name or title_prefix or _("Home")) | e }}" class="img-fluid"></a>
+			{%- else -%}
+				<span>{{ (frappe.get_hooks("brand_html") or [_("Home")])[0] }}</span>
+			{%- endif -%}
+
+      <nav id="navbar" class="navbar">
+        {% include "templates/day/navbar_items.html"%}
+        <i class="bi bi-list mobile-nav-toggle"></i>
+      </nav><!-- .navbar -->
+
+    </div>
+  </header><!-- End Header -->

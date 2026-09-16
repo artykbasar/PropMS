@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="{{ (seo.language if seo else shell.language) | e }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  {% if seo %}
+  <title>{{ seo.title | e }}</title>
+  <meta name="description" content="{{ seo.description | e }}">
+  <meta name="robots" content="{{ seo.robots | e }}">
+  {% if seo.canonical %}<link rel="canonical" href="{{ seo.canonical | e }}">{% endif %}
+  {% for code, href in seo.hreflang %}<link rel="alternate" hreflang="{{ code | e }}" href="{{ href | e }}">{% endfor %}
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="{{ shell.brand_name | e }}">
+  <meta property="og:locale" content="{{ seo.language.replace('-', '_') | e }}">
+  <meta property="og:title" content="{{ seo.title | e }}">
+  <meta property="og:description" content="{{ seo.description | e }}">
+  {% if seo.canonical %}<meta property="og:url" content="{{ seo.canonical | e }}">{% endif %}
+  {% if seo.social_image %}<meta property="og:image" content="{{ seo.social_image | e }}">{% endif %}
+  <meta name="twitter:card" content="{{ seo.twitter_card | e }}">
+  <meta name="twitter:title" content="{{ seo.title | e }}">
+  <meta name="twitter:description" content="{{ seo.description | e }}">
+  {% if seo.social_image %}<meta name="twitter:image" content="{{ seo.social_image | e }}">{% endif %}
+  {% else %}
+  {% if robots_meta %}<meta name="robots" content="{{ robots_meta | e }}">{% endif %}
+  <title>{{ page_title | e }} - {{ shell.brand_name | e }}</title>
+  {% endif %}
+  {% if schema_json %}<script type="application/ld+json">{{ schema_json | safe }}</script>{% endif %}
+  {% if shell.favicon_url %}<link rel="icon" href="{{ shell.favicon_url | e }}">{% endif %}
+  <script>document.documentElement.classList.add("v2-js")</script>
+  <link rel="stylesheet" href="/assets/propms/css/website_v2.css?v={{ asset_version or build_version or '' }}">
+  {% for stylesheet in page_stylesheets or [] %}<link rel="stylesheet" href="{{ stylesheet | e }}?v={{ asset_version or build_version or '' }}">{% endfor %}
+  {% if home_parity %}<link rel="stylesheet" href="/assets/propms/css/home_v2.css?v={{ asset_version or build_version or '' }}">{% endif %}
+  <style>
+    :root {
+      {% for token, value in shell.design_tokens.items() %}{{ token }}: {{ value }};
+      {% endfor %}
+    }
+  </style>
+  <script defer src="/assets/propms/js/website_v2.js?v={{ asset_version or build_version or '' }}"></script>
+  {% for script in page_scripts or [] %}<script defer src="{{ script | e }}?v={{ asset_version or build_version or '' }}"></script>{% endfor %}
+</head>
+<body{% if home_parity %} class="v2-home-parity v2-card-hover--{{ shell.card_hover_style | e }}"{% endif %}>
+  <a class="v2-skip-link" href="#main-content">Skip to main content</a>
+  {% include "propms/templates/website_v2/includes/topbar.html" %}
+  {% include "propms/templates/website_v2/includes/header.html" %}
+  <main id="main-content" tabindex="-1">
+    <div class="v2-container">
+      {% if breadcrumbs %}
+      <nav class="v2-breadcrumbs" aria-label="Breadcrumb">
+        <ol>
+          {% for item in breadcrumbs %}
+          <li>{% if item.href %}<a href="{{ item.href }}">{{ item.label }}</a>{% else %}<span aria-current="page">{{ item.label }}</span>{% endif %}</li>
+          {% endfor %}
+        </ol>
+      </nav>
+      {% endif %}
+      {% block content %}{% endblock %}
+    </div>
+  </main>
+  {% include "propms/templates/website_v2/includes/footer.html" %}
+  {% if consent_config %}
+  <div class="v2-consent-backdrop" data-consent-backdrop hidden></div>
+  <section class="v2-consent" data-consent-panel data-analytics-provider="{{ consent_config.analytics_provider | e }}" data-analytics-id="{{ consent_config.analytics_measurement_id | e }}" aria-label="Privacy choices" hidden>
+    <div class="v2-consent__summary" data-consent-summary>
+      <div class="v2-consent__copy">
+        <p class="v2-consent__eyebrow">Privacy</p>
+        <h2 class="v2-consent__title">Your privacy choices</h2>
+        <p>We use essential storage to run this site. Optional services only load with your permission.</p>
+      </div>
+      <div class="v2-consent__actions">
+        <button type="button" class="v2-button" data-consent-accept-all>Accept all</button>
+        <button type="button" class="v2-button v2-button--secondary" data-consent-reject>Reject non-essential</button>
+        <button type="button" class="v2-text-button" data-consent-manage>Manage choices</button>
+      </div>
+    </div>
+    <form class="v2-consent__preferences" data-consent-preferences role="dialog" aria-modal="true" aria-labelledby="v2-consent-title" hidden>
+      <div class="v2-consent__dialog-header">
+        <div>
+          <p class="v2-consent__eyebrow">Privacy settings</p>
+          <h2 class="v2-consent__title" id="v2-consent-title">Manage your choices</h2>
+          <p>Choose which optional services can load. You can change these preferences at any time.</p>
+        </div>
+        <button type="button" class="v2-consent__close" data-consent-close aria-label="Close privacy preferences">&times;</button>
+      </div>
+      <fieldset>
+        <legend class="v2-visually-hidden">Privacy categories</legend>
+        <label class="v2-consent-option">
+          <span><strong>Essential</strong><small>Required for core site functions and your privacy choices.</small></span>
+          <input type="checkbox" checked disabled aria-label="Essential, always on">
+        </label>
+        <label class="v2-consent-option">
+          <span><strong>Analytics</strong><small>Helps us understand how the website is used.</small></span>
+          <input type="checkbox" name="analytics">
+        </label>
+        <label class="v2-consent-option">
+          <span><strong>Marketing</strong><small>Allows marketing-related functionality when configured.</small></span>
+          <input type="checkbox" name="marketing">
+        </label>
+        <label class="v2-consent-option">
+          <span><strong>External media</strong><small>Loads maps or media from third-party services.</small></span>
+          <input type="checkbox" name="external_media">
+        </label>
+      </fieldset>
+      <div class="v2-consent__footer">
+        <a href="{{ consent_config.privacy_url | e }}">Privacy policy</a>
+        <button type="submit" class="v2-button">Save preferences</button>
+      </div>
+    </form>
+  </section>
+  <button type="button" class="v2-consent-link" data-consent-reopen aria-label="Privacy choices" hidden><span class="v2-consent-link__mark" aria-hidden="true"></span><span>Privacy</span></button>
+  {% endif %}
+</body>
+</html>

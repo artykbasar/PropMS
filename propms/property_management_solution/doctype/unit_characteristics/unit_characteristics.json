@@ -1,0 +1,175 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2023-01-05 14:37:21.068921",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "unit_type",
+  "web_name",
+  "property",
+  "room_name",
+  "facing",
+  "publish_online",
+  "column_break_fqjy",
+  "rent_price",
+  "rent_uom",
+  "security_deposit_period",
+  "security_deposit",
+  "rentable",
+  "section_break_snly",
+  "column_break_pdqp",
+  "for_sale",
+  "new_development",
+  "column_break_jryy"
+ ],
+ "fields": [
+  {
+   "columns": 2,
+   "fieldname": "unit_type",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_preview": 1,
+   "label": "Unit Type",
+   "options": "Unit Type"
+  },
+  {
+   "columns": 1,
+   "fieldname": "rent_price",
+   "fieldtype": "Currency",
+   "in_preview": 1,
+   "in_standard_filter": 1,
+   "label": "Rent Price",
+   "read_only_depends_on": "eval: doc.rentable != 1"
+  },
+  {
+   "default": "0",
+   "fetch_from": "unit_type.rentable",
+   "fieldname": "rentable",
+   "fieldtype": "Check",
+   "label": "Rentable",
+   "read_only": 1
+  },
+  {
+   "columns": 2,
+   "fieldname": "property",
+   "fieldtype": "Link",
+   "in_preview": 1,
+   "in_standard_filter": 1,
+   "label": "Property",
+   "options": "Property",
+   "read_only_depends_on": "eval: doc.rentable == 0 && doc.new_development == 0"
+  },
+  {
+   "columns": 1,
+   "fieldname": "room_name",
+   "fieldtype": "Link",
+   "in_preview": 1,
+   "in_standard_filter": 1,
+   "label": "Room Name",
+   "mandatory_depends_on": "eval: doc.rentable == 1",
+   "options": "Property Room Names",
+   "read_only_depends_on": "eval: doc.rentable != 1"
+  },
+  {
+   "columns": 1,
+   "fieldname": "rent_uom",
+   "fieldtype": "Link",
+   "in_preview": 1,
+   "in_standard_filter": 1,
+   "label": "Rent UOM",
+   "options": "UOM",
+   "read_only_depends_on": "eval: doc.rentable != 1"
+  },
+  {
+   "fieldname": "column_break_fqjy",
+   "fieldtype": "Column Break"
+  },
+  {
+   "columns": 1,
+   "fieldname": "security_deposit",
+   "fieldtype": "Currency",
+   "in_preview": 1,
+   "in_standard_filter": 1,
+   "label": "Security Deposit",
+   "precision": "2",
+   "read_only_depends_on": "eval: doc.security_deposit_period != 'Custom'"
+  },
+  {
+   "columns": 1,
+   "fieldname": "security_deposit_period",
+   "fieldtype": "Link",
+   "in_preview": 1,
+   "in_standard_filter": 1,
+   "label": "Security Deposit Period",
+   "options": "UOM",
+   "read_only_depends_on": "eval: doc.rentable != 1"
+  },
+  {
+   "fieldname": "section_break_snly",
+   "fieldtype": "Section Break"
+  },
+  {
+   "columns": 1,
+   "fieldname": "column_break_pdqp",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "fetch_from": "unit_type.for_sale",
+   "fieldname": "for_sale",
+   "fieldtype": "Check",
+   "label": "For Sale",
+   "read_only": 1
+  },
+  {
+   "default": "0",
+   "fetch_from": "unit_type.new_development",
+   "fieldname": "new_development",
+   "fieldtype": "Check",
+   "label": "New Development",
+   "read_only": 1
+  },
+  {
+   "columns": 9,
+   "fieldname": "column_break_jryy",
+   "fieldtype": "Column Break"
+  },
+  {
+   "columns": 2,
+   "fieldname": "web_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "in_preview": 1,
+   "label": "Web Name",
+   "mandatory_depends_on": "eval: doc.publish_online == 1"
+  },
+  {
+   "columns": 1,
+   "fieldname": "facing",
+   "fieldtype": "Select",
+   "label": "Facing",
+   "options": "\nNorth\nNorth-East\nEast\nSouth-East\nWest\nNorth-West\nSouth-West\nSouth"
+  },
+  {
+   "default": "0",
+   "fieldname": "publish_online",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Publish Online"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2024-12-03 22:35:52.398750",
+ "modified_by": "Administrator",
+ "module": "Property Management Solution",
+ "name": "Unit Characteristics",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

@@ -1,0 +1,14 @@
+<section{% if section_id %} id="{{ section_id | e }}"{% endif %} class="v2-component v2-component--hero v2-theme-{{ theme or 'default' }} v2-hero--{{ variant or 'default' }} v2-hero--overlay-{{ overlay or 'medium' }} v2-hero--overlay-style-{{ overlay_style or 'solid' }} v2-hero--media-{{ media_treatment or 'natural' }} v2-hero--mobile-{{ mobile_height or 'compact' }} v2-hero--scroll-{{ background_scroll or 'normal' }}">
+  <div class="v2-component__inner v2-hero__layout">
+    <div class="v2-hero__content">
+      {% if eyebrow %}<p class="v2-eyebrow">{{ eyebrow | e }}</p>{% endif %}
+      <h1>{{ title | e }}</h1>
+      {% if description %}<p class="v2-lead">{{ description | e }}</p>{% endif %}
+      {% if primary_label and primary_url or secondary_label and secondary_url %}<div class="v2-actions">
+        {% if primary_label and primary_url %}<a class="v2-button" href="{{ primary_url | e }}">{{ primary_label | e }}</a>{% endif %}
+        {% if secondary_label and secondary_url %}<a class="v2-button v2-button--secondary" href="{{ secondary_url | e }}">{{ secondary_label | e }}</a>{% endif %}
+      </div>{% endif %}
+    </div>
+    {% if image %}<figure class="v2-hero__media">{{ render_responsive_image(image, image_alt or '', usage='hero', decorative=image_decorative or false, css_class='v2-hero__image') | safe }}</figure>{% endif %}
+  </div>
+</section>

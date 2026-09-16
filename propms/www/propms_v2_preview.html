@@ -1,0 +1,4 @@
+{% extends "propms/templates/website_v2/base.html" %}
+{% block content %}
+  {% for component in components %}{{ component | safe }}{% endfor %}
+{% endblock %}

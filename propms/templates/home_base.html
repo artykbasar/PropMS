@@ -1,0 +1,28 @@
+{% extends "templates/base.html" %}
+
+{% block head %}
+<link rel="canonical" href="{{ frappe.utils.get_url('/') | e }}">
+<meta property="og:url" content="{{ frappe.utils.get_url('/') | e }}">
+<style id="propms-deferred-home-backgrounds">
+body[data-path="home"] .cta {
+	background-image: linear-gradient(rgba(2, 2, 2, .8), rgba(0, 0, 0, .8)) !important;
+	background-color: #111;
+}
+</style>
+{{ super() }}
+{% endblock %}
+
+{% block base_scripts %}
+<script>
+	frappe.boot = {{ frappe.utils.orjson_dumps(boot, default=frappe.json_handler) }};
+	frappe.sys_defaults = frappe.boot.sysdefaults || {};
+	frappe.session = { user: "Guest" };
+	frappe._messages = {};
+	frappe._translations_loaded = fetch(
+		`/api/method/frappe.translate.get_boot_translations?v=${frappe.boot.translations_version}&lang=${frappe.boot.lang}`,
+		{ credentials: "same-origin" }
+	).then((response) => response.json()).then((data) => {
+		frappe._messages = data.message || {};
+	}).catch(() => {});
+</script>
+{% endblock %}

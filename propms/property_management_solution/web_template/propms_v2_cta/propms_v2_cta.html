@@ -1,0 +1,7 @@
+<section{% if section_id %} id="{{ section_id | e }}"{% endif %} class="v2-component v2-component--cta v2-theme-{{ theme or 'primary' }} v2-cta--{{ variant or 'default' }} v2-cta--scroll-{{ background_scroll or 'normal' }}{% if background_image %} v2-cta--with-media{% endif %}">
+  {% if background_image %}<figure class="v2-cta__media" aria-hidden="true"><img src="{{ background_image | e }}" alt="" loading="lazy"></figure>{% endif %}
+  <div class="v2-component__inner v2-cta__inner">
+    <div><h2>{{ title | e }}</h2>{% if description %}<p>{{ description | e }}</p>{% endif %}</div>
+    {% if button_label and button_url %}<a class="v2-button" href="{{ button_url | e }}">{{ button_label | e }}</a>{% endif %}
+  </div>
+</section>

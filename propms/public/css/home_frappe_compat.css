@@ -1,0 +1,9 @@
+/* Minimal homepage rules previously inherited from propms_website.bundle.css. */
+body[data-path="home"] .container { padding-left: 1.25rem; padding-right: 1.25rem; }
+@media (min-width: 576px) { body[data-path="home"] .container { padding-left: 0; padding-right: 0; } }
+@media (min-width: 992px) { body[data-path="home"] .container { padding-left: 2.5rem; padding-right: 2.5rem; } }
+@media (min-width: 1200px) { body[data-path="home"] .container { padding-left: 5rem; padding-right: 5rem; } }
+@media (min-width: 1400px) { body[data-path="home"] .container { padding-left: 1.5rem; padding-right: 1.5rem; } }
+body[data-path="home"] .main-column .page-content-wrapper { margin: 2rem 0; }
+@media (max-width: 991.98px) { body[data-path="home"] .page-content-wrapper .container { padding-left: 1.5rem; padding-right: 1.5rem; } }
+body[data-path="home"] .page_content { min-height: 50vh; }

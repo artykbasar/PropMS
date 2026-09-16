@@ -1,0 +1,61 @@
+{
+ "doctype": "Web Template",
+ "name": "PropMS V2 Feature Grid",
+ "module": "Property Management Solution",
+ "standard": 1,
+ "type": "Section",
+ "template": "",
+ "fields": [
+  {
+   "fieldname": "section_id",
+   "fieldtype": "Data",
+   "label": "Section ID"
+  },
+  {
+   "fieldname": "theme",
+   "fieldtype": "Select",
+   "label": "Colour theme",
+   "options": "default\nprimary\nsecondary\nsoft\ndark\ninverse",
+   "default": "default"
+  },
+  {
+   "fieldname": "variant",
+   "fieldtype": "Select",
+   "label": "Variant",
+   "options": "cards\nplain",
+   "default": "cards"
+  },
+  {
+   "fieldname": "eyebrow",
+   "fieldtype": "Data",
+   "label": "Eyebrow"
+  },
+  {
+   "fieldname": "title",
+   "fieldtype": "Data",
+   "label": "Title",
+   "reqd": 1
+  },
+  {
+   "fieldname": "description",
+   "fieldtype": "Small Text",
+   "label": "Description"
+  },
+  {
+   "fieldname": "items",
+   "fieldtype": "Table Break",
+   "label": "Features"
+  },
+  {
+   "fieldname": "title",
+   "fieldtype": "Data",
+   "label": "Title",
+   "reqd": 1
+  },
+  {
+   "fieldname": "description",
+   "fieldtype": "Small Text",
+   "label": "Description"
+  }
+ ]
+}

@@ -1,0 +1,184 @@
+body.v2-account {
+  background: var(--brand-background);
+  color: var(--brand-text);
+}
+
+.v2-account .page-content-wrapper {
+  min-height: 34rem;
+  padding: clamp(2.5rem, 7vw, 5rem) 1rem;
+  background: var(--brand-background);
+}
+
+.v2-account main.container {
+  display: block;
+  width: 100%;
+  max-width: none;
+  height: auto;
+  min-height: 0;
+  margin: 0 auto;
+  padding: 0;
+  background: transparent;
+}
+
+.v2-account .page-breadcrumbs,
+.v2-account .page-header-wrapper {
+  margin-inline: auto;
+  max-width: 52rem;
+}
+
+.v2-account main {
+  width: min(100%, 52rem);
+  margin-inline: auto;
+  padding: 0;
+}
+
+.v2-account .page_content {
+  padding: 0;
+}
+
+.v2-account .portal-container {
+  max-width: 40rem;
+  margin: 0 auto;
+  padding: clamp(1.25rem, 4vw, 2rem);
+  border: 1px solid var(--brand-border);
+  border-top: 0.25rem solid var(--brand-primary);
+  border-radius: 0.75rem;
+  background: var(--brand-surface);
+  box-shadow: var(--shadow-sm);
+}
+.v2-account .portal-section.head {
+  gap: 1rem;
+  align-items: center;
+}
+
+.v2-account .portal-section .title {
+  color: var(--brand-text);
+  font-family: var(--font-heading);
+  font-size: 1.5rem;
+  font-weight: 800;
+}
+
+.v2-account .portal-items {
+  overflow: hidden;
+  border-color: var(--brand-border);
+  border-radius: 0.65rem;
+}
+
+.v2-account .portal-items .portal-section {
+  min-height: 3.25rem;
+  padding: 0.65rem 0.85rem;
+  border-color: var(--brand-border);
+}
+
+.v2-account .portal-section a,
+.v2-account .portal-footer a {
+  color: var(--brand-text);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.v2-account .portal-section a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2rem;
+}
+.v2-account .portal-section .item-link-text {
+  padding-left: 0.55rem;
+  color: var(--brand-text);
+}
+
+.v2-account .portal-items .portal-section:hover {
+  background: color-mix(in srgb, var(--brand-primary) 7%, var(--brand-surface));
+}
+
+.v2-account .portal-footer {
+  max-width: 40rem;
+  margin: 1.25rem auto 0;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.65rem;
+}
+
+.v2-account .portal-footer a {
+  display: inline-flex;
+  min-height: 2.75rem;
+  padding: 0.55rem 0.8rem;
+  align-items: center;
+  gap: 0.35rem;
+  border: 1px solid var(--brand-border);
+  border-radius: 0.55rem;
+  background: var(--brand-surface);
+}
+
+.v2-account .icon,
+.v2-account .icon-md,
+.v2-account .icon-sm {
+  width: 1.15rem;
+  height: 1.15rem;
+  flex: 0 0 auto;
+  stroke: currentColor;
+}
+.v2-account .for-reset-password {
+  display: grid;
+  place-items: center;
+}
+
+.v2-account .for-reset-password .page-card {
+  width: min(100%, 30rem);
+  height: auto;
+  min-height: 0;
+  margin: 0;
+  border: 1px solid var(--brand-border);
+  border-top: 0.25rem solid var(--brand-primary);
+  border-radius: 0.75rem;
+  background: var(--brand-surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.v2-account .web-form-container {
+  width: min(100%, 52rem);
+  margin: 0 auto;
+}
+
+.v2-account .web-form,
+.v2-account .web-form-header {
+  border-color: var(--brand-border);
+  background: var(--brand-surface);
+}
+
+.v2-account .web-form {
+  border-radius: 0.75rem;
+  box-shadow: var(--shadow-sm);
+}
+
+@media (max-width: 47.999rem) {
+  .v2-account .page-content-wrapper { padding: 2rem 1rem 3rem; }
+  .v2-account .portal-container { padding: 1.15rem; }
+  .v2-account .portal-section.head { align-items: flex-start; flex-direction: column; }
+  .v2-account .portal-footer { justify-content: flex-start; }
+}
+/* Keep the shared marketing shell visually identical around Frappe-native content. */
+.v2-account .v2-footer {
+  font-size: 1rem;
+  font-weight: 400;
+}
+
+.v2-account .v2-footer h2 {
+  color: inherit;
+  font-weight: 700;
+  line-height: 1.6;
+}
+
+.v2-account .v2-footer p,
+.v2-account .v2-footer__copyright {
+  font-size: inherit;
+  font-weight: inherit;
+}
+
+@media (min-width: 48rem) {
+  .v2-account .v2-header { height: 4.375rem; min-height: 4.375rem; }
+  .v2-account .v2-header__inner { height: 100%; min-height: 100%; }
+  .v2-account .v2-header--compact { height: 3.625rem; min-height: 3.625rem; }
+  .v2-account .v2-header--compact .v2-header__inner { min-height: 3.625rem; }
+}

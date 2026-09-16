@@ -1,0 +1,49 @@
+{% set native_contact = frappe.get_cached_doc("Contact Us Settings") %}
+{% set contact_email = email or native_contact.email_id %}
+{% set contact_phone = phone or native_contact.phone %}
+{% set contact_address = address or native_contact.address_line1 %}
+{% set contact_description = description or native_contact.introduction %}
+{% set subjects = query_options or native_contact.query_options or 'Support\nGeneral' %}
+{% set contact_layout = layout or 'cards-form-map' %}
+<section{% if section_id %} id="{{ section_id | e }}"{% endif %} class="v2-component v2-component--contact v2-theme-{{ theme or 'soft' }}">
+  <div class="v2-component__inner">
+    <div class="v2-section-heading" data-shadow-heading="{{ title | e }}"><h2>{{ title | e }}</h2>{% if contact_description %}<p>{{ contact_description | e }}</p>{% endif %}</div>
+    <div class="v2-contact-layout v2-contact-layout--{{ contact_layout | e }}">
+      {% if contact_layout in ('cards-form-map', 'cards-form') %}
+      <div class="v2-contact__cards">
+        {% if contact_address %}<address class="v2-contact__card"><span aria-hidden="true">⌖</span><h3>Our Address</h3><p>{{ contact_address | e }}</p></address>{% endif %}
+        {% if contact_email %}<div class="v2-contact__card"><span aria-hidden="true">✉</span><h3>Email Us</h3><p><a href="mailto:{{ contact_email | e }}">{{ contact_email | e }}</a></p></div>{% endif %}
+        {% if contact_phone %}<div class="v2-contact__card"><span aria-hidden="true">☎</span><h3>Call Us</h3><p><a href="tel:{{ contact_phone | e }}">{{ contact_phone | e }}</a></p></div>{% endif %}
+      </div>
+      {% endif %}      {% if contact_layout in ('cards-form-map', 'map-form') and (map_embed_url or map_url) %}
+      <div class="v2-contact__location">
+        {% if map_embed_url %}<div class="v2-external-media" data-external-media>
+          <div class="v2-external-media__placeholder">
+            <div class="v2-external-media__map-art" aria-hidden="true"><span class="v2-external-media__pin"></span></div>
+            <div class="v2-external-media__content">
+              <span class="v2-external-media__badge">Interactive map</span><h3>Find us</h3>
+              {% if contact_address %}<p class="v2-external-media__address">{{ contact_address | e }}</p>{% endif %}
+              <p class="v2-external-media__privacy">Google Maps stays blocked until you choose to load it.</p>
+              <div class="v2-external-media__actions"><button class="v2-button" type="button" data-external-media-enable>Load interactive map</button>{% if map_url %}<a class="v2-text-link" href="{{ map_url | e }}">{{ (map_label or 'View location') | e }}</a>{% endif %}</div>
+            </div>
+          </div>
+          <iframe class="v2-contact__map" data-external-media-src="{{ map_embed_url | e }}" title="Business location map" loading="lazy" referrerpolicy="no-referrer-when-downgrade" allowfullscreen hidden></iframe>
+        </div>{% endif %}
+        {% if map_url %}<p class="v2-contact__map-link"><a class="v2-text-link" href="{{ map_url | e }}">{{ (map_label or 'View location') | e }}</a></p>{% endif %}
+      </div>
+      {% endif %}
+      {% if show_form %}
+      <form class="v2-contact-form" novalidate>
+        <input type="hidden" name="form_started_at" value="">
+        <div class="v2-honeypot" aria-hidden="true"><label>Website<input name="website" tabindex="-1" autocomplete="off"></label></div>
+        <div class="v2-form-grid"><label><span class="v2-field-label">Name</span><input name="name" maxlength="140" placeholder="Your Name" autocomplete="name" required></label><label><span class="v2-field-label">Email</span><input type="email" name="email" maxlength="254" placeholder="Your Email" autocomplete="email" required></label></div>
+        <label><span class="v2-field-label">Telephone <span class="v2-field-optional">(optional)</span></span><input type="tel" name="telephone" maxlength="40" placeholder="Your Telephone" autocomplete="tel"></label>        <label><span class="v2-field-label">Subject</span><select name="subject" required>{% for option in subjects.replace('\n', ',').split(',') if option.strip() %}<option value="{{ option.strip() | e }}">{{ option.strip() | e }}</option>{% endfor %}</select></label>
+        <label><span class="v2-field-label">Message</span><textarea name="message" maxlength="5000" placeholder="Message" rows="5" required></textarea></label>
+        <label class="v2-form-consent"><input type="checkbox" name="marketing_consent" value="1"><span>I agree to receive relevant marketing communications. This is optional.</span></label>
+        <button class="v2-button" type="submit">Send Message</button>
+        <p class="v2-form-status" role="status" aria-live="polite"></p>
+      </form>
+      {% endif %}
+    </div>
+  </div>
+</section>

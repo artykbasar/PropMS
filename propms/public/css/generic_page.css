@@ -1,0 +1,11 @@
+.v2-generic-page { width: min(100%, 58rem); margin-inline: auto; padding-block: clamp(2.5rem, 6vw, 5rem); }
+.v2-generic-page__header h1 { margin: 0 0 2rem; font-size: clamp(2rem, 5vw, 3.5rem); line-height: 1.1; }
+.v2-generic-page__content { overflow-wrap: anywhere; }
+.v2-generic-page__content :is(h1, h2, h3, h4) { margin: 2rem 0 .75rem; line-height: 1.2; }
+.v2-generic-page__content h1 { font-size: 1.75rem; }
+.v2-generic-page__content h2 { font-size: 1.4rem; }
+.v2-generic-page__content h3 { font-size: 1.15rem; }
+.v2-generic-page__content p, .v2-generic-page__content li { max-width: 78ch; }
+.v2-generic-page__content table { width: 100%; display: block; overflow-x: auto; border-collapse: collapse; }
+.v2-generic-page__content :is(th, td) { min-width: 8rem; padding: .6rem; border: 1px solid var(--brand-border); vertical-align: top; }
+.v2-generic-page__content a { text-decoration: underline; text-underline-offset: .18em; }

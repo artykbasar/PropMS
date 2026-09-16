@@ -1,0 +1,82 @@
+{
+ "doctype": "Web Template",
+ "name": "PropMS V2 Media Content Split",
+ "module": "Property Management Solution",
+ "standard": 1,
+ "type": "Section",
+ "template": "",
+ "fields": [
+  {
+   "fieldname": "section_id",
+   "fieldtype": "Data",
+   "label": "Section ID"
+  },
+  {
+   "fieldname": "theme",
+   "fieldtype": "Select",
+   "label": "Colour theme",
+   "options": "default\nprimary\nsecondary\nsoft\ndark\ninverse",
+   "default": "default"
+  },
+  {
+   "fieldname": "variant",
+   "fieldtype": "Select",
+   "label": "Variant",
+   "options": "image-left\nimage-right",
+   "default": "image-left"
+  },
+  {
+   "fieldname": "eyebrow",
+   "fieldtype": "Data",
+   "label": "Eyebrow"
+  },
+  {
+   "fieldname": "title",
+   "fieldtype": "Data",
+   "label": "Title",
+   "reqd": 1
+  },
+  {
+   "fieldname": "content",
+   "fieldtype": "Small Text",
+   "label": "Content"
+  },
+  {
+   "fieldname": "image",
+   "fieldtype": "Attach Image",
+   "label": "Image"
+  },
+  {
+   "fieldname": "image_alt",
+   "fieldtype": "Data",
+   "label": "Image alternative text"
+  },
+  {
+   "fieldname": "image_decorative",
+   "fieldtype": "Check",
+   "label": "Decorative image",
+   "default": "0"
+  },
+  {
+   "fieldname": "link_label",
+   "fieldtype": "Data",
+   "label": "Link label"
+  },
+  {
+   "fieldname": "link_url",
+   "fieldtype": "Data",
+   "label": "Link URL"
+  },
+  {
+   "fieldname": "items",
+   "fieldtype": "Table Break",
+   "label": "List items"
+  },
+  {
+   "fieldname": "text",
+   "fieldtype": "Data",
+   "label": "Text",
+   "reqd": 1
+  }
+ ]
+}

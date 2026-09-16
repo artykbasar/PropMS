@@ -1,0 +1,273 @@
+{
+  "actions": [],
+  "doctype": "DocType",
+  "document_type": "Setup",
+  "engine": "InnoDB",
+  "field_order": [
+    "website_engine_section",
+    "website_engine",
+    "design_tokens_section",
+    "brand_primary",
+    "brand_secondary",
+    "brand_accent",
+    "design_tokens_column",
+    "brand_background",
+    "brand_surface",
+    "brand_text",
+    "seo_section",
+    "seo_default_title",
+    "seo_default_description",
+    "seo_base_url",
+    "seo_default_language",
+    "seo_default_index_state",
+    "seo_default_social_image",
+    "schema_section",
+    "schema_business_type",
+    "schema_business_name",
+    "schema_email",
+    "schema_phone",
+    "schema_column",
+    "schema_street_address",
+    "schema_locality",
+    "schema_region",
+    "schema_postal_code",
+    "schema_country",
+    "enquiry_section",
+    "enquiry_notification_email",
+    "enquiry_crm_enabled",
+    "consent_section",
+    "consent_privacy_url",
+    "analytics_provider",
+    "analytics_measurement_id"
+  ],
+  "fields": [
+    {
+      "fieldname": "website_engine_section",
+      "fieldtype": "Section Break",
+      "label": "Website Engine"
+    },
+    {
+      "default": "legacy_day",
+      "description": "Controls which PropMS public website engine is active for this site.",
+      "fieldname": "website_engine",
+      "fieldtype": "Select",
+      "label": "Website Engine",
+      "options": "legacy_day\npropms_v2",
+      "reqd": 1
+    },
+    {
+      "description": "Compatibility fallback only. Configure active branding in Website Settings → Website Theme.",
+      "fieldname": "design_tokens_section",
+      "fieldtype": "Section Break",
+      "hidden": 1,
+      "label": "Legacy Website V2 Design Tokens"
+    },
+    {
+      "description": "Primary brand action and emphasis colour.",
+      "fieldname": "brand_primary",
+      "fieldtype": "Color",
+      "hidden": 1,
+      "label": "Brand Primary"
+    },
+    {
+      "description": "Dark or supporting brand colour used by the shell.",
+      "fieldname": "brand_secondary",
+      "fieldtype": "Color",
+      "hidden": 1,
+      "label": "Brand Secondary"
+    },
+    {
+      "description": "Secondary emphasis colour.",
+      "fieldname": "brand_accent",
+      "fieldtype": "Color",
+      "hidden": 1,
+      "label": "Brand Accent"
+    },
+    {
+      "fieldname": "design_tokens_column",
+      "fieldtype": "Column Break",
+      "hidden": 1
+    },
+    {
+      "fieldname": "brand_background",
+      "fieldtype": "Color",
+      "hidden": 1,
+      "label": "Brand Background"
+    },
+    {
+      "fieldname": "brand_surface",
+      "fieldtype": "Color",
+      "hidden": 1,
+      "label": "Brand Surface"
+    },
+    {
+      "fieldname": "brand_text",
+      "fieldtype": "Color",
+      "hidden": 1,
+      "label": "Brand Text"
+    },
+    {
+      "fieldname": "seo_section",
+      "fieldtype": "Section Break",
+      "label": "Website V2 SEO Defaults"
+    },
+    {
+      "fieldname": "seo_default_title",
+      "fieldtype": "Data",
+      "label": "Default SEO Title"
+    },
+    {
+      "fieldname": "seo_default_description",
+      "fieldtype": "Small Text",
+      "label": "Default Meta Description"
+    },
+    {
+      "fieldname": "seo_base_url",
+      "fieldtype": "Data",
+      "label": "Canonical Base URL",
+      "description": "Absolute public origin used for deterministic Website V2 canonical URLs."
+    },
+    {
+      "fieldname": "seo_default_language",
+      "fieldtype": "Data",
+      "label": "Default Language",
+      "default": "en-GB"
+    },
+    {
+      "fieldname": "seo_default_index_state",
+      "fieldtype": "Select",
+      "label": "Default Index State",
+      "options": "index\nnoindex",
+      "default": "index"
+    },
+    {
+      "fieldname": "seo_default_social_image",
+      "fieldtype": "Attach Image",
+      "label": "Default Social Image"
+    },
+    {
+      "fieldname": "schema_section",
+      "fieldtype": "Section Break",
+      "label": "Structured Business Facts"
+    },
+    {
+      "fieldname": "schema_business_type",
+      "fieldtype": "Select",
+      "label": "Business Schema Type",
+      "options": "Organization\nLocalBusiness",
+      "default": "Organization"
+    },
+    {
+      "fieldname": "schema_business_name",
+      "fieldtype": "Data",
+      "label": "Business Name"
+    },
+    {
+      "fieldname": "schema_email",
+      "fieldtype": "Data",
+      "label": "Business Email",
+      "options": "Email"
+    },
+    {
+      "fieldname": "schema_phone",
+      "fieldtype": "Data",
+      "label": "Business Phone"
+    },
+    {
+      "fieldname": "schema_column",
+      "fieldtype": "Column Break"
+    },
+    {
+      "fieldname": "schema_street_address",
+      "fieldtype": "Data",
+      "label": "Street Address"
+    },
+    {
+      "fieldname": "schema_locality",
+      "fieldtype": "Data",
+      "label": "Locality / City"
+    },
+    {
+      "fieldname": "schema_region",
+      "fieldtype": "Data",
+      "label": "Region"
+    },
+    {
+      "fieldname": "schema_postal_code",
+      "fieldtype": "Data",
+      "label": "Postal Code"
+    },
+    {
+      "fieldname": "schema_country",
+      "fieldtype": "Data",
+      "label": "Country Code",
+      "default": "GB"
+    },
+    {
+      "fieldname": "enquiry_section",
+      "fieldtype": "Section Break",
+      "label": "Website Enquiries"
+    },
+    {
+      "fieldname": "enquiry_notification_email",
+      "fieldtype": "Data",
+      "label": "Enquiry Notification Email",
+      "options": "Email",
+      "description": "Optional internal recipient. Enquiries are saved even when notification delivery fails."
+    },
+    {
+      "default": "0",
+      "fieldname": "enquiry_crm_enabled",
+      "fieldtype": "Check",
+      "label": "Create CRM Lead",
+      "description": "Optional failure-isolated CRM integration."
+    },
+    {
+      "fieldname": "consent_section",
+      "fieldtype": "Section Break",
+      "label": "Consent and Analytics"
+    },
+    {
+      "default": "/policies",
+      "fieldname": "consent_privacy_url",
+      "fieldtype": "Data",
+      "label": "Privacy / Cookie Policy URL"
+    },
+    {
+      "default": "None",
+      "fieldname": "analytics_provider",
+      "fieldtype": "Select",
+      "label": "Analytics Provider",
+      "options": "None\nGoogle Analytics"
+    },
+    {
+      "fieldname": "analytics_measurement_id",
+      "fieldtype": "Data",
+      "label": "Analytics Measurement ID",
+      "description": "Loaded only after Analytics consent. Google Analytics IDs use the G-XXXXXXXXXX format."
+    }
+  ],
+  "index_web_pages_for_search": 0,
+  "issingle": 1,
+  "links": [],
+  "module": "Property Management Solution",
+  "name": "PropMS Website Settings",
+  "permissions": [
+    {
+      "create": 1,
+      "read": 1,
+      "role": "System Manager",
+      "write": 1
+    },
+    {
+      "create": 1,
+      "read": 1,
+      "role": "Website Manager",
+      "write": 1
+    }
+  ],
+  "sort_field": "modified",
+  "sort_order": "DESC",
+  "states": [],
+  "track_changes": 1
+}

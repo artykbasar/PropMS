@@ -1,0 +1,16 @@
+{
+ "__unsaved": 1,
+ "creation": "2023-06-24 01:48:56.828480",
+ "docstatus": 0,
+ "doctype": "Web Template",
+ "fields": [],
+ "idx": 0,
+ "modified": "2023-06-29 12:35:47.185539",
+ "modified_by": "Administrator",
+ "module": "Property Management Solution",
+ "name": "Day Nav Bar",
+ "owner": "Administrator",
+ "standard": 1,
+ "template": "",
+ "type": "Navbar"
+}

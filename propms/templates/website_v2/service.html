@@ -1,0 +1,17 @@
+{% extends "propms/templates/website_v2/base.html" %}
+{% block content %}
+<article class="v2-structured-page">
+  <header class="v2-content-hero">
+    <p class="v2-content-kicker">Service</p><h1>{{ doc.title | e }}</h1><p>{{ doc.summary | e }}</p>
+    {% if doc.hero_image %}<img class="v2-content-hero__image" src="{{ doc.hero_image | e }}" alt="{{ doc.hero_image_alt | e }}" width="1200" height="675">{% endif %}
+  </header>
+  <div class="v2-prose">{{ content.introduction | safe }}</div>
+  <section><h2>Benefits</h2><div class="v2-prose">{{ content.benefits | safe }}</div></section>
+  <section><h2>How it works</h2><div class="v2-prose">{{ content.service_process | safe }}</div></section>
+  <section><h2>Who this is suitable for</h2><div class="v2-prose">{{ content.suitability | safe }}</div></section>
+  <section><h2>Why landlords trust us</h2><div class="v2-prose">{{ content.trust_content | safe }}</div></section>
+  {% for section in optional_sections %}<section><h2>{{ section.heading | e }}</h2><div class="v2-prose">{{ section.body | safe }}</div>{% if section.image %}<img class="v2-inline-media" src="{{ section.image | e }}" alt="{{ section.image_alt | e }}" loading="lazy">{% endif %}</section>{% endfor %}
+  {% if related_areas or related_services %}<aside class="v2-related"><h2>Related information</h2>{% if related_areas %}<h3>Areas</h3><ul>{% for item in related_areas %}<li><a href="{{ item.href | e }}">{{ item.title | e }}</a></li>{% endfor %}</ul>{% endif %}{% if related_services %}<h3>Related services</h3><ul>{% for item in related_services %}<li><a href="{{ item.href | e }}">{{ item.title | e }}</a></li>{% endfor %}</ul>{% endif %}</aside>{% endif %}
+  <section class="v2-content-cta"><h2>{{ doc.cta_title | e }}</h2><p>{{ doc.cta_text | e }}</p><a class="v2-button" href="{{ doc.cta_url | e }}">{{ doc.cta_label | e }}</a></section>
+</article>
+{% endblock %}

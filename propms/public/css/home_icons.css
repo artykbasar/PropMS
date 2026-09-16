@@ -1,0 +1,62 @@
+/* Homepage-only subsets of the vendored Bootstrap Icons and Boxicons fonts. */
+@font-face {
+  font-display: block;
+  font-family: "bootstrap-icons-home";
+  src: url("/assets/propms/fonts/bootstrap-icons-home.woff2") format("woff2");
+}
+.bi::before,
+[class^="bi-"]::before,
+[class*=" bi-"]::before {
+  display: inline-block;
+  font-family: "bootstrap-icons-home" !important;
+  font-style: normal;
+  font-weight: normal !important;
+  font-variant: normal;
+  text-transform: none;
+  line-height: 1;
+  vertical-align: -.125em;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+.bi-arrow-up-short::before { content: "\f145"; }
+.bi-check-circle::before { content: "\f26b"; }
+.bi-envelope-fill::before { content: "\f32c"; }
+.bi-facebook::before { content: "\f344"; }
+.bi-instagram::before { content: "\f437"; }
+.bi-linkedin::before { content: "\f472"; }
+.bi-list::before { content: "\f479"; }
+.bi-phone-fill::before { content: "\f4e2"; }
+.bi-twitter::before { content: "\f5ef"; }
+.bi-x::before { content: "\f62a"; }
+
+@font-face {
+  font-display: block;
+  font-family: "boxicons-home";
+  src: url("/assets/propms/fonts/boxicons-home.woff2") format("woff2");
+}
+.bx {
+  font-family: "boxicons-home" !important;
+  font-weight: normal;
+  font-style: normal;
+  font-variant: normal;
+  line-height: 1;
+  text-rendering: auto;
+  display: inline-block;
+  text-transform: none;
+  speak: none;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+.bx-bar-chart:before { content: "\e9c4"; }
+.bx-chevron-right:before { content: "\ea50"; }
+.bx-envelope:before { content: "\eac1"; }
+.bx-map:before { content: "\eb56"; }
+.bx-phone-call:before { content: "\ebb3"; }
+.bx-pound:before { content: "\ebc7"; }
+.bx-wrench:before { content: "\ec8c"; }
+.bxl-facebook:before { content: "\e92f"; }
+.bxl-google:before { content: "\e93c"; }
+.bxl-instagram:before { content: "\e942"; }
+.bxl-linkedin:before { content: "\e94d"; }
+.bxl-skype:before { content: "\e96f"; }
+.bxl-twitter:before { content: "\e982"; }

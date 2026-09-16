@@ -1,0 +1,16 @@
+{% extends "propms/templates/website_v2/base.html" %}
+{% block content %}
+<article class="v2-structured-page">
+  <header class="v2-content-hero"><p class="v2-content-kicker">{{ doc.region | e }}</p><h1>{{ doc.area_name | e }}</h1>
+    {% if doc.hero_image %}<img class="v2-content-hero__image" src="{{ doc.hero_image | e }}" alt="{{ doc.hero_image_alt | e }}" width="1200" height="675">{% endif %}
+  </header>
+  <div class="v2-prose">{{ content.introduction | safe }}</div>
+  <section><h2>Local property context</h2><div class="v2-prose">{{ content.property_context | safe }}</div></section>
+  <section><h2>Information for landlords</h2><div class="v2-prose">{{ content.landlord_information | safe }}</div></section>
+  <section><h2>Coverage</h2><div class="v2-prose">{{ content.coverage | safe }}</div></section>
+  <section><h2>Local context</h2><div class="v2-prose">{{ content.local_context | safe }}</div>{% if doc.local_media %}<img class="v2-inline-media" src="{{ doc.local_media | e }}" alt="{{ doc.local_media_alt | e }}" loading="lazy">{% endif %}</section>
+  {% for section in optional_sections %}<section><h2>{{ section.heading | e }}</h2><div class="v2-prose">{{ section.body | safe }}</div>{% if section.image %}<img class="v2-inline-media" src="{{ section.image | e }}" alt="{{ section.image_alt | e }}" loading="lazy">{% endif %}</section>{% endfor %}
+  {% if related_services or nearby_areas %}<aside class="v2-related"><h2>Related information</h2>{% if related_services %}<h3>Services in this area</h3><ul>{% for item in related_services %}<li><a href="{{ item.href | e }}">{{ item.title | e }}</a></li>{% endfor %}</ul>{% endif %}{% if nearby_areas %}<h3>Nearby areas</h3><ul>{% for item in nearby_areas %}<li><a href="{{ item.href | e }}">{{ item.title | e }}</a></li>{% endfor %}</ul>{% endif %}</aside>{% endif %}
+  <section class="v2-content-cta"><h2>{{ doc.cta_title | e }}</h2><p>{{ doc.cta_text | e }}</p><a class="v2-button" href="{{ doc.cta_url | e }}">{{ doc.cta_label | e }}</a></section>
+</article>
+{% endblock %}

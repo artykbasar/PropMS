@@ -1,0 +1,116 @@
+{
+ "doctype": "Web Template",
+ "name": "PropMS V2 Hero",
+ "module": "Property Management Solution",
+ "standard": 1,
+ "type": "Section",
+ "template": "",
+ "fields": [
+  {
+   "fieldname": "section_id",
+   "fieldtype": "Data",
+   "label": "Section ID"
+  },
+  {
+   "fieldname": "theme",
+   "fieldtype": "Select",
+   "label": "Colour theme",
+   "options": "default\nprimary\nsecondary\nsoft\ndark\ninverse",
+   "default": "default"
+  },
+  {
+   "fieldname": "variant",
+   "fieldtype": "Select",
+   "label": "Variant",
+   "options": "default\ncentered\nsplit",
+   "default": "default"
+  },
+  {
+   "fieldname": "overlay",
+   "fieldtype": "Select",
+   "label": "Image overlay",
+   "options": "light\nmedium\nstrong",
+   "default": "medium"
+  },
+  {
+   "fieldname": "overlay_style",
+   "fieldtype": "Select",
+   "label": "Overlay style",
+   "options": "solid\nleft-gradient",
+   "default": "solid"
+  },
+  {
+   "fieldname": "media_treatment",
+   "fieldtype": "Select",
+   "label": "Image treatment",
+   "options": "natural\nmuted",
+   "default": "natural"
+  },
+  {
+   "fieldname": "mobile_height",
+   "fieldtype": "Select",
+   "label": "Mobile hero height",
+   "options": "compact\nviewport",
+   "default": "compact"
+  },
+  {
+   "fieldname": "background_scroll",
+   "fieldtype": "Select",
+   "label": "Background scroll behaviour",
+   "options": "normal\nfixed",
+   "default": "normal"
+  },
+  {
+   "fieldname": "eyebrow",
+   "fieldtype": "Data",
+   "label": "Eyebrow"
+  },
+  {
+   "fieldname": "title",
+   "fieldtype": "Data",
+   "label": "Title",
+   "reqd": 1
+  },
+  {
+   "fieldname": "description",
+   "fieldtype": "Small Text",
+   "label": "Description"
+  },
+  {
+   "fieldname": "image",
+   "fieldtype": "Attach Image",
+   "label": "Image"
+  },
+  {
+   "fieldname": "image_alt",
+   "fieldtype": "Data",
+   "label": "Image alternative text"
+  },
+  {
+   "fieldname": "image_decorative",
+   "fieldtype": "Check",
+   "label": "Decorative image",
+   "default": "0"
+  },
+  {
+   "fieldname": "primary_label",
+   "fieldtype": "Data",
+   "label": "Primary action label"
+  },
+  {
+   "fieldname": "primary_url",
+   "fieldtype": "Data",
+   "label": "Primary action URL"
+  },
+  {
+   "fieldname": "secondary_label",
+   "fieldtype": "Data",
+   "label": "Secondary action label"
+  },
+  {
+   "fieldname": "secondary_url",
+   "fieldtype": "Data",
+   "label": "Secondary action URL"
+  }
+ ]
+}

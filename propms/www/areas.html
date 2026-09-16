@@ -1,0 +1,16 @@
+{% extends "propms/templates/website_v2/base.html" %}
+{% block content %}
+<section class="v2-content-hero">
+  <p class="v2-content-kicker">Local coverage</p>
+  <h1>{{ page_title | e }}</h1>
+  <p>{{ hub_description | e }}</p>
+</section>
+<section class="v2-card-grid" aria-label="Published areas">
+  {% for item in items %}
+  <article class="v2-content-card">
+    {% if item.hero_image %}<img src="{{ item.hero_image | e }}" alt="{{ item.hero_image_alt | e }}" loading="lazy">{% endif %}
+    <div><h2><a href="/areas/{{ item.slug | e }}">{{ item[item_title_field] | e }}</a></h2><p>{{ item.region | e }}</p></div>
+  </article>
+  {% else %}<p>No areas have been published yet.</p>{% endfor %}
+</section>
+{% endblock %}

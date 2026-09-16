@@ -1,0 +1,25 @@
+.v2-property-page { padding-block: clamp(2.5rem, 6vw, 5rem); }
+.v2-property-page__header { max-width: 52rem; margin-bottom: 2rem; }
+.v2-property-page__header h1 { margin: 0; font-size: clamp(2.25rem, 6vw, 4.5rem); line-height: 1.05; }
+.v2-property-page__location { color: var(--brand-muted); font-size: 1.1rem; }
+.v2-property-gallery, .v2-property-copy, .v2-property-units { margin-top: 3rem; }
+.v2-property-gallery__grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .75rem; }
+.v2-property-gallery__item { min-height: 12rem; padding: 0; overflow: hidden; border: 1px solid var(--brand-border); border-radius: var(--radius-md); background: var(--brand-surface); cursor: zoom-in; }
+.v2-property-gallery__item img { width: 100%; height: 100%; min-height: 12rem; aspect-ratio: 4 / 3; object-fit: cover; }
+.v2-property-gallery__dialog { width: min(94vw, 72rem); padding: 3.5rem 4rem; border: 0; border-radius: var(--radius-md); background: #111; color: #fff; }
+.v2-property-gallery__dialog::backdrop { background: rgb(0 0 0 / 78%); }
+.v2-property-gallery__dialog img { width: 100%; max-height: 78vh; object-fit: contain; }
+.v2-property-gallery__close, .v2-property-gallery__previous, .v2-property-gallery__next { position: absolute; width: 2.75rem; height: 2.75rem; border: 1px solid rgb(255 255 255 / 55%); border-radius: 999px; background: rgb(0 0 0 / 55%); color: #fff; font-size: 1.6rem; cursor: pointer; }
+.v2-property-gallery__close { top: .6rem; right: .6rem; }
+.v2-property-gallery__previous, .v2-property-gallery__next { top: 50%; transform: translateY(-50%); }
+.v2-property-gallery__previous { left: .6rem; }
+.v2-property-gallery__next { right: .6rem; }
+.v2-property-copy { max-width: 52rem; }
+.v2-property-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; }
+.v2-property-card { padding: 1.25rem; border: 1px solid var(--brand-border); border-radius: var(--radius-md); background: var(--brand-surface); box-shadow: var(--shadow-sm); }
+.v2-property-card h2, .v2-property-card h3 { margin-top: 0; }
+.v2-property-card a { text-underline-offset: .2em; }
+@media (max-width: 47.999rem) {
+  .v2-property-gallery__grid, .v2-property-grid { grid-template-columns: 1fr; }
+  .v2-property-gallery__dialog { padding: 3.25rem .75rem; }
+}

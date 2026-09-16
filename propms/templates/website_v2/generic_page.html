@@ -1,0 +1,7 @@
+{% extends "propms/templates/website_v2/base.html" %}
+{% block content %}
+<article class="v2-generic-page">
+  <header class="v2-generic-page__header"><h1>{{ page_title | e }}</h1></header>
+  <div class="v2-generic-page__content">{{ generic_content | safe }}</div>
+</article>
+{% endblock %}

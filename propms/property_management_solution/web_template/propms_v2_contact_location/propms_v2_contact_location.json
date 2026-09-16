@@ -1,0 +1,88 @@
+{
+ "doctype": "Web Template",
+ "name": "PropMS V2 Contact Location",
+ "module": "Property Management Solution",
+ "standard": 1,
+ "type": "Section",
+ "template": "",
+ "fields": [
+  {
+   "fieldname": "section_id",
+   "fieldtype": "Data",
+   "label": "Section ID"
+  },
+  {
+   "fieldname": "theme",
+   "fieldtype": "Select",
+   "label": "Colour theme",
+   "options": "default\nprimary\nsecondary\nsoft\ndark\ninverse",
+   "default": "soft"
+  },
+  {
+   "fieldname": "variant",
+   "fieldtype": "Select",
+   "label": "Variant",
+   "options": "contact\nlocation\nsplit",
+   "default": "split"
+  },
+  {
+   "fieldname": "layout",
+   "fieldtype": "Select",
+   "label": "Contact layout",
+   "options": "cards-form-map\nmap-form\ncards-form\nform-only",
+   "default": "cards-form-map"
+  },
+  {
+   "fieldname": "title",
+   "fieldtype": "Data",
+   "label": "Title",
+   "reqd": 1
+  },
+  {
+   "fieldname": "description",
+   "fieldtype": "Small Text",
+   "label": "Description"
+  },
+  {
+   "fieldname": "email",
+   "fieldtype": "Data",
+   "label": "Email"
+  },
+  {
+   "fieldname": "phone",
+   "fieldtype": "Data",
+   "label": "Phone"
+  },
+  {
+   "fieldname": "address",
+   "fieldtype": "Small Text",
+   "label": "Address"
+  },
+  {
+   "fieldname": "map_url",
+   "fieldtype": "Data",
+   "label": "Map link URL"
+  },
+  {
+   "fieldname": "map_label",
+   "fieldtype": "Data",
+   "label": "Map link label"
+  },
+  {
+   "fieldname": "map_embed_url",
+   "fieldtype": "Small Text",
+   "label": "Map embed URL"
+  },
+  {
+   "fieldname": "show_form",
+   "fieldtype": "Check",
+   "label": "Show enquiry form",
+   "default": "0"
+  },
+  {
+   "fieldname": "query_options",
+   "fieldtype": "Small Text",
+   "label": "Enquiry subjects"
+  }
+ ]
+}

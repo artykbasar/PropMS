@@ -1,0 +1,50 @@
+/* Minimal Bootstrap-compatible grid used by the PropMS homepage. */
+.container {
+  --bs-gutter-x: 1.5rem;
+  width: 100%;
+  margin-right: auto;
+  margin-left: auto;
+  padding-right: calc(var(--bs-gutter-x) * .5);
+  padding-left: calc(var(--bs-gutter-x) * .5);
+}
+.row {
+  --bs-gutter-x: 1.5rem;
+  --bs-gutter-y: 0;
+  display: flex;
+  flex-wrap: wrap;
+  margin-top: calc(-1 * var(--bs-gutter-y));
+  margin-right: calc(-.5 * var(--bs-gutter-x));
+  margin-left: calc(-.5 * var(--bs-gutter-x));
+}
+.row > * {
+  flex-shrink: 0;
+  width: 100%;
+  max-width: 100%;
+  padding-right: calc(var(--bs-gutter-x) * .5);
+  padding-left: calc(var(--bs-gutter-x) * .5);
+  margin-top: var(--bs-gutter-y);
+}
+.col-6 { flex: 0 0 auto; width: 50%; }
+.order-1 { order: 1 !important; }
+.order-2 { order: 2 !important; }
+@media (min-width: 576px) {
+  .container { max-width: 540px; }
+  .col-sm-2 { flex: 0 0 auto; width: 16.666667%; }
+  .col-sm-6 { flex: 0 0 auto; width: 50%; }
+}
+@media (min-width: 768px) {
+  .container { max-width: 720px; }
+  .col-md-4 { flex: 0 0 auto; width: 33.333333%; }
+  .col-md-6 { flex: 0 0 auto; width: 50%; }
+}
+@media (min-width: 992px) {
+  .container { max-width: 960px; }
+  .col-lg-2 { flex: 0 0 auto; width: 16.666667%; }
+  .col-lg-3 { flex: 0 0 auto; width: 25%; }
+  .col-lg-4 { flex: 0 0 auto; width: 33.333333%; }
+  .col-lg-6 { flex: 0 0 auto; width: 50%; }
+  .order-lg-1 { order: 1 !important; }
+  .order-lg-2 { order: 2 !important; }
+}
+@media (min-width: 1200px) { .container { max-width: 1140px; } }
+@media (min-width: 1400px) { .container { max-width: 1320px; } }

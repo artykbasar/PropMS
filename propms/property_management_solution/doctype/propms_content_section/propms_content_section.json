@@ -1,0 +1,39 @@
+{
+  "actions": [],
+  "doctype": "DocType",
+  "editable_grid": 1,
+  "engine": "InnoDB",
+  "istable": 1,
+  "module": "Property Management Solution",
+  "name": "PropMS Content Section",
+  "fields": [
+    {
+      "fieldname": "heading",
+      "fieldtype": "Data",
+      "label": "Heading",
+      "reqd": 1
+    },
+    {
+      "fieldname": "body",
+      "fieldtype": "Text Editor",
+      "label": "Body",
+      "reqd": 1
+    },
+    {
+      "fieldname": "image",
+      "fieldtype": "Attach Image",
+      "label": "Image"
+    },
+    {
+      "fieldname": "image_alt",
+      "fieldtype": "Data",
+      "label": "Image Alt Text"
+    }
+  ],
+  "field_order": [
+    "heading",
+    "body",
+    "image",
+    "image_alt"
+  ]
+}

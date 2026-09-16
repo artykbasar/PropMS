@@ -1,0 +1,53 @@
+{
+ "__unsaved": 1,
+ "creation": "2023-06-28 23:14:08.437998",
+ "docstatus": 0,
+ "doctype": "Web Template",
+ "fields": [
+  {
+   "fieldname": "section_label",
+   "fieldtype": "Data",
+   "label": "section_label",
+   "reqd": 0
+  },
+  {
+   "fieldname": "section_description",
+   "fieldtype": "Small Text",
+   "label": "section_description",
+   "reqd": 0
+  },
+  {
+   "fieldname": "service_cards",
+   "fieldtype": "Table Break",
+   "label": "service_cards",
+   "reqd": 0
+  },
+  {
+   "fieldname": "box_icon",
+   "fieldtype": "Data",
+   "label": "box_icon",
+   "reqd": 0
+  },
+  {
+   "fieldname": "box_title",
+   "fieldtype": "Data",
+   "label": "box_title",
+   "reqd": 0
+  },
+  {
+   "fieldname": "box_description",
+   "fieldtype": "Small Text",
+   "label": "box_description",
+   "reqd": 0
+  }
+ ],
+ "idx": 0,
+ "modified": "2023-06-29 12:38:48.963888",
+ "modified_by": "Administrator",
+ "module": "Property Management Solution",
+ "name": "Services Day",
+ "owner": "Administrator",
+ "standard": 1,
+ "template": "",
+ "type": "Section"
+}

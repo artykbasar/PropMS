@@ -1,0 +1,272 @@
+{
+  "actions": [],
+  "autoname": "hash",
+  "doctype": "DocType",
+  "engine": "InnoDB",
+  "field_order": [
+    "content_section",
+    "area_name",
+    "slug",
+    "route",
+    "region",
+    "introduction",
+    "property_context",
+    "landlord_information",
+    "coverage",
+    "local_context",
+    "hero_image",
+    "hero_image_alt",
+    "local_media",
+    "local_media_alt",
+    "relationships_section",
+    "related_services",
+    "nearby_areas",
+    "optional_sections",
+    "cta_section",
+    "cta_title",
+    "cta_text",
+    "cta_label",
+    "cta_url",
+    "seo_section",
+    "seo_title",
+    "seo_description",
+    "canonical_url",
+    "social_image",
+    "publication_section",
+    "publication_status",
+    "published",
+    "index_state",
+    "approved_by",
+    "approved_on"
+  ],
+  "fields": [
+    {
+      "fieldname": "content_section",
+      "fieldtype": "Section Break",
+      "label": "Content"
+    },
+    {
+      "fieldname": "area_name",
+      "fieldtype": "Data",
+      "label": "Area Name",
+      "reqd": 1,
+      "in_list_view": 1
+    },
+    {
+      "fieldname": "slug",
+      "fieldtype": "Data",
+      "label": "Slug",
+      "reqd": 1,
+      "unique": 1,
+      "in_list_view": 1
+    },
+    {
+      "fieldname": "route",
+      "fieldtype": "Data",
+      "label": "Route",
+      "read_only": 1,
+      "unique": 1
+    },
+    {
+      "fieldname": "region",
+      "fieldtype": "Data",
+      "label": "Region"
+    },
+    {
+      "fieldname": "introduction",
+      "fieldtype": "Text Editor",
+      "label": "Introduction"
+    },
+    {
+      "fieldname": "property_context",
+      "fieldtype": "Text Editor",
+      "label": "Local Property Context"
+    },
+    {
+      "fieldname": "landlord_information",
+      "fieldtype": "Text Editor",
+      "label": "Landlord / Service Information"
+    },
+    {
+      "fieldname": "coverage",
+      "fieldtype": "Text Editor",
+      "label": "Coverage"
+    },
+    {
+      "fieldname": "local_context",
+      "fieldtype": "Text Editor",
+      "label": "Relevant Local Data / Context"
+    },
+    {
+      "fieldname": "hero_image",
+      "fieldtype": "Attach Image",
+      "label": "Hero Image"
+    },
+    {
+      "fieldname": "hero_image_alt",
+      "fieldtype": "Data",
+      "label": "Hero Image Alt Text"
+    },
+    {
+      "fieldname": "local_media",
+      "fieldtype": "Attach Image",
+      "label": "Local Media"
+    },
+    {
+      "fieldname": "local_media_alt",
+      "fieldtype": "Data",
+      "label": "Local Media Alt Text"
+    },
+    {
+      "fieldname": "relationships_section",
+      "fieldtype": "Section Break",
+      "label": "Relationships"
+    },
+    {
+      "fieldname": "related_services",
+      "fieldtype": "Table",
+      "label": "Related Services",
+      "options": "PropMS Service Link"
+    },
+    {
+      "fieldname": "nearby_areas",
+      "fieldtype": "Table",
+      "label": "Nearby Areas",
+      "options": "PropMS Area Link"
+    },
+    {
+      "fieldname": "optional_sections",
+      "fieldtype": "Table",
+      "label": "Optional Controlled Sections",
+      "options": "PropMS Content Section"
+    },
+    {
+      "fieldname": "cta_section",
+      "fieldtype": "Section Break",
+      "label": "Call to Action"
+    },
+    {
+      "fieldname": "cta_title",
+      "fieldtype": "Data",
+      "label": "CTA Title"
+    },
+    {
+      "fieldname": "cta_text",
+      "fieldtype": "Small Text",
+      "label": "CTA Text"
+    },
+    {
+      "fieldname": "cta_label",
+      "fieldtype": "Data",
+      "label": "CTA Button Label"
+    },
+    {
+      "fieldname": "cta_url",
+      "fieldtype": "Data",
+      "label": "CTA URL"
+    },
+    {
+      "fieldname": "seo_section",
+      "fieldtype": "Section Break",
+      "label": "SEO"
+    },
+    {
+      "fieldname": "seo_title",
+      "fieldtype": "Data",
+      "label": "SEO Title"
+    },
+    {
+      "fieldname": "seo_description",
+      "fieldtype": "Small Text",
+      "label": "SEO Description"
+    },
+    {
+      "fieldname": "canonical_url",
+      "fieldtype": "Data",
+      "label": "Canonical URL",
+      "description": "Leave empty to use the generated self-canonical URL."
+    },
+    {
+      "fieldname": "social_image",
+      "fieldtype": "Attach Image",
+      "label": "Social Image"
+    },
+    {
+      "fieldname": "publication_section",
+      "fieldtype": "Section Break",
+      "label": "Publication"
+    },
+    {
+      "fieldname": "publication_status",
+      "fieldtype": "Select",
+      "label": "Publication Status",
+      "options": "Draft\nApproved",
+      "default": "Draft",
+      "read_only": 1,
+      "in_list_view": 1
+    },
+    {
+      "fieldname": "published",
+      "fieldtype": "Check",
+      "label": "Published",
+      "default": "0",
+      "read_only": 1,
+      "in_list_view": 1
+    },
+    {
+      "fieldname": "index_state",
+      "fieldtype": "Select",
+      "label": "Index State",
+      "options": "noindex\nindex",
+      "default": "noindex",
+      "read_only": 1
+    },
+    {
+      "fieldname": "approved_by",
+      "fieldtype": "Link",
+      "label": "Approved By",
+      "options": "User",
+      "read_only": 1
+    },
+    {
+      "fieldname": "approved_on",
+      "fieldtype": "Datetime",
+      "label": "Approved On",
+      "read_only": 1
+    }
+  ],
+  "index_web_pages_for_search": 1,
+  "links": [],
+  "module": "Property Management Solution",
+  "name": "PropMS Area",
+  "permissions": [
+    {
+      "create": 1,
+      "read": 1,
+      "report": 1,
+      "write": 1,
+      "delete": 1,
+      "role": "System Manager"
+    },
+    {
+      "create": 1,
+      "read": 1,
+      "report": 1,
+      "write": 1,
+      "role": "Website Manager"
+    },
+    {
+      "create": 1,
+      "read": 1,
+      "report": 1,
+      "write": 1,
+      "role": "Website Publisher"
+    }
+  ],
+  "sort_field": "modified",
+  "sort_order": "DESC",
+  "track_changes": 1,
+  "title_field": "area_name",
+  "is_published_field": "published",
+  "allow_guest_to_view": 1
+}

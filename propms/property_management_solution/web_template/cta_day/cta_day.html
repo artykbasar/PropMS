@@ -1,0 +1,27 @@
+<!-- ======= Cta Section ======= -->
+    <section id="cta" class="cta">
+      <div class="container" data-aos="zoom-in">
+
+        <div class="text-center">
+            {%- if title -%}
+                <h3>{{ _(title) }}</h3>
+            {%- endif -%}
+            {%- if description -%}
+                <p>{{ _(description) }}</p>
+            {%- endif -%}
+          
+            <a class="cta-btn" href="
+                {%- if button_link -%}
+                    {{ button_link }}
+                {%- else -%}
+                    #
+                {%- endif -%}
+            ">
+                {%- if button_label -%}
+                    {{ _(button_label) }}
+                {%- endif -%}
+            </a>
+        </div>
+
+      </div>
+    </section><!-- End Cta Section -->

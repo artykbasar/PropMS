@@ -1,0 +1,36 @@
+<footer class="v2-footer">
+  {% if footer_details %}
+  <div class="v2-container v2-footer__legacy{% if footer_newsletter_enabled %} v2-footer__legacy--newsletter{% endif %}">
+    <section class="v2-footer__contact-card" aria-label="Contact details">
+      {% if footer_logo %}<img class="v2-footer__logo" src="{{ footer_logo | e }}" alt="{{ footer_details.brand | e }}">{% endif %}
+      <h2>{{ footer_details.brand | e }}</h2>
+      {% if footer_details.address %}<p>{{ footer_details.address | e }}</p>{% endif %}
+      <p>{% if footer_details.phone %}<strong>Phone:</strong> <a href="tel:{{ footer_details.phone | replace(' ', '') | e }}">{{ footer_details.phone | e }}</a>{% endif %}
+      {% if footer_details.phone and footer_details.email %}<br>{% endif %}
+      {% if footer_details.email %}<strong>Email:</strong> <a href="mailto:{{ footer_details.email | e }}">{{ footer_details.email | e }}</a>{% endif %}</p>
+      {% if footer_social or top_bar_social %}
+      <div class="v2-footer__social" aria-label="Social links">
+        {% for item in footer_social or top_bar_social %}<a href="{{ item.href | e }}" aria-label="{{ item.label | e }}"><span aria-hidden="true">{{ item.label[0] | e }}</span></a>{% endfor %}
+      </div>{% endif %}
+    </section>
+    <nav class="v2-footer__links" aria-label="Footer navigation">
+      {% for group in footer_groups or [] %}
+      <section class="v2-footer__link-group"><h2>{{ group.label | e }}</h2>
+        {% for item in group["items"] %}<a href="{{ item.href | e }}"{% if item.open_in_new_tab %} target="_blank" rel="noopener noreferrer"{% endif %}>{{ item.label | e }}</a>{% endfor %}
+      </section>
+      {% else %}<section class="v2-footer__link-group"><h2>Useful Links</h2>{% for item in footer_navigation or [] %}<a href="{{ item.href | e }}">{{ item.label | e }}</a>{% endfor %}</section>{% endfor %}
+    </nav>
+    {% if footer_newsletter_enabled %}
+    <form class="v2-footer__newsletter" novalidate>
+      <label class="v2-field-label" for="footer-subscribe-email">Email updates</label>
+      <div class="v2-footer__newsletter-row"><input id="footer-subscribe-email" type="email" name="email" placeholder="Your email address..." autocomplete="email" required><button id="footer-subscribe-button" type="submit">Get Updates</button></div>
+      <p id="footer-subscribe-status" role="status" aria-live="polite"></p>
+    </form>{% endif %}
+  </div>
+  <div class="v2-container v2-footer__copyright">Copyright &copy; {% if footer_copyright_text %}{{ footer_copyright_text | e }}{% else %}{{ frappe.utils.now_datetime().year }} {{ (footer_copyright_brand or footer_details.brand) | e }}{% endif %}{% if footer_powered %}<span class="v2-footer__powered">{{ footer_powered | e }}</span>{% endif %}</div>
+  {% else %}
+  <div class="v2-container v2-footer__inner"><p>&copy; {{ frappe.utils.now_datetime().year }} {{ shell.brand_name }}</p><nav aria-label="Footer navigation">
+    {% if footer_navigation %}{% for item in footer_navigation %}<a href="{{ item.href | e }}">{{ item.label | e }}</a>{% endfor %}{% else %}<a href="{{ website_home_href or '/' }}">Home</a><a href="/login">Login</a>{% endif %}
+  </nav></div>
+  {% endif %}
+</footer>

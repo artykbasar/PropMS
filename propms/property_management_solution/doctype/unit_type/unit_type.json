@@ -1,0 +1,199 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "field:unit_type",
+ "creation": "2018-04-18 23:21:56.307232",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "unit_type",
+  "column_break_baiq",
+  "room",
+  "bedroom",
+  "balcony",
+  "showerbath",
+  "toilet",
+  "column_break_slfs",
+  "development_project",
+  "rentable",
+  "rented",
+  "for_sale",
+  "new_development"
+ ],
+ "fields": [
+  {
+   "allow_in_quick_entry": 1,
+   "columns": 4,
+   "fieldname": "unit_type",
+   "fieldtype": "Data",
+   "label": "Unit Type",
+   "translatable": 1,
+   "unique": 1
+  },
+  {
+   "fieldname": "column_break_baiq",
+   "fieldtype": "Section Break"
+  },
+  {
+   "allow_in_quick_entry": 1,
+   "default": "0",
+   "depends_on": "eval: doc.unit_type != \"\" && doc.unit_type != undefined && doc.development_project == 0",
+   "description": "Tick it, if this unit is a room of a property.",
+   "fieldname": "room",
+   "fieldtype": "Check",
+   "hidden": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Room"
+  },
+  {
+   "fieldname": "column_break_slfs",
+   "fieldtype": "Column Break"
+  },
+  {
+   "allow_in_quick_entry": 1,
+   "bold": 1,
+   "default": "0",
+   "depends_on": "eval: doc.unit_type != \"\" && doc.unit_type != undefined && doc.development_project == 0",
+   "description": "Tick it, if this unit is rentable.",
+   "fieldname": "rentable",
+   "fieldtype": "Check",
+   "hidden": 1,
+   "label": "Rentable"
+  },
+  {
+   "allow_in_quick_entry": 1,
+   "bold": 1,
+   "default": "0",
+   "depends_on": "eval: doc.room == 1",
+   "description": "Tick this if only this room has the access to the balcony!",
+   "fieldname": "balcony",
+   "fieldtype": "Check",
+   "hidden": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Balcony"
+  },
+  {
+   "allow_in_quick_entry": 1,
+   "bold": 1,
+   "default": "0",
+   "depends_on": "eval: doc.room == 1",
+   "description": "Tick this if only this room has the access to the shower/bath!",
+   "fieldname": "showerbath",
+   "fieldtype": "Check",
+   "hidden": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Shower/Bath"
+  },
+  {
+   "allow_in_quick_entry": 1,
+   "bold": 1,
+   "default": "0",
+   "depends_on": "eval: doc.room == 1",
+   "description": "Tick this if only this room has the access to the toilet!",
+   "fieldname": "toilet",
+   "fieldtype": "Check",
+   "hidden": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Toilet"
+  },
+  {
+   "allow_in_quick_entry": 1,
+   "bold": 1,
+   "default": "0",
+   "depends_on": "eval: doc.unit_type != \"\" && doc.unit_type != undefined && doc.development_project == 0",
+   "description": "Tick it, if this unit is being rented from a landlord/landlady.",
+   "fieldname": "rented",
+   "fieldtype": "Check",
+   "hidden": 1,
+   "label": "Rented"
+  },
+  {
+   "allow_in_quick_entry": 1,
+   "bold": 1,
+   "default": "0",
+   "depends_on": "eval: doc.unit_type != \"\" && doc.unit_type != undefined && doc.development_project == 0",
+   "description": "Tick it, if this unit is for Sale",
+   "fieldname": "for_sale",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "For Sale"
+  },
+  {
+   "allow_in_quick_entry": 1,
+   "bold": 1,
+   "default": "0",
+   "depends_on": "eval: doc.for_sale == 1",
+   "description": "Tick it, if this unit is New Development",
+   "fieldname": "new_development",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "New Development"
+  },
+  {
+   "bold": 1,
+   "default": "0",
+   "depends_on": "eval: doc.unit_type != \"\" && doc.unit_type != undefined",
+   "description": "Tick it, if this unit is Development Project.",
+   "fieldname": "development_project",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Development Project"
+  },
+  {
+   "allow_in_quick_entry": 1,
+   "default": "0",
+   "depends_on": "eval: doc.room == 1",
+   "description": "Tick this if the room is a bedroom",
+   "fieldname": "bedroom",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Bedroom"
+  }
+ ],
+ "links": [],
+ "modified": "2024-12-02 15:09:23.270002",
+ "modified_by": "Administrator",
+ "module": "Property Management Solution",
+ "name": "Unit Type",
+ "naming_rule": "By fieldname",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Property Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

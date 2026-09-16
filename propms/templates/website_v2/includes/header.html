@@ -1,0 +1,33 @@
+{% macro nav_link(item, class_name='') -%}
+<a{% if class_name %} class="{{ class_name }}"{% endif %} href="{{ item.href | e }}"{% if item.open_in_new_tab %} target="_blank" rel="noopener noreferrer"{% endif %}>{{ item.label | e }}</a>
+{%- endmacro %}
+<header class="v2-header">
+  <div class="v2-container v2-header__inner">
+    <a class="v2-brand" href="{{ website_home_href or '/' }}" aria-label="{{ shell.brand_name }} home">
+      {% if home_logo_layers %}
+      <span class="v2-brand__layers" aria-hidden="true">
+        {% for logo in home_logo_layers %}<img src="{{ logo | e }}" alt="" class="v2-brand__layer v2-brand__layer--{{ loop.index }}">{% endfor %}
+        <img src="{{ home_logo_url | e }}" alt="" class="v2-brand__layer v2-brand__layer--full">
+      </span>
+      {% elif home_logo_url or shell.logo_url %}
+      <img src="{{ (home_logo_url or shell.logo_url) | e }}" alt="" class="v2-brand__logo">
+      {% else %}<span class="v2-brand__text">{{ shell.brand_name }}</span>{% endif %}
+    </a>
+    <button class="v2-nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" hidden>
+      <span class="v2-nav-toggle__label">Menu</span><span class="v2-nav-toggle__icon" aria-hidden="true"></span>
+    </button>
+    <nav class="v2-nav" id="primary-navigation" aria-label="Primary navigation">
+      {% for item in primary_navigation or [] %}
+        {% if item.children %}
+        <details class="v2-nav__group"><summary>{{ item.label | e }}</summary><div class="v2-nav__submenu">
+          {% for child in item.children %}{{ nav_link(child) }}{% endfor %}
+        </div></details>
+        {% else %}{{ nav_link(item) }}{% endif %}
+      {% else %}<a href="{{ website_home_href or '/' }}">Home</a><a href="/login">Login</a>{% endfor %}
+      {% if navbar_search %}
+      <form class="v2-nav-search" action="/search" method="get" role="search"><label class="v2-visually-hidden" for="v2-nav-search">Search</label><input id="v2-nav-search" name="q" type="search" placeholder="Search..."></form>
+      {% endif %}
+      {% if navbar_call_to_action %}{{ nav_link(navbar_call_to_action, 'v2-nav__cta') }}{% endif %}
+    </nav>
+  </div>
+</header>

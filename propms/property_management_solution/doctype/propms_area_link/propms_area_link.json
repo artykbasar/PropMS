@@ -1,0 +1,21 @@
+{
+  "actions": [],
+  "doctype": "DocType",
+  "editable_grid": 1,
+  "engine": "InnoDB",
+  "istable": 1,
+  "module": "Property Management Solution",
+  "name": "PropMS Area Link",
+  "fields": [
+    {
+      "fieldname": "area",
+      "fieldtype": "Link",
+      "label": "Area",
+      "options": "PropMS Area",
+      "reqd": 1
+    }
+  ],
+  "field_order": [
+    "area"
+  ]
+}

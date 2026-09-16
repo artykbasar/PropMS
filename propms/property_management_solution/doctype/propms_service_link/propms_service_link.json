@@ -1,0 +1,21 @@
+{
+  "actions": [],
+  "doctype": "DocType",
+  "editable_grid": 1,
+  "engine": "InnoDB",
+  "istable": 1,
+  "module": "Property Management Solution",
+  "name": "PropMS Service Link",
+  "fields": [
+    {
+      "fieldname": "service",
+      "fieldtype": "Link",
+      "label": "Service",
+      "options": "PropMS Service",
+      "reqd": 1
+    }
+  ],
+  "field_order": [
+    "service"
+  ]
+}

@@ -1,0 +1,77 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "field:development_name",
+ "creation": "2024-11-05 19:12:16.548116",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "development_name",
+  "location",
+  "description",
+  "images",
+  "bullet_points"
+ ],
+ "fields": [
+  {
+   "fieldname": "development_name",
+   "fieldtype": "Data",
+   "in_global_search": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Development Name",
+   "length": 250,
+   "not_nullable": 1,
+   "reqd": 1,
+   "unique": 1
+  },
+  {
+   "fieldname": "location",
+   "fieldtype": "Data",
+   "label": "Location",
+   "length": 140
+  },
+  {
+   "fieldname": "description",
+   "fieldtype": "Text",
+   "label": "Description"
+  },
+  {
+   "fieldname": "images",
+   "fieldtype": "Table",
+   "label": "Images",
+   "options": "New Development Images"
+  },
+  {
+   "fieldname": "bullet_points",
+   "fieldtype": "Table",
+   "label": "Bullet Points",
+   "options": "New Development Bullet Points"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2024-11-05 20:22:10.764795",
+ "modified_by": "Administrator",
+ "module": "Property Management Solution",
+ "name": "New Development",
+ "naming_rule": "By fieldname",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}
