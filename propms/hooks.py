@@ -84,7 +84,10 @@ after_request = [
 
 # before_install = "propms.install.before_install"
 # after_install = "propms.install.after_install"
-after_migrate = "propms.website_theme_assets.prepare_v2_theme_assets"
+after_migrate = [
+    "propms.website_theme_assets.prepare_v2_theme_assets",
+    "propms.uom_conversions.sync_week_conversions",
+]
 
 # Desk Notifications
 # ------------------
@@ -193,18 +196,6 @@ fixtures = [
                     "2 Weeks",
                     "1 Week"
 
-                )
-            ]
-        ]
-    },
-    {
-        "doctype": "UOM Conversion Factor",
-        "filters": [
-            [
-                "from_uom",
-                "in",
-                (
-                    "Week"
                 )
             ]
         ]
