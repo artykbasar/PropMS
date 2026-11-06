@@ -13,7 +13,7 @@ def sync_week_conversions():
     import frappe
 
     rows = json.loads(
-        (Path(__file__).parent / "fixtures" / "uom_conversion_factor.json").read_text(
+        (Path(__file__).parent / "data" / "uom_conversion_factor.json").read_text(
             encoding="utf-8"
         )
     )

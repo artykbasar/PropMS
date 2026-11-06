@@ -50,7 +50,7 @@ class UOMConversionTests(unittest.TestCase):
     def setUpClass(cls):
         cls.root = Path(__file__).resolve().parent
         cls.fixture = json.loads(
-            (cls.root / "fixtures" / "uom_conversion_factor.json").read_text()
+            (cls.root / "data" / "uom_conversion_factor.json").read_text()
         )
 
     def invoke(self, frappe):
@@ -71,6 +71,11 @@ class UOMConversionTests(unittest.TestCase):
             )
             self.assertNotIn(key, identity)
             identity.add(key)
+
+    def test_frappe17_fixture_directory_has_no_uom_conversion_file(self):
+        self.assertFalse(
+            (self.root / "fixtures" / "uom_conversion_factor.json").exists()
+        )
 
     def test_hooks_preserve_theme_and_disable_unsafe_fixture(self):
         hooks = (self.root / "hooks.py").read_text()
